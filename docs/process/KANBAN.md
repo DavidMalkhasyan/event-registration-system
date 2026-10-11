@@ -49,6 +49,7 @@
 
 | Card | Milestone | Awaiting |
 |---|---|---|
+| K-304c Event cancellation (FR-EVT-9, BR-16, BR-23, TX-E05, AC-18, AC-19, AC-59; D1–D7) | M3 | Done on `feature/k-304c-event-cancellation` (`7575432` server and tests, `44b453e` UI and E2E): 20 integration tests (AC-18 and BR-23 in forced orders, 4-round races), 2 E2E tests, mutation checks. [PR #5](https://github.com/DavidMalkhasyan/event-registration-system/pull/5) CI [run 38162451724](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38162451724) passed (73/73, 5/5, 9/9). **Awaiting:** merge into `dev`; Done is recorded after the merge. |
 | K-001 Apply R60; synchronize the documents | M0 | Stakeholder check (commit `3fe9cb7`) |
 | K-004 Process documentation | M0 | Stakeholder review |
 
@@ -56,7 +57,6 @@
 
 | Card | Milestone | State |
 |---|---|---|
-| K-304c Event cancellation (FR-EVT-9, BR-16, BR-23, TX-E05, AC-18, AC-19, AC-59) | M3 | **In progress** on `feature/k-304c-event-cancellation`; stakeholder decisions D1–D7 (PD-36 to PD-42) |
 | K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Updated in S-07 |
 
 ## To Do
@@ -64,13 +64,13 @@
 | Card | Milestone | Notes |
 |---|---|---|
 | K-604 Release tag and submission | M6 | The secret scan was done in S-03. Tagging and submitting are the owner's actions. |
-| K-304d Event deletion (FR-EVT-10, 11, 13, 14) | M3 | Largest part: eligibility checks in the deletion transaction, a deletion marker, audit survival |
+| K-304d Event deletion (FR-EVT-10, 11, 13, 14; TX-E06; API #37, #38) | M3 | **Next.** Needs migration `0004` (`deletion_markers`), the `K_preview` secret (ADR-010 §7) and the stateless preview token (API_DESIGN §7.4). Without webhooks (P2) no provider facts exist, so the marker's counts use send states only. |
 
 ## Partly done (remaining parts are in Backlog or Deferred)
 
 | Card | Done | Remaining |
 |---|---|---|
-| K-304 Event lifecycle | Idempotent create; reschedule with notification (P0 #1, #14); capacity change (K-304a) and title and description edit (K-304b), both done in `dev` | Cancel, delete: see To Do |
+| K-304 Event lifecycle | Idempotent create; reschedule (P0 #1, #14); capacity change (K-304a), title and description edit (K-304b), both done in `dev`; cancellation (K-304c, in Review) | Deletion: K-304d |
 | K-306 Check-in | Check-in with replay, window and outcomes (P0 #9, #10) | Undo |
 | K-401 Messaging | Outbox claim, fenced send, reaper, sweeps, pre-claim counter | Budget, pause, render-time re-check |
 | K-403 Notifications | 9 of 17 message types | The rest, with their features |

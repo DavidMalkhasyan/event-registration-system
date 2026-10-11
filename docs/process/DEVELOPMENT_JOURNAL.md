@@ -410,3 +410,52 @@
 | *(closing commit)* | after 20:05 | docs: record K-302b. Pushed to PR #4. |
 
 **Next:** merge PR #4 into `dev` once its final CI run is green; record K-302b as Done at the start of the next branch; K-304c after the stakeholder reviews its plan.
+
+---
+
+## S-08: K-304c Event cancellation
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-11 21:51:25 +04:00 |
+| **End** | 2026-10-11, at the closing documentation commit on `feature/k-304c-event-cancellation`. The activity table ends at 22:10. |
+| **Cards** | K-302b (Review → Done), K-304c (To Do → In Progress → Review), K-304d (readiness check) |
+| **Tools and model** | Claude Code 2.1.296, model `claude-opus-5-5`; GitHub CLI 2.101.0; the S-02 toolchain |
+| **Significant prompt** | "K-304c EVENT CANCELLATION — DECISIONS APPROVED", D1–D7 (PD-36 to PD-42). Implement per FR-EVT-9, FR-EVT-11, FR-ORG-5, BR-16, BR-18, BR-23, FR-LNK-6, FR-SHR-4, AC-18, AC-19, AC-59, AC-149 and TX-E05; 21 listed integration cases with deterministic concurrency; browser tests; a pull request into `dev`; then K-304d if its requirements are sufficiently resolved. |
+
+**Activity:**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 21:51:25 | `feature/k-304c-event-cancellation` from `origin/dev` (`88399fd`); read BR-18, BR-23, FR-EVT-11, FR-STAFF-4 | — |
+| 21:51–21:54 | Read the dispatcher (claim under the shared event lock; freshness → `DROPPED`, or `UNCONFIRMED` when possibly accepted; ambiguous failure → `WAITING_RETRY` with `possibly_accepted`), the check-in outcome order (`EVENT_CANCELLED` before the window check), and the management, share and verification paths | D1 holds on every link path: status and event status are re-checked, under the lock for actions |
+| 21:53:02 | Commit | `b3379f5` docs(process): K-302b Done; decisions D1–D7; K-406 dependency |
+| 21:53–21:54 | `cancelEvent` (TX-E05), `confirmedActionSchema`, `eventCancellationPerAccount` rule, route, `event_cancellation` handler; `reauthenticate` harness helper | Typecheck and lint pass |
+| 21:56:13 | `cancellation.test.ts` (20 tests) | **19 passed, 1 failed.** The failure was in the test: it asserted `DROPPED` on every verification message, including those delivered during setup. The test was fixed to snapshot exactly the messages queued at cancellation time. |
+| 21:56:50 | Rerun three times | 20/20, 20/20, 20/20 |
+| 21:58:01 | Mutation checks | No recent-auth check → 2 tests fail; no idempotent short-circuit → 2 fail; no rate limit → 1 fails. "Change email without the status check" **survived**: its freshness also checks the schedule version, which cancellation bumps, so it was not a real weakening. |
+| 21:59:19 | Stronger freshness mutations | Change email always fresh → 2 tests fail; registration messages always fresh → 4 fail. Sources restored. |
+| 22:01:06 | Server suite **73/73**; commit | `7575432` feat(events): event cancellation (K-304c) |
+| 22:01–22:02 | UI: "Cancel event" card, CANCELLED banners (organizer and public); `cancellation.spec.ts` | Client typecheck and lint pass |
+| 22:02:27–22:06:36 | Full suite | `format:check`, `lint`, `typecheck`, `test` (server 73/73, client 5/5) and `build` exit 0; **E2E 9/9 three times**. Commit `44b453e`. |
+| 22:06:53 | Pushed; [PR #5](https://github.com/DavidMalkhasyan/event-registration-system/pull/5), `dev` ← `feature/k-304c-event-cancellation` | CI [run 38162451724](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38162451724) **passed** in 2 min 27 s: 3 migrations; 73/73, 5/5, 9/9 |
+| 22:07–22:10 | K-304d readiness check: FR-EVT-10, 13, 14, TX-E06, API #37 and #38, API_DESIGN §7.4, `deletion_markers`, BR-26, BR-29, AC-86 to AC-88, AC-97, AC-98, AC-100, AC-184 | Requirements and design are specified, and no open product or security decision was found. Implementation needs migration `0004`, the `K_preview` secret, and send-state-only counting (no provider facts without webhooks). |
+
+**Concurrency results:**
+- **AC-18 (claim vs. cancellation), forced with a gated provider:**
+  - cancellation first: all 4 queued messages `DROPPED`;
+  - claim first: both claimed change emails `ACCEPTED` (EC-20);
+  - possibly accepted messages end `UNCONFIRMED`.
+- **BR-23 (participant cancellation vs. event cancellation):** both orders forced, and 4 simultaneous rounds each produced exactly one of the two outcomes.
+- **Other races, 4 rounds each:** verification, capacity increase, and two simultaneous cancellations; all invariants held.
+
+**Commits in S-08:**
+
+| Hash | Time (+04:00) | Message |
+|---|---|---|
+| `55943cc` | 20:06:18 | docs: record K-302b … S-07's closing commit |
+| `88399fd` | 20:08:53 (GitHub) | Merge K-302b: re-authentication for protected actions (#4) |
+| `b3379f5` | 21:53:02 | docs(process): K-302b Done; K-304c decisions D1–D7; K-406 dependency |
+| `7575432` | 22:01:06 | feat(events): event cancellation (K-304c) |
+| `44b453e` | 22:06:36 | feat(client): cancel an event from the dashboard (K-304c) |
+| *(closing commit)* | after 22:10 | docs: record K-304c. Pushed to PR #5. |
