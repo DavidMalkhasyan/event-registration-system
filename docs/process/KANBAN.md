@@ -46,6 +46,7 @@
 
 | Card | Milestone | Awaiting |
 |---|---|---|
+| K-304a Capacity change (FR-EVT-7, FR-EVT-8, TX-E03, AC-13 to AC-15) | M3 | Done on `feature/k-304a-capacity` (`f6024e3` backend and tests, `c4f5733` UI and E2E): 8 integration tests (3 concurrency), 1 E2E test, mutation checks; locally 35/35, 3/3, 5/5. **Awaiting:** the pull-request review and merge into `dev` (PD-29). |
 | K-001 Apply R60; synchronize the documents | M0 | Stakeholder check (commit `3fe9cb7`) |
 | K-004 Process documentation | M0 | Stakeholder review |
 
@@ -53,15 +54,14 @@
 
 | Card | Milestone | State |
 |---|---|---|
-| K-304a Capacity change (FR-EVT-7, FR-EVT-8, TX-E03, AC-13 to AC-15) | M3 | **In progress** on `feature/k-304a-capacity`. An increase promotes FIFO before the cutoff in the same transaction; a decrease is never below the confirmed count, and the error names the minimum. Needs concurrency tests against cancellation and verification. |
-| K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Updated in S-04 |
+| K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Updated in S-05 |
 
 ## To Do
 
 | Card | Milestone | Notes |
 |---|---|---|
 | K-604 Release tag and submission | M6 | The secret scan was done in S-03. Tagging and submitting are the owner's actions. |
-| K-304b Title and description edit (FR-EVT-5) | M3 | No emails |
+| K-304b Title and description edit (FR-EVT-5) | M3 | **Next.** No emails. |
 | K-304c Event cancellation (FR-EVT-9, BR-16, TX-E05) | M3 | **Dependency:** FR-EVT-9 requires recent authentication (FR-ORG-5), which is not implemented. Needs a decision before starting: implement re-authentication, or record a deviation. |
 | K-304d Event deletion (FR-EVT-10, 11, 13, 14) | M3 | Largest part: eligibility checks in the deletion transaction, a deletion marker, audit survival |
 
@@ -69,7 +69,7 @@
 
 | Card | Done | Remaining |
 |---|---|---|
-| K-304 Event lifecycle | Idempotent create; reschedule with notification (P0 #1, #14) | Capacity change, title and description edit, cancel, delete: see To Do |
+| K-304 Event lifecycle | Idempotent create; reschedule with notification (P0 #1, #14); capacity change (K-304a, in Review) | Title and description edit, cancel, delete: see To Do |
 | K-306 Check-in | Check-in with replay, window and outcomes (P0 #9, #10) | Undo |
 | K-401 Messaging | Outbox claim, fenced send, reaper, sweeps, pre-claim counter | Budget, pause, render-time re-check |
 | K-403 Notifications | 9 of 17 message types | The rest, with their features |
