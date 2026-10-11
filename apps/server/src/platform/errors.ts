@@ -23,6 +23,8 @@ export type ProblemCode =
   | 'rotation_not_applied'
   | 'resend_limit'
   | 'rotation_limit'
+  | 'invitation_not_pending'
+  | 'check_in_window_ended'
   | 'schedule_version_mismatch'
   | 'nonexistent_local_time'
   | 'ambiguous_local_time'
@@ -58,6 +60,8 @@ const TITLES: Record<ProblemCode, string> = {
   rotation_not_applied: 'Your link was not changed. Your current link still works. Please try again.',
   resend_limit: 'Too many ticket emails were requested. Please try again later.',
   rotation_limit: 'Too many link replacements. Please try again later.',
+  invitation_not_pending: 'This invitation is no longer pending',
+  check_in_window_ended: 'The check-in window of this event has ended',
   schedule_version_mismatch: 'The event was changed by another request; reload and try again',
   nonexistent_local_time: 'This local time does not exist in the time zone',
   ambiguous_local_time: 'This local time is ambiguous in the time zone',

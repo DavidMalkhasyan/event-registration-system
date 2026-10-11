@@ -3,6 +3,7 @@ import type { AppContext } from '../../composition/context.js';
 import { hashToken, hmac, safeEqual } from '../../platform/crypto.js';
 import { AppError } from '../../platform/errors.js';
 import { decisionTime, type Tx } from '../../platform/tx.js';
+import { STAFF_COOKIE, resolveStaff } from './staff-sessions.js';
 
 // FR-ORG-4, ADR-010 §3 and §5.
 export const ORG_COOKIE = '__Host-ers_org';
@@ -76,7 +77,12 @@ export async function requireOrganizer(
   options: { csrf: boolean },
 ): Promise<OrganizerPrincipal> {
   const principal = await resolveOrganizer(ctx, request);
-  if (!principal) throw new AppError(401, 'unauthenticated');
+  if (!principal) {
+    // API_DESIGN §5.1 (AC-26, AC-151): a staff-only caller is authenticated, but not allowed here.
+    if (request.cookies[STAFF_COOKIE] && (await resolveStaff(ctx, request)))
+      throw new AppError(403, 'forbidden');
+    throw new AppError(401, 'unauthenticated');
+  }
   if (options.csrf) {
     const header = request.headers['x-csrf-token'];
     const expected = csrfTokenFor(ctx.config.CSRF_SECRET, 'org', principal.sessionId);

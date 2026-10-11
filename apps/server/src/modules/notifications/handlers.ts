@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import type { Database } from '../../platform/db.js';
-import { cutoffOf } from '../../platform/time.js';
+import { checkInWindow, cutoffOf } from '../../platform/time.js';
 import type { Tx } from '../../platform/tx.js';
 import { issueToken } from '../access-tokens/tokens.js';
 
@@ -14,6 +14,7 @@ export interface OutboxRow {
   registration_id: string | null;
   sign_in_request_id: string | null;
   verification_generation: number | null;
+  request_ref?: string | null;
   schedule_version?: number | null;
   recipient_email: string;
   payload: Record<string, unknown>;
@@ -358,6 +359,46 @@ const waitlistClosed: MessageHandler = {
   },
 };
 
+const staffInvitation: MessageHandler = {
+  // §4.9 "Staff invitation": invitation still pending and unexpired, event SCHEDULED, window open (PD-54).
+  async freshness(trx, msg, now) {
+    const invitation = await trx
+      .selectFrom('app.staff_invitations as i')
+      .innerJoin('app.events as e', 'e.id', 'i.event_id')
+      .select(['i.status', 'i.expires_at', 'e.status as event_status', 'e.starts_at'])
+      .where('i.id', '=', msg.request_ref!)
+      .executeTakeFirst();
+    const fresh =
+      invitation?.status === 'pending' &&
+      now < invitation.expires_at &&
+      invitation.event_status === 'SCHEDULED' &&
+      now <= checkInWindow(invitation.starts_at).closes;
+    return fresh ? { fresh: true } : { fresh: false, reason: 'obsolete' };
+  },
+  async issueTokens(trx, msg, now, attemptNo) {
+    // FR-STAFF-1: invitation tokens are hash-only and issued at send time.
+    const t = await issueToken(trx, {
+      type: 'staff_invitation',
+      now,
+      staffInvitationId: msg.request_ref!,
+      eventId: msg.event_id!,
+      via: 'email',
+      outboxMessageId: msg.id,
+      attemptNo,
+    });
+    return { invite: t };
+  },
+  async render(db, msg, tokens, origin) {
+    const event = (await eventOf(db, msg.event_id!))!;
+    return email(`You are invited to help with check-in: ${event.title}`, [
+      `You have been invited to check in participants at "${event.title}" on ${localTime(event.starts_at, event.time_zone)}.`,
+      'Open the link on the device you will use at the entrance and press "Accept". Opening the link alone does not give access.',
+      { label: 'Open the invitation', link: `${origin}/invite#t=${tokens.invite}` },
+      'The link works once and expires 7 days after it was sent. Whoever accepts it first gets check-in access, so do not forward it. Access ends when the check-in window closes or the organizer revokes it.',
+    ]);
+  },
+};
+
 const ticketResend: MessageHandler = {
   // §4.9 "Ticket resend": still CONFIRMED, event not cancelled; management and share links issued at send time.
   ...registrationMessage('CONFIRMED', true),
@@ -445,5 +486,6 @@ export const HANDLERS: Record<string, MessageHandler> = {
   registration_cancelled: registrationCancelled,
   event_cancellation: eventCancellation,
   ticket_resend: ticketResend,
+  staff_invitation: staffInvitation,
   management_link_replaced: managementLinkReplaced,
 };

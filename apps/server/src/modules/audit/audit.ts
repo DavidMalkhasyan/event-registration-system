@@ -6,6 +6,7 @@ export interface AuditInput {
   action: string;
   actorKind: 'owner' | 'staff' | 'participant_link' | 'system' | 'account';
   actorAccountId?: string | null;
+  actorStaffSessionId?: string | null;
   eventId?: string | null;
   registrationId?: string | null;
   ticketId?: string | null;
@@ -22,7 +23,7 @@ export async function recordAudit(trx: Tx, input: AuditInput): Promise<void> {
       action: input.action,
       actor_kind: input.actorKind,
       actor_account_id: input.actorAccountId ?? null,
-      actor_staff_session_id: null,
+      actor_staff_session_id: input.actorStaffSessionId ?? null,
       event_id: input.eventId ?? null,
       registration_id: input.registrationId ?? null,
       ticket_id: input.ticketId ?? null,

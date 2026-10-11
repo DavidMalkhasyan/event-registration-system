@@ -11,6 +11,7 @@ export interface IssueInput {
   registrationId?: string;
   eventId?: string;
   signInRequestId?: string;
+  staffInvitationId?: string;
   via: 'page' | 'email';
   outboxMessageId?: string;
   attemptNo?: number;
@@ -32,6 +33,7 @@ export async function issueTokenWithId(trx: Tx, input: IssueInput): Promise<{ ra
       token_hash: hashToken(input.type, raw)!,
       registration_id: input.registrationId ?? null,
       sign_in_request_id: input.signInRequestId ?? null,
+      staff_invitation_id: input.staffInvitationId ?? null,
       event_id: input.eventId ?? null,
       issued_at: input.now,
       issued_via: input.via,
@@ -49,6 +51,7 @@ export interface TokenRow {
   token_type: TokenType;
   registration_id: string | null;
   sign_in_request_id: string | null;
+  staff_invitation_id: string | null;
   event_id: string | null;
   issued_at: Date;
   expires_at: Date | null;
@@ -66,6 +69,7 @@ export async function findToken(db: Database | Tx, type: TokenType, raw: string)
       'token_type',
       'registration_id',
       'sign_in_request_id',
+      'staff_invitation_id',
       'event_id',
       'issued_at',
       'expires_at',

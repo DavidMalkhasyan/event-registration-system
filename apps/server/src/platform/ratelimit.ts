@@ -24,6 +24,8 @@ export const RULES = {
   // FR-SELF-4 and FR-ROT-8 defaults (PD-48).
   ticketResendPerRegistration: { scope: 'resend_registration', limit: 3, windowSeconds: 3600 },
   rotationPerRegistrationAndType: { scope: 'rotation_registration_type', limit: 5, windowSeconds: 3600 },
+  // PD-55: staff invitations per event (provisional, OQ-9).
+  staffInvitationsPerEvent: { scope: 'staff_invite_event', limit: 20, windowSeconds: 3600 },
   registrationPerIp: { scope: 'register_ip', limit: 30, windowSeconds: 900 },
   registrationPerAddress: { scope: 'register_email', limit: 5, windowSeconds: 900 },
   failedCheckInsPerSession: { scope: 'checkin_fail_session', limit: 30, windowSeconds: 300 },

@@ -11,6 +11,7 @@ import { RateLimiter } from '../platform/ratelimit.js';
 import { registerEventCoreRoutes } from '../modules/event-core/routes.js';
 import { registerIdentityRoutes } from '../modules/identity/routes.js';
 import { registerParticipantPortalRoutes } from '../modules/participant-portal/routes.js';
+import { registerStaffRoutes } from '../modules/staff/routes.js';
 import { registerLiveRoutes, type LiveHub } from '../modules/reporting/live.js';
 import { registerDevMailbox } from './dev-mailbox.js';
 import type { AppContext } from './context.js';
@@ -52,6 +53,7 @@ export async function buildWebApp(
   registerIdentityRoutes(app, ctx);
   registerEventCoreRoutes(app, ctx);
   registerParticipantPortalRoutes(app, ctx);
+  registerStaffRoutes(app, ctx);
   if (options.liveHub) registerLiveRoutes(app, ctx, options.liveHub);
 
   app.get('/healthz', async () => {
@@ -74,9 +76,9 @@ export async function buildWebApp(
     });
     const entry = (file: string) => async (_req: unknown, reply: { sendFile: (f: string) => unknown }) =>
       reply.sendFile(file);
-    for (const path of ['/e/*', '/verify', '/manage', '/ticket', '/sign-in'])
+    for (const path of ['/e/*', '/verify', '/manage', '/ticket', '/sign-in', '/invite'])
       app.get(path, entry('public.html'));
-    for (const path of ['/', '/organizer', '/organizer/*']) app.get(path, entry('organizer.html'));
+    for (const path of ['/', '/organizer', '/organizer/*', '/staff']) app.get(path, entry('organizer.html'));
     app.get('/assets/*', async (request, reply) =>
       reply.sendFile((request.params as { '*': string })['*'], resolve(config.CLIENT_DIST_DIR!, 'assets')),
     );
