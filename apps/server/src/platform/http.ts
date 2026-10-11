@@ -40,7 +40,8 @@ export function registerHttpPlumbing(app: FastifyInstance, publicOrigin: string)
   app.addHook('onSend', async (request, reply, payload) => {
     reply.header('x-content-type-options', 'nosniff');
     reply.header('referrer-policy', 'no-referrer');
-    if (request.url.startsWith('/api/') || request.url.startsWith('/dev/')) reply.header('cache-control', 'no-store');
+    if (request.url.startsWith('/api/') || request.url.startsWith('/dev/'))
+      reply.header('cache-control', 'no-store');
     if (!isLinkRoute(request.url)) reply.header('x-correlation-id', request.id);
     return payload;
   });

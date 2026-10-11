@@ -55,7 +55,16 @@ export async function findToken(db: Database | Tx, type: TokenType, raw: string)
   if (!hash) return null;
   const row = await db
     .selectFrom('app.access_tokens')
-    .select(['id', 'token_type', 'registration_id', 'sign_in_request_id', 'event_id', 'issued_at', 'expires_at', 'revoked_at'])
+    .select([
+      'id',
+      'token_type',
+      'registration_id',
+      'sign_in_request_id',
+      'event_id',
+      'issued_at',
+      'expires_at',
+      'revoked_at',
+    ])
     .where('token_hash', '=', hash)
     .where('token_type', '=', type)
     .executeTakeFirst();

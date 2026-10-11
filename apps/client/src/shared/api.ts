@@ -43,7 +43,8 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
 export function errorMessage(error: unknown): string {
   if (!(error instanceof ApiError)) return 'Something went wrong. Please try again.';
   if (error.code === 'invalid_link') return 'This link is not valid or has expired.';
-  if (error.code === 'network_error') return 'The server cannot be reached. Please check your connection and try again.';
+  if (error.code === 'network_error')
+    return 'The server cannot be reached. Please check your connection and try again.';
   const title = typeof error.body.title === 'string' ? error.body.title : 'The request failed';
   const extra =
     error.code === 'validation_failed' && Array.isArray(error.body.errors)

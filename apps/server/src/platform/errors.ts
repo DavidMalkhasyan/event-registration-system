@@ -67,7 +67,8 @@ export const problems = {
   unauthenticated: () => new AppError(401, 'unauthenticated'),
   forbidden: () => new AppError(403, 'forbidden'),
   conflict: (code: ProblemCode, extras: Record<string, unknown> = {}) => new AppError(409, code, extras),
-  validation: (errors: { field: string; code: string }[]) => new AppError(422, 'validation_failed', { errors }),
+  validation: (errors: { field: string; code: string }[]) =>
+    new AppError(422, 'validation_failed', { errors }),
   rateLimited: (retryAfterSeconds: number) => new AppError(429, 'rate_limited', { retryAfterSeconds }),
 };
 

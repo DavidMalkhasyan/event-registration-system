@@ -70,13 +70,24 @@ function SignInRequest() {
     <Page title="Organizer sign-in">
       <Card>
         {sent ? (
-          <Alert kind="success">Check your email for a sign-in link. It expires 15 minutes after you requested it and works once.</Alert>
+          <Alert kind="success">
+            Check your email for a sign-in link. It expires 15 minutes after you requested it and works once.
+          </Alert>
         ) : (
           <form className="stack" onSubmit={submit}>
-            <p>Sign in or create your organizer account with a link sent to your email address. No password needed.</p>
+            <p>
+              Sign in or create your organizer account with a link sent to your email address. No password
+              needed.
+            </p>
             <label>
               Email address
-              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+              />
             </label>
             <button>Send sign-in link</button>
           </form>
@@ -94,7 +105,14 @@ function defaultZone(): string {
 }
 
 function CreateEvent({ session, onCreated }: { session: Session; onCreated: () => void }) {
-  const [form, setForm] = useState({ title: '', description: '', localStart: '', timeZone: defaultZone(), capacity: 50, utcOffset: '' });
+  const [form, setForm] = useState({
+    title: '',
+    description: '',
+    localStart: '',
+    timeZone: defaultZone(),
+    capacity: 50,
+    utcOffset: '',
+  });
   const [offsets, setOffsets] = useState<string[]>([]);
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -116,13 +134,18 @@ function CreateEvent({ session, onCreated }: { session: Session; onCreated: () =
     const key = JSON.stringify(payload);
     if (requestRef.current?.key !== key) requestRef.current = { key, id: crypto.randomUUID() };
     try {
-      await api('/api/events', { method: 'POST', csrf: session.csrfToken, body: { requestId: requestRef.current.id, ...payload } });
+      await api('/api/events', {
+        method: 'POST',
+        csrf: session.csrfToken,
+        body: { requestId: requestRef.current.id, ...payload },
+      });
       setForm({ ...form, title: '', description: '', localStart: '', utcOffset: '' });
       setOffsets([]);
       requestRef.current = null;
       onCreated();
     } catch (err) {
-      if (err instanceof ApiError && err.code === 'ambiguous_local_time') setOffsets((err.body.offsets as string[]) ?? []);
+      if (err instanceof ApiError && err.code === 'ambiguous_local_time')
+        setOffsets((err.body.offsets as string[]) ?? []);
       setError(errorMessage(err));
     } finally {
       setBusy(false);
@@ -134,20 +157,38 @@ function CreateEvent({ session, onCreated }: { session: Session; onCreated: () =
       <form className="stack" onSubmit={submit}>
         <label>
           Title
-          <input required maxLength={200} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+          <input
+            required
+            maxLength={200}
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+          />
         </label>
         <label>
           Description
-          <textarea maxLength={5000} rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          <textarea
+            maxLength={5000}
+            rows={3}
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+          />
         </label>
         <div className="row">
           <label>
             Date and time (local)
-            <input type="datetime-local" required value={form.localStart} onChange={(e) => setForm({ ...form, localStart: e.target.value, utcOffset: '' })} />
+            <input
+              type="datetime-local"
+              required
+              value={form.localStart}
+              onChange={(e) => setForm({ ...form, localStart: e.target.value, utcOffset: '' })}
+            />
           </label>
           <label>
             Time zone
-            <select value={form.timeZone} onChange={(e) => setForm({ ...form, timeZone: e.target.value, utcOffset: '' })}>
+            <select
+              value={form.timeZone}
+              onChange={(e) => setForm({ ...form, timeZone: e.target.value, utcOffset: '' })}
+            >
               {Intl.supportedValuesOf('timeZone').map((z) => (
                 <option key={z}>{z}</option>
               ))}
@@ -155,7 +196,14 @@ function CreateEvent({ session, onCreated }: { session: Session; onCreated: () =
           </label>
           <label>
             Capacity
-            <input type="number" min={1} max={100000} required value={form.capacity} onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })} />
+            <input
+              type="number"
+              min={1}
+              max={100000}
+              required
+              value={form.capacity}
+              onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })}
+            />
           </label>
         </div>
         {offsets.length > 0 && (
@@ -198,7 +246,8 @@ function EventsPage({ session }: { session: Session }) {
                 <strong>{e.title}</strong>
                 <br />
                 <span className="muted">
-                  {formatLocal(e.startsAt, e.timeZone)} · {e.confirmedCount}/{e.capacity} confirmed · {PHASE_LABEL[e.phase]}
+                  {formatLocal(e.startsAt, e.timeZone)} · {e.confirmedCount}/{e.capacity} confirmed ·{' '}
+                  {PHASE_LABEL[e.phase]}
                 </span>
               </Link>
             </li>
@@ -264,7 +313,9 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
   const load = useCallback(() => {
     Promise.all([
       api<EventItem>(`/api/events/${eventId}`),
-      api<{ counts: { confirmed: number; waitlisted: number; checkedIn: number } }>(`/api/events/${eventId}/dashboard`),
+      api<{ counts: { confirmed: number; waitlisted: number; checkedIn: number } }>(
+        `/api/events/${eventId}/dashboard`,
+      ),
       api<{ items: Participant[] }>(`/api/events/${eventId}/participants`),
     ])
       .then(([e, d, p]) => {
@@ -272,7 +323,9 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
         setCounts(d.counts);
         setParticipants(p.items);
       })
-      .catch((e: unknown) => setError(e instanceof ApiError && e.status === 404 ? 'Event not found.' : errorMessage(e)));
+      .catch((e: unknown) =>
+        setError(e instanceof ApiError && e.status === 404 ? 'Event not found.' : errorMessage(e)),
+      );
   }, [eventId]);
   useEffect(load, [load]);
   // Refresh confirmed and waiting counts whenever the live check-in count changes.
@@ -285,7 +338,8 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
     <Page title={event.title} actions={<Link to="/organizer">← All events</Link>}>
       <Card>
         <p>
-          <strong>{formatLocal(event.startsAt, event.timeZone)}</strong> · {PHASE_LABEL[event.phase]} · capacity {event.capacity}
+          <strong>{formatLocal(event.startsAt, event.timeZone)}</strong> · {PHASE_LABEL[event.phase]} ·
+          capacity {event.capacity}
         </p>
         {event.description && <p style={{ whiteSpace: 'pre-wrap' }}>{event.description}</p>}
         <CopyLink label="Public registration link" url={event.publicUrl} />
@@ -304,7 +358,10 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
         </div>
         <div className="stat">
           <strong>{live.count ?? counts?.checkedIn ?? '–'}</strong>
-          <span>{live.connected && <span className="live-dot" aria-hidden />}Checked in{live.connected ? ' (live)' : ''}</span>
+          <span>
+            {live.connected && <span className="live-dot" aria-hidden />}Checked in
+            {live.connected ? ' (live)' : ''}
+          </span>
         </div>
       </div>
       <Reschedule session={session} event={event} onDone={load} />
@@ -323,7 +380,9 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
               <tr key={p.registrationId}>
                 <td>{p.email}</td>
                 <td>
-                  <span className="badge">{p.state === 'WAITLISTED' ? `WAITLISTED #${p.position}` : p.state.replace('_', ' ')}</span>
+                  <span className="badge">
+                    {p.state === 'WAITLISTED' ? `WAITLISTED #${p.position}` : p.state.replace('_', ' ')}
+                  </span>
                 </td>
                 <td>{p.checkedInAt ? new Date(p.checkedInAt).toLocaleTimeString() : ''}</td>
                 <td>{p.emailIssues.map((i) => `${i.messageType}: ${i.label}`).join(', ')}</td>
@@ -348,7 +407,10 @@ function Reschedule({ session, event, onDone }: { session: Session; event: Event
         csrf: session.csrfToken,
         body: { localStart, expectedScheduleVersion: event.scheduleVersion },
       });
-      setMessage({ kind: 'success', text: 'Rescheduled. Every confirmed and waiting participant is being notified by email.' });
+      setMessage({
+        kind: 'success',
+        text: 'Rescheduled. Every confirmed and waiting participant is being notified by email.',
+      });
       setLocalStart('');
       onDone();
     } catch (err) {
@@ -360,7 +422,12 @@ function Reschedule({ session, event, onDone }: { session: Session; event: Event
       <form className="row" onSubmit={submit}>
         <label>
           New date and time ({event.timeZone})
-          <input type="datetime-local" required value={localStart} onChange={(e) => setLocalStart(e.target.value)} />
+          <input
+            type="datetime-local"
+            required
+            value={localStart}
+            onChange={(e) => setLocalStart(e.target.value)}
+          />
         </label>
         <button style={{ flex: '0 0 auto' }}>Reschedule and notify</button>
       </form>
@@ -382,7 +449,9 @@ const OUTCOME_TEXT: Record<string, string> = {
 
 declare global {
   interface Window {
-    BarcodeDetector?: new (options: { formats: string[] }) => { detect(source: CanvasImageSource): Promise<{ rawValue: string }[]> };
+    BarcodeDetector?: new (options: { formats: string[] }) => {
+      detect(source: CanvasImageSource): Promise<{ rawValue: string }[]>;
+    };
   }
 }
 
@@ -407,11 +476,14 @@ function CheckIn({ session, eventId }: { session: Session; eventId: string }) {
       // Retry with the same request ID after a network failure; never assume success (FR-CHK-3, FR-CHK-6).
       for (let attempt = 0; attempt < 2; attempt += 1) {
         try {
-          const r = await api<{ outcome: string; firstCheckedInAt?: string }>(`/api/events/${eventId}/check-ins`, {
-            method: 'POST',
-            csrf: session.csrfToken,
-            body: { code: value.trim(), requestId },
-          });
+          const r = await api<{ outcome: string; firstCheckedInAt?: string }>(
+            `/api/events/${eventId}/check-ins`,
+            {
+              method: 'POST',
+              csrf: session.csrfToken,
+              body: { code: value.trim(), requestId },
+            },
+          );
           setResult(r);
           setCode('');
           setBusy(false);
@@ -458,7 +530,10 @@ function CheckIn({ session, eventId }: { session: Session; eventId: string }) {
 
   const ok = result !== 'offline' && result?.outcome === 'CHECKED_IN';
   return (
-    <Page title={event ? `Check-in: ${event.title}` : 'Check-in'} actions={<Link to={`/organizer/events/${eventId}`}>← Dashboard</Link>}>
+    <Page
+      title={event ? `Check-in: ${event.title}` : 'Check-in'}
+      actions={<Link to={`/organizer/events/${eventId}`}>← Dashboard</Link>}
+    >
       <div className="stats">
         <div className="stat">
           <strong>{live.count ?? '–'}</strong>
@@ -475,7 +550,13 @@ function CheckIn({ session, eventId }: { session: Session; eventId: string }) {
         >
           <label>
             Ticket code
-            <input autoFocus value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. 7K3QX9M2B4TW" autoComplete="off" />
+            <input
+              autoFocus
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="e.g. 7K3QX9M2B4TW"
+              autoComplete="off"
+            />
           </label>
           <button style={{ flex: '0 0 auto' }} disabled={busy}>
             {busy ? 'Checking…' : 'Check in'}
@@ -489,16 +570,25 @@ function CheckIn({ session, eventId }: { session: Session; eventId: string }) {
           </p>
         )}
         {scanning && <video ref={videoRef} muted playsInline style={{ width: '100%', borderRadius: 12 }} />}
-        {result === 'offline' && <div className="outcome outcome-bad">Cannot validate: the server is unreachable. Do not admit yet.</div>}
+        {result === 'offline' && (
+          <div className="outcome outcome-bad">
+            Cannot validate: the server is unreachable. Do not admit yet.
+          </div>
+        )}
         {result && result !== 'offline' && (
           <div className={`outcome ${ok ? 'outcome-ok' : 'outcome-bad'}`} role="status">
             {OUTCOME_TEXT[result.outcome] ?? result.outcome}
-            {result.firstCheckedInAt && <div className="muted">First check-in at {new Date(result.firstCheckedInAt).toLocaleTimeString()}</div>}
+            {result.firstCheckedInAt && (
+              <div className="muted">
+                First check-in at {new Date(result.firstCheckedInAt).toLocaleTimeString()}
+              </div>
+            )}
           </div>
         )}
         {event && (
           <p className="muted">
-            Check-in window: {formatLocal(event.checkInOpensAt, event.timeZone)} to {formatLocal(event.checkInClosesAt, event.timeZone)}.
+            Check-in window: {formatLocal(event.checkInOpensAt, event.timeZone)} to{' '}
+            {formatLocal(event.checkInClosesAt, event.timeZone)}.
           </p>
         )}
       </Card>

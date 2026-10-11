@@ -39,8 +39,10 @@ export function parseConfig(env: Record<string, string | undefined>): Config {
   }
   const config = result.data;
   // Relative paths are relative to the repository root, whichever package directory a process runs from.
-  if (!isAbsolute(config.DEV_MAILBOX_DIR)) config.DEV_MAILBOX_DIR = resolve(REPO_ROOT, config.DEV_MAILBOX_DIR);
-  if (config.CLIENT_DIST_DIR && !isAbsolute(config.CLIENT_DIST_DIR)) config.CLIENT_DIST_DIR = resolve(REPO_ROOT, config.CLIENT_DIST_DIR);
+  if (!isAbsolute(config.DEV_MAILBOX_DIR))
+    config.DEV_MAILBOX_DIR = resolve(REPO_ROOT, config.DEV_MAILBOX_DIR);
+  if (config.CLIENT_DIST_DIR && !isAbsolute(config.CLIENT_DIST_DIR))
+    config.CLIENT_DIST_DIR = resolve(REPO_ROOT, config.CLIENT_DIST_DIR);
   if (config.NODE_ENV === 'production' && config.EMAIL_PROVIDER === 'fake') {
     throw new ConfigError(['EMAIL_PROVIDER (the fake provider is not allowed in production)']);
   }

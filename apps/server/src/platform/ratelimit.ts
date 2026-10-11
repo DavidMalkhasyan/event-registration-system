@@ -40,7 +40,10 @@ export class RateLimiter {
   }
 
   /** Counts one hit in its own short transaction. Returns seconds until retry when over the limit. */
-  async hit(rule: RateLimitRule, identifier: string): Promise<{ allowed: boolean; retryAfterSeconds: number }> {
+  async hit(
+    rule: RateLimitRule,
+    identifier: string,
+  ): Promise<{ allowed: boolean; retryAfterSeconds: number }> {
     const { start, end } = await this.window(rule);
     const result = await sql<{ count: number }>`
       INSERT INTO app.rate_limit_counters (scope, key_id, key_hash, window_start, count, expires_at)
@@ -48,7 +51,10 @@ export class RateLimiter {
       ON CONFLICT (scope, key_id, key_hash, window_start) DO UPDATE SET count = app.rate_limit_counters.count + 1
       RETURNING count`.execute(this.db);
     const count = result.rows[0]?.count ?? 1;
-    return { allowed: count <= rule.limit, retryAfterSeconds: Math.max(1, Math.ceil((end.getTime() - Date.now()) / 1000)) };
+    return {
+      allowed: count <= rule.limit,
+      retryAfterSeconds: Math.max(1, Math.ceil((end.getTime() - Date.now()) / 1000)),
+    };
   }
 
   /** Reads the current count without counting (used before link lookups). */

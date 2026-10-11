@@ -12,12 +12,19 @@ const SIGN_IN_TTL_MS = 15 * 60_000; // FR-ORG-3 c, R55
 const PRE_SESSION_MAX_MS = 15 * 60_000;
 
 /** TX-A01: always the same response, whether or not an account exists (FR-ORG-3 a). */
-export async function requestSignIn(ctx: AppContext, rawEmail: string, ip: string, correlationId: string): Promise<void> {
+export async function requestSignIn(
+  ctx: AppContext,
+  rawEmail: string,
+  ip: string,
+  correlationId: string,
+): Promise<void> {
   const email = normalizeEmail(rawEmail);
   const perAddress = await ctx.limiter.hit(RULES.signInPerAddress, email);
   const perIp = await ctx.limiter.hit(RULES.signInPerIp, ip);
   if (!perAddress.allowed || !perIp.allowed) {
-    throw new AppError(429, 'rate_limited', { retryAfterSeconds: Math.max(perAddress.retryAfterSeconds, perIp.retryAfterSeconds) });
+    throw new AppError(429, 'rate_limited', {
+      retryAfterSeconds: Math.max(perAddress.retryAfterSeconds, perIp.retryAfterSeconds),
+    });
   }
   await withAccountLocks(ctx.db, [email], async ({ trx, now }) => {
     const account = await trx
@@ -35,7 +42,14 @@ export async function requestSignIn(ctx: AppContext, rawEmail: string, ip: strin
     const expiresAt = new Date(now.getTime() + SIGN_IN_TTL_MS);
     const request = await trx
       .insertInto('app.sign_in_requests')
-      .values({ email, account_id: account?.id ?? null, purpose: 'sign_in', reauth_session_id: null, created_at: now, expires_at: expiresAt })
+      .values({
+        email,
+        account_id: account?.id ?? null,
+        purpose: 'sign_in',
+        reauth_session_id: null,
+        created_at: now,
+        expires_at: expiresAt,
+      })
       .returning('id')
       .executeTakeFirstOrThrow();
     await enqueue(trx, {
@@ -87,7 +101,12 @@ export async function resolveSignInLink(ctx: AppContext, rawToken: string): Prom
   const exp = Math.floor(Math.min(now.getTime() + PRE_SESSION_MAX_MS, request.expiresAt.getTime()) / 1000);
   const nonce = randomToken();
   const mac = hmac(ctx.config.PRESESSION_SECRET, 'ers/presession/v1', nonce, request.id, String(exp));
-  return { maskedEmail: maskEmail(request.email), purpose: request.purpose, preSessionToken: `v1.1.${exp}.${mac}`, nonce };
+  return {
+    maskedEmail: maskEmail(request.email),
+    purpose: request.purpose,
+    preSessionToken: `v1.1.${exp}.${mac}`,
+    nonce,
+  };
 }
 
 /** POST /api/links/sign-in/confirm (TX-A02). Returns the raw session ID for the cookie. */
@@ -111,7 +130,10 @@ export async function confirmSignIn(
     !!nonce &&
     Number.isFinite(exp) &&
     exp * 1000 > now0.getTime() &&
-    safeEqual(parts[3]!, hmac(ctx.config.PRESESSION_SECRET, 'ers/presession/v1', nonce, request.id, String(exp)));
+    safeEqual(
+      parts[3]!,
+      hmac(ctx.config.PRESESSION_SECRET, 'ers/presession/v1', nonce, request.id, String(exp)),
+    );
   if (!valid) throw new AppError(403, 'csrf_failed');
 
   const rawSession = randomToken();

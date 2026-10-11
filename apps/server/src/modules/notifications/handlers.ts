@@ -19,7 +19,8 @@ export interface OutboxRow {
   payload: Record<string, unknown>;
 }
 
-export type Freshness = { fresh: true } | { fresh: false; reason: 'obsolete' | 'link_expiry' | 'request_replaced' };
+export type Freshness =
+  { fresh: true } | { fresh: false; reason: 'obsolete' | 'link_expiry' | 'request_replaced' };
 
 export interface RenderedEmail {
   subject: string;
@@ -30,7 +31,12 @@ export interface RenderedEmail {
 export interface MessageHandler {
   freshness(trx: Tx, msg: OutboxRow, now: Date): Promise<Freshness>;
   issueTokens(trx: Tx, msg: OutboxRow, now: Date, attemptNo: number): Promise<Record<string, string>>;
-  render(db: Database, msg: OutboxRow, tokens: Record<string, string>, origin: string): Promise<RenderedEmail>;
+  render(
+    db: Database,
+    msg: OutboxRow,
+    tokens: Record<string, string>,
+    origin: string,
+  ): Promise<RenderedEmail>;
 }
 
 const TRANSFER = 'This ticket can be transferred, but it admits one person, once.';
@@ -38,18 +44,23 @@ const FORWARD_WARNING = 'Anyone you forward this email or link to can manage or 
 const SHARE_HINT = 'To pass on only your ticket, send this share link instead of forwarding this email.';
 
 function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+  return value.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
 }
 
 function localTime(startsAt: Date, zone: string): string {
-  return `${DateTime.fromJSDate(startsAt, { zone }).toFormat("cccc d LLLL yyyy, HH:mm")} (${zone})`;
+  return `${DateTime.fromJSDate(startsAt, { zone }).toFormat('cccc d LLLL yyyy, HH:mm')} (${zone})`;
 }
 
 function email(subject: string, lines: (string | { link: string; label: string })[]): RenderedEmail {
   const text = lines.map((l) => (typeof l === 'string' ? l : `${l.label}: ${l.link}`)).join('\n\n');
   const html = lines
     .map((l) =>
-      typeof l === 'string' ? `<p>${escapeHtml(l)}</p>` : `<p><a href="${escapeHtml(l.link)}">${escapeHtml(l.label)}</a></p>`,
+      typeof l === 'string'
+        ? `<p>${escapeHtml(l)}</p>`
+        : `<p><a href="${escapeHtml(l.link)}">${escapeHtml(l.label)}</a></p>`,
     )
     .join('\n');
   return { subject, text, html };
@@ -72,7 +83,11 @@ async function registrationOf(db: Database | Tx, id: string) {
 }
 
 async function ticketCodeOf(db: Database, registrationId: string): Promise<string | undefined> {
-  const row = await db.selectFrom('app.tickets').select('code').where('registration_id', '=', registrationId).executeTakeFirst();
+  const row = await db
+    .selectFrom('app.tickets')
+    .select('code')
+    .where('registration_id', '=', registrationId)
+    .executeTakeFirst();
   return row?.code;
 }
 
@@ -86,7 +101,8 @@ const signIn: MessageHandler = {
       .forShare()
       .executeTakeFirst();
     if (!request || request.status !== 'active') return { fresh: false, reason: 'request_replaced' };
-    if (now.getTime() + 2 * 60_000 > request.expires_at.getTime()) return { fresh: false, reason: 'link_expiry' };
+    if (now.getTime() + 2 * 60_000 > request.expires_at.getTime())
+      return { fresh: false, reason: 'link_expiry' };
     return { fresh: true };
   },
   async issueTokens(trx, msg, now, attemptNo) {
@@ -145,7 +161,10 @@ const verification: MessageHandler = {
   },
 };
 
-function registrationMessage(requiredState: 'CONFIRMED' | 'WAITLISTED' | 'ACTIVE', withShare: boolean): Pick<MessageHandler, 'freshness' | 'issueTokens'> {
+function registrationMessage(
+  requiredState: 'CONFIRMED' | 'WAITLISTED' | 'ACTIVE',
+  withShare: boolean,
+): Pick<MessageHandler, 'freshness' | 'issueTokens'> {
   return {
     async freshness(trx, msg) {
       const registration = await registrationOf(trx, msg.registration_id!);
@@ -154,11 +173,22 @@ function registrationMessage(requiredState: 'CONFIRMED' | 'WAITLISTED' | 'ACTIVE
         requiredState === 'ACTIVE'
           ? !!registration && ['PENDING_VERIFICATION', 'CONFIRMED', 'WAITLISTED'].includes(registration.state)
           : registration?.state === requiredState;
-      return stateOk && event?.status === 'SCHEDULED' ? { fresh: true } : { fresh: false, reason: 'obsolete' };
+      return stateOk && event?.status === 'SCHEDULED'
+        ? { fresh: true }
+        : { fresh: false, reason: 'obsolete' };
     },
     async issueTokens(trx, msg, now, attemptNo) {
-      const common = { now, registrationId: msg.registration_id!, eventId: msg.event_id!, via: 'email' as const, outboxMessageId: msg.id, attemptNo };
-      const tokens: Record<string, string> = { manage: await issueToken(trx, { type: 'management', ...common }) };
+      const common = {
+        now,
+        registrationId: msg.registration_id!,
+        eventId: msg.event_id!,
+        via: 'email' as const,
+        outboxMessageId: msg.id,
+        attemptNo,
+      };
+      const tokens: Record<string, string> = {
+        manage: await issueToken(trx, { type: 'management', ...common }),
+      };
       if (withShare) tokens.share = await issueToken(trx, { type: 'share', ...common });
       return tokens;
     },
@@ -278,7 +308,10 @@ const eventChange: MessageHandler = {
     if (msg.payload.registrationClosed === true) {
       lines.push('Registration for this event is now closed, and no place became available for you.');
     }
-    lines.push({ label: 'Manage or cancel your registration', link: `${origin}/manage#t=${tokens.manage}` }, FORWARD_WARNING);
+    lines.push(
+      { label: 'Manage or cancel your registration', link: `${origin}/manage#t=${tokens.manage}` },
+      FORWARD_WARNING,
+    );
     return email(`Date changed: ${event.title}`, lines);
   },
 };

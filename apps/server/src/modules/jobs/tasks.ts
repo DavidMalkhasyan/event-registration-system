@@ -44,7 +44,11 @@ export async function runDueTasks(db: Database, workerId: string): Promise<numbe
     if (!task) return 'busy' as const;
     await trx
       .updateTable('app.scheduled_tasks')
-      .set({ status: 'RUNNING', attempt_no: task.attempt_no + 1, lease_expires_at: new Date(now.getTime() + LEASE_MS) })
+      .set({
+        status: 'RUNNING',
+        attempt_no: task.attempt_no + 1,
+        lease_expires_at: new Date(now.getTime() + LEASE_MS),
+      })
       .where('id', '=', task.id)
       .execute();
     return { ...task, attempt_no: task.attempt_no + 1 };
@@ -53,19 +57,33 @@ export async function runDueTasks(db: Database, workerId: string): Promise<numbe
   if (claimed === null) {
     // The event no longer exists (deleted): the task has nothing to do.
     await withTransaction(db, ({ trx, now }) =>
-      trx.updateTable('app.scheduled_tasks').set({ status: 'SKIPPED', finished_at: now, lease_expires_at: null })
-        .where('id', '=', candidate.id).where('status', '=', 'PENDING').execute(),
+      trx
+        .updateTable('app.scheduled_tasks')
+        .set({ status: 'SKIPPED', finished_at: now, lease_expires_at: null })
+        .where('id', '=', candidate.id)
+        .where('status', '=', 'PENDING')
+        .execute(),
     );
     return 1;
   }
-  if (claimed.kind === 'reminder_fanout') await runReminderFanout(db, claimed.id, claimed.attempt_no, workerId);
+  if (claimed.kind === 'reminder_fanout')
+    await runReminderFanout(db, claimed.id, claimed.attempt_no, workerId);
   return 1;
 }
 
 /** TX-J02: reminder fan-out in batches under short shared locks (insert-only work). */
-async function runReminderFanout(db: Database, taskId: string, attemptNo: number, _workerId: string): Promise<void> {
+async function runReminderFanout(
+  db: Database,
+  taskId: string,
+  attemptNo: number,
+  _workerId: string,
+): Promise<void> {
   for (;;) {
-    const task = await db.selectFrom('app.scheduled_tasks').selectAll().where('id', '=', taskId).executeTakeFirstOrThrow();
+    const task = await db
+      .selectFrom('app.scheduled_tasks')
+      .selectAll()
+      .where('id', '=', taskId)
+      .executeTakeFirstOrThrow();
     const step = await withEventLock(db, task.event_id, 'shared', async ({ trx, now, event }) => {
       // Fence on the attempt so a task reclaimed after a lease expiry is not run twice in parallel.
       const fenced = await trx
@@ -76,11 +94,19 @@ async function runReminderFanout(db: Database, taskId: string, attemptNo: number
         .executeTakeFirstOrThrow();
       if (fenced.status !== 'RUNNING' || fenced.attempt_no !== attemptNo) return 'stop' as const;
       const finish = async (status: 'DONE' | 'SKIPPED') => {
-        await trx.updateTable('app.scheduled_tasks').set({ status, finished_at: now, lease_expires_at: null }).where('id', '=', taskId).execute();
+        await trx
+          .updateTable('app.scheduled_tasks')
+          .set({ status, finished_at: now, lease_expires_at: null })
+          .where('id', '=', taskId)
+          .execute();
         return 'stop' as const;
       };
       // Stale version, cancelled event, or missed send time (FR-NTF-5: not sent after Start).
-      if (event.status !== 'SCHEDULED' || event.schedule_version !== task.schedule_version || now >= event.starts_at) {
+      if (
+        event.status !== 'SCHEDULED' ||
+        event.schedule_version !== task.schedule_version ||
+        now >= event.starts_at
+      ) {
         return finish('SKIPPED');
       }
       let query = trx
@@ -124,7 +150,10 @@ async function runReminderFanout(db: Database, taskId: string, attemptNo: number
       if (batch.length < BATCH) return finish('DONE');
       await trx
         .updateTable('app.scheduled_tasks')
-        .set({ cursor_registration_id: batch.at(-1)!.id, lease_expires_at: new Date(now.getTime() + LEASE_MS) })
+        .set({
+          cursor_registration_id: batch.at(-1)!.id,
+          lease_expires_at: new Date(now.getTime() + LEASE_MS),
+        })
         .where('id', '=', taskId)
         .execute();
       return 'continue' as const;

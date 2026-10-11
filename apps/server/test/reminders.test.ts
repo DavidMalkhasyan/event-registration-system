@@ -53,7 +53,9 @@ describe('reminders: exactly one per participant 24 hours before (P0 #13, FR-NTF
     moveClockTo(new Date(event.startsAt), -9 * 3_600_000);
     await drain(h);
     expect(reminders('late@example.test')).toHaveLength(0);
-    expect(mailFor(h, 'late@example.test').filter((m) => m.subject.startsWith('Your ticket'))).toHaveLength(1);
+    expect(mailFor(h, 'late@example.test').filter((m) => m.subject.startsWith('Your ticket'))).toHaveLength(
+      1,
+    );
     const slots = await h.db.selectFrom('app.reminder_slots').select(['filled_by']).execute();
     expect(slots.map((x) => x.filled_by)).toEqual(['ticket']);
   });
@@ -105,6 +107,8 @@ describe('rescheduling notifies every affected participant (P0 #14, FR-EVT-6)', 
     moveClockTo(new Date(response.json().startsAt), -23 * 3_600_000);
     await drain(h);
     expect(reminders('confirmed@example.test')).toHaveLength(1);
-    expect(reminders('confirmed@example.test')[0]!.text).toContain(new Date(response.json().startsAt).toISOString().slice(11, 16));
+    expect(reminders('confirmed@example.test')[0]!.text).toContain(
+      new Date(response.json().startsAt).toISOString().slice(11, 16),
+    );
   });
 });

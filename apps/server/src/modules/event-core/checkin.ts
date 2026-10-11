@@ -45,7 +45,9 @@ export async function checkInAsOwner(
       if (previous.principal_id !== principal.sessionId) return 'conflict' as const;
       return {
         outcome: previous.outcome,
-        ...(previous.first_checked_in_at ? { firstCheckedInAt: previous.first_checked_in_at.toISOString() } : {}),
+        ...(previous.first_checked_in_at
+          ? { firstCheckedInAt: previous.first_checked_in_at.toISOString() }
+          : {}),
       };
     }
 
@@ -66,7 +68,13 @@ export async function checkInAsOwner(
       else {
         const inserted = await trx
           .insertInto('app.check_ins')
-          .values({ ticket_id: ticket.id, event_id: eventId, checked_in_at: now, actor_kind: 'owner', actor_account_id: principal.accountId })
+          .values({
+            ticket_id: ticket.id,
+            event_id: eventId,
+            checked_in_at: now,
+            actor_kind: 'owner',
+            actor_account_id: principal.accountId,
+          })
           .onConflict((oc) => oc.column('ticket_id').where('undone_at', 'is', null).doNothing())
           .returning('checked_in_at')
           .executeTakeFirst();
@@ -104,7 +112,8 @@ export async function checkInAsOwner(
   if (result === 'conflict') throw new AppError(409, 'request_id_conflict');
   if (result.outcome === 'INVALID_CODE' || result.outcome === 'WRONG_EVENT') {
     const limit = await ctx.limiter.hit(RULES.failedCheckInsPerSession, principal.sessionId);
-    if (!limit.allowed) throw new AppError(429, 'rate_limited', { retryAfterSeconds: limit.retryAfterSeconds });
+    if (!limit.allowed)
+      throw new AppError(429, 'rate_limited', { retryAfterSeconds: limit.retryAfterSeconds });
   }
   return result;
 }

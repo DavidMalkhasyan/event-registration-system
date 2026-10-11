@@ -3,7 +3,11 @@
 import type { ColumnType, Generated } from 'kysely';
 
 type Timestamp = ColumnType<Date, Date | string, Date | string>;
-type Json = ColumnType<Record<string, unknown>, string | Record<string, unknown>, string | Record<string, unknown>>;
+type Json = ColumnType<
+  Record<string, unknown>,
+  string | Record<string, unknown>,
+  string | Record<string, unknown>
+>;
 
 export interface AccountsTable {
   id: Generated<string>;
@@ -117,7 +121,8 @@ export interface CheckInRequestsTable {
   created_at: Timestamp;
 }
 
-export type TokenType = 'verification' | 'management' | 'share' | 'staff_invitation' | 'sign_in' | 'email_change';
+export type TokenType =
+  'verification' | 'management' | 'share' | 'staff_invitation' | 'sign_in' | 'email_change';
 export interface AccessTokensTable {
   id: Generated<string>;
   token_type: TokenType;

@@ -5,7 +5,10 @@ import { readMailbox } from '../modules/messaging/fake-provider.js';
 // It plays the role of the recipients' inboxes, so the demo can follow emailed links.
 
 function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+  return value.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
 }
 
 export function registerDevMailbox(app: FastifyInstance, dir: string): void {
@@ -14,7 +17,8 @@ export function registerDevMailbox(app: FastifyInstance, dir: string): void {
     const entries = readMailbox(dir).filter((e) => !filter || e.to.includes(filter));
     const rows = entries
       .map(
-        (e) => `<article><h3>${escapeHtml(e.subject)}</h3><p class="meta">To ${escapeHtml(e.to)} · ${escapeHtml(e.createdAt)}</p>${e.html}</article>`,
+        (e) =>
+          `<article><h3>${escapeHtml(e.subject)}</h3><p class="meta">To ${escapeHtml(e.to)} · ${escapeHtml(e.createdAt)}</p>${e.html}</article>`,
       )
       .join('\n');
     reply.type('text/html; charset=utf-8');

@@ -25,7 +25,10 @@ export function csrfTokenFor(secret: string, kind: 'org' | 'staff', sessionId: s
 }
 
 /** Resolves the organizer session cookie (hash lookup, revocation, idle and absolute expiry). */
-export async function resolveOrganizer(ctx: AppContext, request: FastifyRequest): Promise<OrganizerPrincipal | null> {
+export async function resolveOrganizer(
+  ctx: AppContext,
+  request: FastifyRequest,
+): Promise<OrganizerPrincipal | null> {
   const raw = request.cookies[ORG_COOKIE];
   if (!raw) return null;
   const hash = hashToken('organizer_session', raw);
@@ -33,12 +36,21 @@ export async function resolveOrganizer(ctx: AppContext, request: FastifyRequest)
   const row = await ctx.db
     .selectFrom('app.organizer_sessions as s')
     .innerJoin('app.accounts as a', 'a.id', 's.account_id')
-    .select(['s.id', 's.account_id', 's.authenticated_at', 's.last_seen_at', 's.absolute_expires_at', 's.revoked_at', 'a.email'])
+    .select([
+      's.id',
+      's.account_id',
+      's.authenticated_at',
+      's.last_seen_at',
+      's.absolute_expires_at',
+      's.revoked_at',
+      'a.email',
+    ])
     .where('s.session_hash', '=', hash)
     .executeTakeFirst();
   if (!row || row.revoked_at) return null;
   const now = await decisionTime(ctx.db);
-  if (now >= row.absolute_expires_at || now.getTime() >= row.last_seen_at.getTime() + SESSION_IDLE_MS) return null;
+  if (now >= row.absolute_expires_at || now.getTime() >= row.last_seen_at.getTime() + SESSION_IDLE_MS)
+    return null;
   if (now.getTime() - row.last_seen_at.getTime() > LAST_SEEN_THROTTLE_MS) {
     // Own single-row transaction, never inside an event lock (FR-ORG-4, NFR-CON-7 g).
     await ctx.db

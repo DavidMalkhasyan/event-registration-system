@@ -11,7 +11,8 @@ const entryRouter = (): Plugin => ({
     server.middlewares.use((req, _res, next) => {
       const path = (req.url ?? '/').split('?')[0]!;
       if (/^\/(e\/|verify$|manage$|ticket$|sign-in$)/.test(path)) req.url = '/public.html';
-      else if (path === '/' || path === '/organizer' || path.startsWith('/organizer/')) req.url = '/organizer.html';
+      else if (path === '/' || path === '/organizer' || path.startsWith('/organizer/'))
+        req.url = '/organizer.html';
       next();
     });
   },
@@ -30,7 +31,10 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      input: { public: resolve(import.meta.dirname, 'public.html'), organizer: resolve(import.meta.dirname, 'organizer.html') },
+      input: {
+        public: resolve(import.meta.dirname, 'public.html'),
+        organizer: resolve(import.meta.dirname, 'organizer.html'),
+      },
     },
   },
   test: { environment: 'jsdom' },

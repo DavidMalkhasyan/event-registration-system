@@ -17,7 +17,13 @@ export const TRANSFER_STATEMENT = 'This ticket can be transferred, but it admits
 // ---------------------------------------------------------------- reminders (FR-NTF-1 to FR-NTF-3)
 
 /** One reminder fan-out task per schedule version, due at Start − 24 h (U-26 makes it idempotent). */
-export async function scheduleReminderTask(trx: Tx, eventId: string, version: number, startsAt: Date, now: Date): Promise<void> {
+export async function scheduleReminderTask(
+  trx: Tx,
+  eventId: string,
+  version: number,
+  startsAt: Date,
+  now: Date,
+): Promise<void> {
   await trx
     .insertInto('app.scheduled_tasks')
     .values({
@@ -86,7 +92,12 @@ export function withinReminderWindow(startsAt: Date, now: Date): boolean {
 
 // ---------------------------------------------------------------- promotion (FR-WL-2, BR-4 to BR-6)
 
-export async function insertTicket(trx: Tx, registrationId: string, eventId: string, now: Date): Promise<string> {
+export async function insertTicket(
+  trx: Tx,
+  registrationId: string,
+  eventId: string,
+  now: Date,
+): Promise<string> {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const inserted = await trx
       .insertInto('app.tickets')
@@ -100,7 +111,12 @@ export async function insertTicket(trx: Tx, registrationId: string, eventId: str
 }
 
 /** Fills free seats FIFO from the waiting list, only before the cutoff. Must run under the exclusive event lock. */
-export async function promoteFifo(trx: Tx, eventId: string, now: Date, correlationId: string): Promise<string[]> {
+export async function promoteFifo(
+  trx: Tx,
+  eventId: string,
+  now: Date,
+  correlationId: string,
+): Promise<string[]> {
   const event = await trx
     .selectFrom('app.events')
     .select(['id', 'status', 'starts_at', 'capacity', 'confirmed_count', 'schedule_version'])
@@ -148,7 +164,10 @@ interface ManagedRegistration {
   registration: { id: string; email: string; state: string; waitlist_seq: number | null; event_id: string };
 }
 
-async function managedRegistration(db: AppContext['db'] | Tx, raw: string): Promise<ManagedRegistration | null> {
+async function managedRegistration(
+  db: AppContext['db'] | Tx,
+  raw: string,
+): Promise<ManagedRegistration | null> {
   const token = await findToken(db, 'management', raw);
   if (!token?.registration_id || token.revoked_at) return null;
   const registration = await db
@@ -177,13 +196,16 @@ export async function managementView(ctx: AppContext, raw: string) {
     .where('id', '=', found.registration.event_id)
     .executeTakeFirstOrThrow();
   const now = await decisionTime(ctx.db);
-  if (event.status !== 'SCHEDULED' || now > checkInWindow(event.starts_at).closes) throw new InvalidLinkError();
+  if (event.status !== 'SCHEDULED' || now > checkInWindow(event.starts_at).closes)
+    throw new InvalidLinkError();
   const summary = { title: event.title, startsAt: event.starts_at.toISOString(), timeZone: event.time_zone };
   const beforeStart = now < event.starts_at;
   if (found.registration.state === 'CONFIRMED') {
     const ticket = await ctx.db
       .selectFrom('app.tickets as t')
-      .leftJoin('app.check_ins as c', (join) => join.onRef('c.ticket_id', '=', 't.id').on('c.undone_at', 'is', null))
+      .leftJoin('app.check_ins as c', (join) =>
+        join.onRef('c.ticket_id', '=', 't.id').on('c.undone_at', 'is', null),
+      )
       .select(['t.code', 'c.id as check_in_id'])
       .where('t.registration_id', '=', found.registration.id)
       .executeTakeFirstOrThrow();
@@ -213,67 +235,87 @@ export async function shareView(ctx: AppContext, raw: string) {
     .selectFrom('app.registrations as r')
     .innerJoin('app.events as e', 'e.id', 'r.event_id')
     .leftJoin('app.tickets as t', 't.registration_id', 'r.id')
-    .leftJoin('app.check_ins as c', (join) => join.onRef('c.ticket_id', '=', 't.id').on('c.undone_at', 'is', null))
+    .leftJoin('app.check_ins as c', (join) =>
+      join.onRef('c.ticket_id', '=', 't.id').on('c.undone_at', 'is', null),
+    )
     .select(['r.state', 'e.title', 'e.starts_at', 'e.time_zone', 'e.status', 't.code', 'c.id as check_in_id'])
     .where('r.id', '=', token.registration_id)
     .executeTakeFirst();
   const now = await decisionTime(ctx.db);
   if (!row || now > checkInWindow(row.starts_at).closes) throw new InvalidLinkError(); // FR-LNK-5
   const event = { title: row.title, startsAt: row.starts_at.toISOString(), timeZone: row.time_zone };
-  if (row.state !== 'CONFIRMED' || row.status !== 'SCHEDULED' || !row.code) return { state: 'not_available' as const, event };
+  if (row.state !== 'CONFIRMED' || row.status !== 'SCHEDULED' || !row.code)
+    return { state: 'not_available' as const, event };
   if (row.check_in_id) return { state: 'checked_in' as const, event, transferStatement: TRANSFER_STATEMENT };
-  return { state: 'valid' as const, event, ticket: { code: row.code }, transferStatement: TRANSFER_STATEMENT };
+  return {
+    state: 'valid' as const,
+    event,
+    ticket: { code: row.code },
+    transferStatement: TRANSFER_STATEMENT,
+  };
 }
 
 /** TX-R03: participant cancellation with FIFO promotion in the same transaction (FR-SELF-2, FR-WL-2, BR-5). */
-export async function cancelByManagementLink(ctx: AppContext, raw: string, body: unknown, correlationId: string) {
+export async function cancelByManagementLink(
+  ctx: AppContext,
+  raw: string,
+  body: unknown,
+  correlationId: string,
+) {
   const found = await managedRegistration(ctx.db, raw);
   if (!found) throw new InvalidLinkError();
   // The token is checked before the body, so a malformed body never reveals token validity (ADR-017).
-  z.object({ confirmed: z.literal(true) }).strict().parse(body);
-  const outcome = await withEventLock(ctx.db, found.registration.event_id, 'exclusive', async ({ trx, now, event }) => {
-    const current = await managedRegistration(trx, raw); // re-validate under the lock (NFR-CON-4 b)
-    if (!current || event.status !== 'SCHEDULED') return null;
-    if (now >= event.starts_at) return 'closed' as const;
-    const reg = current.registration;
-    if (reg.state === 'CONFIRMED') {
-      const checkedIn = await trx
-        .selectFrom('app.check_ins as c')
-        .innerJoin('app.tickets as t', 't.id', 'c.ticket_id')
-        .select('c.id')
-        .where('t.registration_id', '=', reg.id)
-        .where('c.undone_at', 'is', null)
-        .executeTakeFirst();
-      if (checkedIn) return 'checked_in' as const;
-    }
-    // The decrement runs before any promotion increments (NFR-CON-4 f).
-    await trx
-      .updateTable('app.registrations')
-      .set({ state: 'CANCELLED', ended_at: now, end_reason: 'participant_cancelled', updated_at: now })
-      .where('id', '=', reg.id)
-      .execute();
-    await enqueue(trx, {
-      type: 'registration_cancelled',
-      logicalKey: `registration_cancelled:${reg.id}`,
-      recipientEmail: reg.email,
-      now,
-      eventId: event.id,
-      registrationId: reg.id,
-      payload: { previousState: reg.state },
-      correlationId,
-    });
-    const promoted = reg.state === 'CONFIRMED' ? await promoteFifo(trx, event.id, now, correlationId) : [];
-    await recordAudit(trx, {
-      now,
-      action: 'registration_cancel',
-      actorKind: 'participant_link',
-      eventId: event.id,
-      registrationId: reg.id,
-      outcome: 'success',
-      details: { previousState: reg.state, promoted: promoted.length },
-    });
-    return { result: 'cancelled' as const, previousState: reg.state as 'CONFIRMED' | 'WAITLISTED' };
-  });
+  z.object({ confirmed: z.literal(true) })
+    .strict()
+    .parse(body);
+  const outcome = await withEventLock(
+    ctx.db,
+    found.registration.event_id,
+    'exclusive',
+    async ({ trx, now, event }) => {
+      const current = await managedRegistration(trx, raw); // re-validate under the lock (NFR-CON-4 b)
+      if (!current || event.status !== 'SCHEDULED') return null;
+      if (now >= event.starts_at) return 'closed' as const;
+      const reg = current.registration;
+      if (reg.state === 'CONFIRMED') {
+        const checkedIn = await trx
+          .selectFrom('app.check_ins as c')
+          .innerJoin('app.tickets as t', 't.id', 'c.ticket_id')
+          .select('c.id')
+          .where('t.registration_id', '=', reg.id)
+          .where('c.undone_at', 'is', null)
+          .executeTakeFirst();
+        if (checkedIn) return 'checked_in' as const;
+      }
+      // The decrement runs before any promotion increments (NFR-CON-4 f).
+      await trx
+        .updateTable('app.registrations')
+        .set({ state: 'CANCELLED', ended_at: now, end_reason: 'participant_cancelled', updated_at: now })
+        .where('id', '=', reg.id)
+        .execute();
+      await enqueue(trx, {
+        type: 'registration_cancelled',
+        logicalKey: `registration_cancelled:${reg.id}`,
+        recipientEmail: reg.email,
+        now,
+        eventId: event.id,
+        registrationId: reg.id,
+        payload: { previousState: reg.state },
+        correlationId,
+      });
+      const promoted = reg.state === 'CONFIRMED' ? await promoteFifo(trx, event.id, now, correlationId) : [];
+      await recordAudit(trx, {
+        now,
+        action: 'registration_cancel',
+        actorKind: 'participant_link',
+        eventId: event.id,
+        registrationId: reg.id,
+        outcome: 'success',
+        details: { previousState: reg.state, promoted: promoted.length },
+      });
+      return { result: 'cancelled' as const, previousState: reg.state as 'CONFIRMED' | 'WAITLISTED' };
+    },
+  );
   if (!outcome) throw new InvalidLinkError();
   if (outcome === 'closed') throw new AppError(409, 'cancellation_closed');
   if (outcome === 'checked_in') throw new AppError(409, 'ticket_checked_in');
@@ -285,7 +327,10 @@ export async function cancelByManagementLink(ctx: AppContext, raw: string, body:
 export const rescheduleSchema = z
   .object({
     localStart: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/),
-    utcOffset: z.string().regex(/^[+-]\d{2}:\d{2}$/).optional(),
+    utcOffset: z
+      .string()
+      .regex(/^[+-]\d{2}:\d{2}$/)
+      .optional(),
     expectedScheduleVersion: z.number().int().min(1),
   })
   .strict();
@@ -299,11 +344,16 @@ export async function rescheduleEvent(
   correlationId: string,
 ) {
   if (!z.uuid().safeParse(eventId).success) throw new AppError(404, 'not_found');
-  const zone = await ctx.db.selectFrom('app.events').select('time_zone').where('id', '=', eventId).executeTakeFirst();
+  const zone = await ctx.db
+    .selectFrom('app.events')
+    .select('time_zone')
+    .where('id', '=', eventId)
+    .executeTakeFirst();
   if (!zone) throw new AppError(404, 'not_found');
   const resolved = resolveLocalStart(input.localStart, zone.time_zone, input.utcOffset);
   if (resolved.kind === 'nonexistent') throw new AppError(422, 'nonexistent_local_time');
-  if (resolved.kind === 'ambiguous') throw new AppError(422, 'ambiguous_local_time', { offsets: resolved.offsets });
+  if (resolved.kind === 'ambiguous')
+    throw new AppError(422, 'ambiguous_local_time', { offsets: resolved.offsets });
 
   const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
     if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
@@ -362,7 +412,8 @@ export async function rescheduleEvent(
   if (result === 'not_scheduled') throw new AppError(409, 'event_not_scheduled');
   if (result === 'started') throw new AppError(409, 'event_started');
   if (result === 'past') throw new AppError(422, 'start_not_in_future');
-  if (typeof result === 'object') throw new AppError(409, 'schedule_version_mismatch', { currentScheduleVersion: result.mismatch });
+  if (typeof result === 'object')
+    throw new AppError(409, 'schedule_version_mismatch', { currentScheduleVersion: result.mismatch });
   return result;
 }
 

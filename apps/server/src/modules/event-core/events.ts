@@ -4,7 +4,13 @@ import type { AppContext } from '../../composition/context.js';
 import { canonicalJson, publicId, sha256 } from '../../platform/crypto.js';
 import { AppError } from '../../platform/errors.js';
 import { decisionTime, withTransaction } from '../../platform/tx.js';
-import { checkInWindow, cutoffOf, eventPhase, isValidTimeZone, resolveLocalStart } from '../../platform/time.js';
+import {
+  checkInWindow,
+  cutoffOf,
+  eventPhase,
+  isValidTimeZone,
+  resolveLocalStart,
+} from '../../platform/time.js';
 import type { OrganizerPrincipal } from '../identity/sessions.js';
 import { scheduleReminderTask } from './lifecycle.js';
 
@@ -15,7 +21,10 @@ export const eventCreateSchema = z
     description: z.string().max(5000).nullable().optional(),
     localStart: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/),
     timeZone: z.string().min(1).max(64),
-    utcOffset: z.string().regex(/^[+-]\d{2}:\d{2}$/).optional(),
+    utcOffset: z
+      .string()
+      .regex(/^[+-]\d{2}:\d{2}$/)
+      .optional(),
     capacity: z.number().int().min(1).max(100_000),
   })
   .strict();
@@ -77,11 +86,14 @@ export function eventView(ctx: AppContext, row: EventRow, now: Date) {
 /** TX-E01 (D-17): idempotent per organizer and client request ID, with a normalized fingerprint. */
 export async function createEvent(ctx: AppContext, principal: OrganizerPrincipal, input: EventCreateInput) {
   if (!isValidTimeZone(input.timeZone)) {
-    throw new AppError(422, 'validation_failed', { errors: [{ field: 'timeZone', code: 'invalid_time_zone' }] });
+    throw new AppError(422, 'validation_failed', {
+      errors: [{ field: 'timeZone', code: 'invalid_time_zone' }],
+    });
   }
   const resolved = resolveLocalStart(input.localStart, input.timeZone, input.utcOffset);
   if (resolved.kind === 'nonexistent') throw new AppError(422, 'nonexistent_local_time');
-  if (resolved.kind === 'ambiguous') throw new AppError(422, 'ambiguous_local_time', { offsets: resolved.offsets });
+  if (resolved.kind === 'ambiguous')
+    throw new AppError(422, 'ambiguous_local_time', { offsets: resolved.offsets });
 
   const normalized = {
     title: input.title,
@@ -178,7 +190,9 @@ export async function dashboard(ctx: AppContext, principal: OrganizerPrincipal, 
   const counts = await sql<{ waitlisted: number; checked_in: number }>`
     SELECT
       (SELECT count(*) FROM app.registrations WHERE event_id = ${eventId} AND state = 'WAITLISTED')::int AS waitlisted,
-      (SELECT count(*) FROM app.check_ins WHERE event_id = ${eventId} AND undone_at IS NULL)::int AS checked_in`.execute(ctx.db);
+      (SELECT count(*) FROM app.check_ins WHERE event_id = ${eventId} AND undone_at IS NULL)::int AS checked_in`.execute(
+    ctx.db,
+  );
   const failures = await ctx.db
     .selectFrom('app.outbox_messages')
     .select((eb) => eb.fn.countAll<number>().as('n'))

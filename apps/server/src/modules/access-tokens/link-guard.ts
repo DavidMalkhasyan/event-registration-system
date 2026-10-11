@@ -8,7 +8,11 @@ import { RULES } from '../../platform/ratelimit.js';
  * token counts as a failed lookup and returns the generic 404. Writing the counter fails open
  * (ADR-017 §2.3), so an outage never makes invalid tokens distinguishable.
  */
-export async function withLinkRateLimit<T>(ctx: AppContext, request: FastifyRequest, run: () => Promise<T>): Promise<T> {
+export async function withLinkRateLimit<T>(
+  ctx: AppContext,
+  request: FastifyRequest,
+  run: () => Promise<T>,
+): Promise<T> {
   if (await ctx.limiter.isLimited(RULES.failedLinkLookupsPerIp, request.ip).catch(() => false)) {
     throw new InvalidLinkError(true);
   }

@@ -5,8 +5,22 @@ import { linkToken } from '../../platform/http.js';
 import { withLinkRateLimit } from '../access-tokens/link-guard.js';
 import { requireOrganizer } from '../identity/sessions.js';
 import { checkInAsOwner, checkInSchema } from './checkin.js';
-import { createEvent, dashboard, eventCreateSchema, getOwnedEvent, getPublicEvent, listEvents, listParticipants } from './events.js';
-import { cancelByManagementLink, managementView, rescheduleEvent, rescheduleSchema, shareView } from './lifecycle.js';
+import {
+  createEvent,
+  dashboard,
+  eventCreateSchema,
+  getOwnedEvent,
+  getPublicEvent,
+  listEvents,
+  listParticipants,
+} from './events.js';
+import {
+  cancelByManagementLink,
+  managementView,
+  rescheduleEvent,
+  rescheduleSchema,
+  shareView,
+} from './lifecycle.js';
 import { confirmVerification, resolveVerification, submitRegistration } from './registrations.js';
 
 const registrationSchema = z.object({ email: z.email().max(254) }).strict();
@@ -40,13 +54,19 @@ export function registerEventCoreRoutes(app: FastifyInstance, ctx: AppContext): 
     withLinkRateLimit(ctx, request, () => managementView(ctx, linkToken(request))),
   );
   app.post('/api/links/manage/cancel', async (request) =>
-    withLinkRateLimit(ctx, request, () => cancelByManagementLink(ctx, linkToken(request), request.body, request.id)),
+    withLinkRateLimit(ctx, request, () =>
+      cancelByManagementLink(ctx, linkToken(request), request.body, request.id),
+    ),
   );
 
-  app.get('/api/links/ticket', async (request) => withLinkRateLimit(ctx, request, () => shareView(ctx, linkToken(request))));
+  app.get('/api/links/ticket', async (request) =>
+    withLinkRateLimit(ctx, request, () => shareView(ctx, linkToken(request))),
+  );
 
   // ---- organizer
-  app.get('/api/events', async (request) => listEvents(ctx, await requireOrganizer(ctx, request, { csrf: false })));
+  app.get('/api/events', async (request) =>
+    listEvents(ctx, await requireOrganizer(ctx, request, { csrf: false })),
+  );
 
   app.post('/api/events', async (request, reply) => {
     const principal = await requireOrganizer(ctx, request, { csrf: true });
@@ -80,6 +100,11 @@ export function registerEventCoreRoutes(app: FastifyInstance, ctx: AppContext): 
 
   app.post('/api/events/:eventId/check-ins', async (request) => {
     const principal = await requireOrganizer(ctx, request, { csrf: true });
-    return checkInAsOwner(ctx, principal, params.parse(request.params).eventId, checkInSchema.parse(request.body));
+    return checkInAsOwner(
+      ctx,
+      principal,
+      params.parse(request.params).eventId,
+      checkInSchema.parse(request.body),
+    );
   });
 }

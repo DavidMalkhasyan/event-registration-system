@@ -56,7 +56,8 @@ export async function runMigrations(
     for (const row of applied.rows) {
       const file = migrations.find((m) => m.version === row.version);
       if (!file) throw new Error(`database has migration ${row.version} (${row.name}) unknown to this build`);
-      if (!file.checksum.equals(row.checksum)) throw new Error(`checksum mismatch for applied migration ${row.name}`);
+      if (!file.checksum.equals(row.checksum))
+        throw new Error(`checksum mismatch for applied migration ${row.name}`);
     }
     let count = 0;
     for (const migration of migrations.filter((m) => !applied.rows.some((r) => r.version === m.version))) {
@@ -71,7 +72,7 @@ export async function runMigrations(
         await client.query('COMMIT');
       } catch (error) {
         await client.query('ROLLBACK');
-        throw new Error(`migration ${migration.name} failed: ${(error as Error).message}`);
+        throw new Error(`migration ${migration.name} failed: ${(error as Error).message}`, { cause: error });
       }
       log(`applied ${migration.name} (${Date.now() - started} ms)`);
       count += 1;
@@ -89,12 +90,14 @@ export async function assertSchemaVersion(connectionString: string): Promise<num
   const client = new pg.Client({ connectionString });
   await client.connect();
   try {
-    const result = await client.query<{ v: number | null }>(
-      'SELECT max(version) AS v FROM app.schema_migrations',
-    ).catch(() => ({ rows: [{ v: null }] }));
+    const result = await client
+      .query<{ v: number | null }>('SELECT max(version) AS v FROM app.schema_migrations')
+      .catch(() => ({ rows: [{ v: null }] }));
     const actual = result.rows[0]?.v ?? 0;
     if (actual !== expected) {
-      throw new Error(`schema version ${actual} does not match the expected version ${expected}; run "pnpm migrate"`);
+      throw new Error(
+        `schema version ${actual} does not match the expected version ${expected}; run "pnpm migrate"`,
+      );
     }
     return actual;
   } finally {

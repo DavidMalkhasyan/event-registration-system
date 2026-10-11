@@ -19,12 +19,18 @@ export async function submitRegistration(
   correlationId: string,
 ): Promise<void> {
   const email = normalizeEmail(rawEmail);
-  const event = await ctx.db.selectFrom('app.events').select('id').where('public_id', '=', publicEventId).executeTakeFirst();
+  const event = await ctx.db
+    .selectFrom('app.events')
+    .select('id')
+    .where('public_id', '=', publicEventId)
+    .executeTakeFirst();
   if (!event) throw new AppError(404, 'not_found');
   const perIp = await ctx.limiter.hit(RULES.registrationPerIp, ip);
   const perAddress = await ctx.limiter.hit(RULES.registrationPerAddress, `${event.id}:${email}`);
   if (!perIp.allowed || !perAddress.allowed) {
-    throw new AppError(429, 'rate_limited', { retryAfterSeconds: Math.max(perIp.retryAfterSeconds, perAddress.retryAfterSeconds) });
+    throw new AppError(429, 'rate_limited', {
+      retryAfterSeconds: Math.max(perIp.retryAfterSeconds, perAddress.retryAfterSeconds),
+    });
   }
 
   const result = await withEventLock(ctx.db, event.id, 'exclusive', async ({ trx, now, event: locked }) => {
@@ -100,7 +106,10 @@ interface VerificationContext {
   registration: { id: string; email: string; state: string; verified_at: Date | null };
 }
 
-async function verificationContext(db: AppContext['db'] | Tx, raw: string): Promise<VerificationContext | null> {
+async function verificationContext(
+  db: AppContext['db'] | Tx,
+  raw: string,
+): Promise<VerificationContext | null> {
   const token = await findToken(db, 'verification', raw);
   if (!token?.registration_id) return null;
   const registration = await db
@@ -135,7 +144,8 @@ export async function resolveVerification(ctx: AppContext, raw: string) {
   if (!withinWindow(found.token, event.starts_at, now)) throw new InvalidLinkError();
   const summary = { title: event.title, startsAt: event.starts_at.toISOString(), timeZone: event.time_zone };
   if (found.registration.verified_at) return { state: 'already_confirmed' as const, event: summary };
-  if (found.registration.state !== 'PENDING_VERIFICATION' || event.status !== 'SCHEDULED') throw new InvalidLinkError();
+  if (found.registration.state !== 'PENDING_VERIFICATION' || event.status !== 'SCHEDULED')
+    throw new InvalidLinkError();
   return { state: 'awaiting_confirmation' as const, event: summary };
 }
 
@@ -164,76 +174,113 @@ export type VerificationResult =
   | { result: 'already_confirmed' };
 
 /** TX-R02: confirmation decided atomically under the exclusive event lock (FR-REG-4, BR-1, EC-1). */
-export async function confirmVerification(ctx: AppContext, raw: string, correlationId: string): Promise<VerificationResult> {
+export async function confirmVerification(
+  ctx: AppContext,
+  raw: string,
+  correlationId: string,
+): Promise<VerificationResult> {
   const found = await verificationContext(ctx.db, raw);
   if (!found?.token.event_id) throw new InvalidLinkError();
   const origin = ctx.config.PUBLIC_ORIGIN;
 
-  const outcome = await withEventLock(ctx.db, found.token.event_id, 'exclusive', async ({ trx, now, event }) => {
-    // Re-check everything read before the lock (NFR-CON-4 b).
-    const current = await verificationContext(trx, raw);
-    if (!current || !withinWindow(current.token, event.starts_at, now)) return null;
-    if (current.registration.verified_at) return { result: 'already_confirmed' } as const;
-    if (current.registration.state !== 'PENDING_VERIFICATION' || event.status !== 'SCHEDULED') return null;
-    const registrationId = current.registration.id;
-    const summary = { title: event.title, startsAt: event.starts_at.toISOString(), timeZone: event.time_zone };
+  const outcome = await withEventLock(
+    ctx.db,
+    found.token.event_id,
+    'exclusive',
+    async ({ trx, now, event }) => {
+      // Re-check everything read before the lock (NFR-CON-4 b).
+      const current = await verificationContext(trx, raw);
+      if (!current || !withinWindow(current.token, event.starts_at, now)) return null;
+      if (current.registration.verified_at) return { result: 'already_confirmed' } as const;
+      if (current.registration.state !== 'PENDING_VERIFICATION' || event.status !== 'SCHEDULED') return null;
+      const registrationId = current.registration.id;
+      const summary = {
+        title: event.title,
+        startsAt: event.starts_at.toISOString(),
+        timeZone: event.time_zone,
+      };
 
-    if (event.confirmed_count < event.capacity) {
+      if (event.confirmed_count < event.capacity) {
+        await trx
+          .updateTable('app.registrations')
+          .set({ state: 'CONFIRMED', verified_at: now, confirmed_at: now, updated_at: now })
+          .where('id', '=', registrationId)
+          .execute();
+        const code = await insertTicket(trx, registrationId, event.id, now);
+        const management = await issueToken(trx, {
+          type: 'management',
+          now,
+          registrationId,
+          eventId: event.id,
+          via: 'page',
+        });
+        const share = await issueToken(trx, {
+          type: 'share',
+          now,
+          registrationId,
+          eventId: event.id,
+          via: 'page',
+        });
+        // FR-NTF-2: confirmed within 24 h of Start → the ticket email is this version's reminder.
+        await enqueueWithSlotRule(trx, {
+          type: 'ticket_confirmation',
+          filledBy: 'ticket',
+          logicalKey: `ticket_confirmation:${registrationId}`,
+          event,
+          registrationId,
+          email: current.registration.email,
+          now,
+          occupiesSlot: withinReminderWindow(event.starts_at, now),
+          correlationId,
+        });
+        return {
+          result: 'confirmed',
+          event: summary,
+          ticket: { code },
+          links: { management: `${origin}/manage#t=${management}`, share: `${origin}/ticket#t=${share}` },
+          transferStatement: TRANSFER_STATEMENT,
+        } as const;
+      }
+
+      const seq = await claimWaitlistSeq(trx, event);
       await trx
         .updateTable('app.registrations')
-        .set({ state: 'CONFIRMED', verified_at: now, confirmed_at: now, updated_at: now })
+        .set({
+          state: 'WAITLISTED',
+          verified_at: now,
+          waitlisted_at: now,
+          waitlist_seq: seq,
+          updated_at: now,
+        })
         .where('id', '=', registrationId)
         .execute();
-      const code = await insertTicket(trx, registrationId, event.id, now);
-      const management = await issueToken(trx, { type: 'management', now, registrationId, eventId: event.id, via: 'page' });
-      const share = await issueToken(trx, { type: 'share', now, registrationId, eventId: event.id, via: 'page' });
-      // FR-NTF-2: confirmed within 24 h of Start → the ticket email is this version's reminder.
-      await enqueueWithSlotRule(trx, {
-        type: 'ticket_confirmation',
-        filledBy: 'ticket',
-        logicalKey: `ticket_confirmation:${registrationId}`,
-        event,
-        registrationId,
-        email: current.registration.email,
+      const position = await waitlistPosition(trx, event.id, seq);
+      const management = await issueToken(trx, {
+        type: 'management',
         now,
-        occupiesSlot: withinReminderWindow(event.starts_at, now),
+        registrationId,
+        eventId: event.id,
+        via: 'page',
+      });
+      await enqueue(trx, {
+        type: 'waitlist_confirmation',
+        logicalKey: `waitlist_confirmation:${registrationId}`,
+        recipientEmail: current.registration.email,
+        now,
+        eventId: event.id,
+        registrationId,
+        payload: { position },
         correlationId,
       });
       return {
-        result: 'confirmed',
+        result: 'waitlisted',
         event: summary,
-        ticket: { code },
-        links: { management: `${origin}/manage#t=${management}`, share: `${origin}/ticket#t=${share}` },
-        transferStatement: TRANSFER_STATEMENT,
+        position,
+        positionMayChange: true,
+        links: { management: `${origin}/manage#t=${management}` },
       } as const;
-    }
-
-    const seq = await claimWaitlistSeq(trx, event);
-    await trx
-      .updateTable('app.registrations')
-      .set({ state: 'WAITLISTED', verified_at: now, waitlisted_at: now, waitlist_seq: seq, updated_at: now })
-      .where('id', '=', registrationId)
-      .execute();
-    const position = await waitlistPosition(trx, event.id, seq);
-    const management = await issueToken(trx, { type: 'management', now, registrationId, eventId: event.id, via: 'page' });
-    await enqueue(trx, {
-      type: 'waitlist_confirmation',
-      logicalKey: `waitlist_confirmation:${registrationId}`,
-      recipientEmail: current.registration.email,
-      now,
-      eventId: event.id,
-      registrationId,
-      payload: { position },
-      correlationId,
-    });
-    return {
-      result: 'waitlisted',
-      event: summary,
-      position,
-      positionMayChange: true,
-      links: { management: `${origin}/manage#t=${management}` },
-    } as const;
-  });
+    },
+  );
   if (!outcome) throw new InvalidLinkError();
   return outcome;
 }

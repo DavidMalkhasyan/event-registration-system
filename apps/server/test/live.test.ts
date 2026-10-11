@@ -34,7 +34,12 @@ afterAll(async () => {
 });
 
 /** Reads SSE "count" events from a real HTTP connection until `want` counts arrived. */
-async function readCounts(url: string, cookie: string, want: number, onOpen: () => Promise<void>): Promise<number[]> {
+async function readCounts(
+  url: string,
+  cookie: string,
+  want: number,
+  onOpen: () => Promise<void>,
+): Promise<number[]> {
   const controller = new AbortController();
   const response = await fetch(url, { headers: { cookie }, signal: controller.signal });
   expect(response.headers.get('content-type')).toContain('text/event-stream');
@@ -93,7 +98,10 @@ describe('live checked-in count over SSE (P0 #12, FR-DSH-2, FR-DSH-3)', () => {
       }
       await bothOpen;
     };
-    const [first, second] = await Promise.all([readCounts(url, s.cookie, 2, onOpen), readCounts(url, s.cookie, 2, onOpen)]);
+    const [first, second] = await Promise.all([
+      readCounts(url, s.cookie, 2, onOpen),
+      readCounts(url, s.cookie, 2, onOpen),
+    ]);
     expect(first).toEqual([0, 1]);
     expect(second).toEqual([0, 1]);
   });

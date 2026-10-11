@@ -14,7 +14,12 @@ export interface ProviderResult {
 }
 
 export interface EmailProvider {
-  send(input: { idempotencyKey: string; to: string; email: RenderedEmail; tags: Record<string, string> }): Promise<ProviderResult>;
+  send(input: {
+    idempotencyKey: string;
+    to: string;
+    email: RenderedEmail;
+    tags: Record<string, string>;
+  }): Promise<ProviderResult>;
 }
 
 export interface MailboxEntry {
@@ -32,10 +37,21 @@ export class FakeEmailProvider implements EmailProvider {
     mkdirSync(join(dir, 'keys'), { recursive: true });
   }
 
-  async send(input: { idempotencyKey: string; to: string; email: RenderedEmail; tags: Record<string, string> }): Promise<ProviderResult> {
+  async send(input: {
+    idempotencyKey: string;
+    to: string;
+    email: RenderedEmail;
+    tags: Record<string, string>;
+  }): Promise<ProviderResult> {
     mkdirSync(join(this.dir, 'keys'), { recursive: true });
-    const keyFile = join(this.dir, 'keys', `${createHash('sha256').update(input.idempotencyKey).digest('hex')}.json`);
-    const bodyHash = createHash('sha256').update(JSON.stringify([input.to, input.email])).digest('hex');
+    const keyFile = join(
+      this.dir,
+      'keys',
+      `${createHash('sha256').update(input.idempotencyKey).digest('hex')}.json`,
+    );
+    const bodyHash = createHash('sha256')
+      .update(JSON.stringify([input.to, input.email]))
+      .digest('hex');
     if (existsSync(keyFile)) {
       const previous = JSON.parse(readFileSync(keyFile, 'utf8')) as { bodyHash: string; id: string };
       return previous.bodyHash === bodyHash
@@ -43,7 +59,13 @@ export class FakeEmailProvider implements EmailProvider {
         : { category: 'idempotent_key_conflict' };
     }
     const id = `fake_${randomUUID()}`;
-    const entry: MailboxEntry = { id, createdAt: new Date().toISOString(), to: input.to, ...input.email, tags: input.tags };
+    const entry: MailboxEntry = {
+      id,
+      createdAt: new Date().toISOString(),
+      to: input.to,
+      ...input.email,
+      tags: input.tags,
+    };
     // Record the key first: a crash after this point is replayed, never delivered twice.
     writeFileSync(keyFile, JSON.stringify({ bodyHash, id }));
     writeFileSync(join(this.dir, `${Date.now()}-${id}.json`), JSON.stringify(entry, null, 2));

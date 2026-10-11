@@ -55,11 +55,7 @@ export function ticketCode(): string {
 
 /** Normalizes typed codes: upper case, separators removed, Crockford look-alikes mapped. */
 export function normalizeTicketCode(input: string): string {
-  return input
-    .toUpperCase()
-    .replace(/[\s-]/g, '')
-    .replace(/O/g, '0')
-    .replace(/[IL]/g, '1');
+  return input.toUpperCase().replace(/[\s-]/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
 }
 
 /** Unguessable public event identifier (FR-EVT-12). */

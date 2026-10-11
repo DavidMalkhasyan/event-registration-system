@@ -26,9 +26,9 @@ export function setTestClockOffset(seconds: number): void {
 
 /** Decision time (Glossary, D-1): database clock read after the serialization lock. */
 export async function decisionTime(trx: Tx | Database): Promise<Date> {
-  const row = await sql<{ t: Date }>`SELECT clock_timestamp() + make_interval(secs => ${clockOffsetSeconds}) AS t`.execute(
-    trx,
-  );
+  const row = await sql<{
+    t: Date;
+  }>`SELECT clock_timestamp() + make_interval(secs => ${clockOffsetSeconds}) AS t`.execute(trx);
   return row.rows[0]!.t;
 }
 
@@ -110,7 +110,10 @@ export async function withAccountLocks<T>(
 }
 
 /** Transaction without an event or account lock (event creation, outbox-only paths, single rows). */
-export async function withTransaction<T>(db: Database, fn: (ctx: { trx: Tx; now: Date }) => Promise<T>): Promise<T> {
+export async function withTransaction<T>(
+  db: Database,
+  fn: (ctx: { trx: Tx; now: Date }) => Promise<T>,
+): Promise<T> {
   return withRetry(() =>
     db.transaction().execute(async (trx) => {
       await setTimeouts(trx);

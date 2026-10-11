@@ -53,9 +53,18 @@ export function registerIdentityRoutes(app: FastifyInstance, ctx: AppContext): v
   app.post('/api/links/sign-in/confirm', async (request, reply) => {
     const header = request.headers['x-csrf-token'];
     const result = await withLinkRateLimit(ctx, request, () =>
-      confirmSignIn(ctx, linkToken(request), request.cookies[PRESESSION_COOKIE], typeof header === 'string' ? header : undefined),
+      confirmSignIn(
+        ctx,
+        linkToken(request),
+        request.cookies[PRESESSION_COOKIE],
+        typeof header === 'string' ? header : undefined,
+      ),
     );
-    reply.setCookie(ORG_COOKIE, result.sessionId, { ...cookieBase, sameSite: 'lax', maxAge: result.maxAgeSeconds });
+    reply.setCookie(ORG_COOKIE, result.sessionId, {
+      ...cookieBase,
+      sameSite: 'lax',
+      maxAge: result.maxAgeSeconds,
+    });
     reply.clearCookie(PRESESSION_COOKIE, { ...cookieBase, sameSite: 'strict' });
     return { redirect: '/organizer/' };
   });

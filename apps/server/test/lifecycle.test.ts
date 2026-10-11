@@ -64,7 +64,9 @@ describe('cancellation and FIFO promotion (P0 #3, #6, #8)', () => {
     ]);
 
     await drain(h);
-    const promotionMail = mailFor(h, 'b@example.test').find((m) => m.subject.startsWith('A place became free'));
+    const promotionMail = mailFor(h, 'b@example.test').find((m) =>
+      m.subject.startsWith('A place became free'),
+    );
     const ticket = await h.db
       .selectFrom('app.tickets as t')
       .innerJoin('app.registrations as r', 'r.id', 't.registration_id')
@@ -72,7 +74,9 @@ describe('cancellation and FIFO promotion (P0 #3, #6, #8)', () => {
       .where('r.email', '=', 'b@example.test')
       .executeTakeFirstOrThrow();
     expect(promotionMail?.text).toContain(ticket.code);
-    expect(mailFor(h, 'a@example.test').some((m) => m.subject.startsWith('Registration cancelled'))).toBe(true);
+    expect(mailFor(h, 'a@example.test').some((m) => m.subject.startsWith('Registration cancelled'))).toBe(
+      true,
+    );
 
     // The cancelled participant's management link no longer works (FR-LNK-6).
     const reuse = await cancel(tokenFromLink(results[0].links.management));
@@ -82,7 +86,10 @@ describe('cancellation and FIFO promotion (P0 #3, #6, #8)', () => {
 
   it('promotes exactly one person when two confirmed participants cancel at once (AC-9)', async () => {
     const { event, results } = await setup(2, ['a@example.test', 'b@example.test', 'w@example.test']);
-    await Promise.all([cancel(tokenFromLink(results[0].links.management)), cancel(tokenFromLink(results[1].links.management))]);
+    await Promise.all([
+      cancel(tokenFromLink(results[0].links.management)),
+      cancel(tokenFromLink(results[1].links.management)),
+    ]);
     const confirmed = await h.db
       .selectFrom('app.registrations')
       .select('email')
@@ -91,14 +98,21 @@ describe('cancellation and FIFO promotion (P0 #3, #6, #8)', () => {
       .execute();
     expect(confirmed.map((r) => r.email)).toEqual(['w@example.test']);
     await drain(h);
-    expect(mailFor(h, 'w@example.test').filter((m) => m.subject.startsWith('A place became free'))).toHaveLength(1);
+    expect(
+      mailFor(h, 'w@example.test').filter((m) => m.subject.startsWith('A place became free')),
+    ).toHaveLength(1);
   });
 
   it('does not promote anyone when a waiting participant cancels', async () => {
     const { event, results } = await setup(1, ['a@example.test', 'b@example.test', 'c@example.test']);
     const response = await cancel(tokenFromLink(results[1].links.management));
     expect(response.json().previousState).toBe('WAITLISTED');
-    const waiting = await h.db.selectFrom('app.registrations').select('email').where('event_id', '=', event.id).where('state', '=', 'WAITLISTED').execute();
+    const waiting = await h.db
+      .selectFrom('app.registrations')
+      .select('email')
+      .where('event_id', '=', event.id)
+      .where('state', '=', 'WAITLISTED')
+      .execute();
     expect(waiting.map((r) => r.email)).toEqual(['c@example.test']);
   });
 
@@ -115,7 +129,12 @@ describe('cancellation and FIFO promotion (P0 #3, #6, #8)', () => {
 
 describe('check-in (P0 #9, #10)', () => {
   async function checkIn(s: Session, eventId: string, code: string, requestId = randomUUID()) {
-    return h.app.inject({ method: 'POST', url: `/api/events/${eventId}/check-ins`, headers: organizerHeaders(s), payload: { code, requestId } });
+    return h.app.inject({
+      method: 'POST',
+      url: `/api/events/${eventId}/check-ins`,
+      headers: organizerHeaders(s),
+      payload: { code, requestId },
+    });
   }
 
   it('checks a ticket in exactly once, and replays the original result for a repeated request ID', async () => {
@@ -134,14 +153,20 @@ describe('check-in (P0 #9, #10)', () => {
     expect(again.firstCheckedInAt).toBeTruthy();
     expect((await checkIn(s, event.id, 'ZZZZZZZZZZZZ')).json().outcome).toBe('INVALID_CODE');
 
-    const rows = await h.db.selectFrom('app.check_ins').select('id').where('event_id', '=', event.id).execute();
+    const rows = await h.db
+      .selectFrom('app.check_ins')
+      .select('id')
+      .where('event_id', '=', event.id)
+      .execute();
     expect(rows).toHaveLength(1);
   });
 
   it('gives exactly one success when ten devices scan the same ticket at once (AC-22)', async () => {
     const { s, event, results } = await setup(1, ['a@example.test']);
     moveClockTo(new Date(event.startsAt), -10 * 60_000);
-    const responses = await Promise.all(Array.from({ length: 10 }, () => checkIn(s, event.id, results[0].ticket.code)));
+    const responses = await Promise.all(
+      Array.from({ length: 10 }, () => checkIn(s, event.id, results[0].ticket.code)),
+    );
     const outcomes = responses.map((r) => r.json().outcome).sort();
     expect(outcomes.filter((o) => o === 'CHECKED_IN')).toHaveLength(1);
     expect(outcomes.filter((o) => o === 'ALREADY_CHECKED_IN')).toHaveLength(9);
@@ -170,7 +195,11 @@ describe('organizer dashboard (P0 #11)', () => {
       headers: organizerHeaders(s),
       payload: { code: results[0].ticket.code, requestId: randomUUID() },
     });
-    const dash = await h.app.inject({ method: 'GET', url: `/api/events/${event.id}/dashboard`, headers: { cookie: s.cookie } });
+    const dash = await h.app.inject({
+      method: 'GET',
+      url: `/api/events/${event.id}/dashboard`,
+      headers: { cookie: s.cookie },
+    });
     expect(dash.json().counts).toEqual({ confirmed: 2, waitlisted: 1, checkedIn: 1 });
   });
 });
@@ -178,7 +207,13 @@ describe('organizer dashboard (P0 #11)', () => {
 describe('event creation (FR-EVT-1, AC-185)', () => {
   it('is idempotent per organizer and request ID, and rejects a reused ID with different data', async () => {
     const s = await signIn(h, 'organizer@example.test');
-    const payload = { requestId: randomUUID(), title: 'Idempotent', localStart: '2099-05-01T18:00', timeZone: 'Europe/Berlin', capacity: 10 };
+    const payload = {
+      requestId: randomUUID(),
+      title: 'Idempotent',
+      localStart: '2099-05-01T18:00',
+      timeZone: 'Europe/Berlin',
+      capacity: 10,
+    };
     const post = (p: Record<string, unknown>) =>
       h.app.inject({ method: 'POST', url: '/api/events', headers: organizerHeaders(s), payload: p });
 
@@ -200,7 +235,13 @@ describe('event creation (FR-EVT-1, AC-185)', () => {
       method: 'POST',
       url: '/api/events',
       headers: { origin: ORIGIN, cookie: s.cookie, 'x-csrf-token': 'v1.1.wrong' },
-      payload: { requestId: randomUUID(), title: 'x', localStart: '2099-05-01T18:00', timeZone: 'UTC', capacity: 1 },
+      payload: {
+        requestId: randomUUID(),
+        title: 'x',
+        localStart: '2099-05-01T18:00',
+        timeZone: 'UTC',
+        capacity: 1,
+      },
     });
     expect(response.statusCode).toBe(403);
     expect(response.json().code).toBe('csrf_failed');

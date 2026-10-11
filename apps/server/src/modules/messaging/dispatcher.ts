@@ -56,10 +56,14 @@ export class Dispatcher {
 
     // TX-M14: durable pre-claim counter in its own transaction (NFR-REL-13 h).
     await sql`UPDATE app.outbox_messages SET preclaim_failures = preclaim_failures + 1
-      WHERE id IN (SELECT id FROM app.outbox_messages WHERE id = ANY(${ids}::uuid[]) ORDER BY id FOR UPDATE SKIP LOCKED)`.execute(this.db);
+      WHERE id IN (SELECT id FROM app.outbox_messages WHERE id = ANY(${ids}::uuid[]) ORDER BY id FOR UPDATE SKIP LOCKED)`.execute(
+      this.db,
+    );
 
     const claimed = first.event_id
-      ? ((await withEventLock(this.db, first.event_id, 'shared', ({ trx, now }) => this.claim(trx, ids, now))) ?? [])
+      ? ((await withEventLock(this.db, first.event_id, 'shared', ({ trx, now }) =>
+          this.claim(trx, ids, now),
+        )) ?? [])
       : await withTransaction(this.db, ({ trx, now }) => this.claim(trx, ids, now));
     for (const item of claimed) await this.send(item);
     return group.length;
@@ -68,7 +72,20 @@ export class Dispatcher {
   private async claim(trx: Tx, ids: string[], now: Date): Promise<Claimed[]> {
     const rows = await trx
       .selectFrom('app.outbox_messages')
-      .select(['id', 'message_type', 'event_id', 'registration_id', 'sign_in_request_id', 'verification_generation', 'schedule_version', 'recipient_email', 'payload', 'possibly_accepted', 'attempt_no', 'logical_key'])
+      .select([
+        'id',
+        'message_type',
+        'event_id',
+        'registration_id',
+        'sign_in_request_id',
+        'verification_generation',
+        'schedule_version',
+        'recipient_email',
+        'payload',
+        'possibly_accepted',
+        'attempt_no',
+        'logical_key',
+      ])
       .where('id', 'in', ids)
       .where('status', 'in', ['QUEUED', 'WAITING_RETRY'])
       .where('next_attempt_at', '<=', now)
@@ -81,7 +98,14 @@ export class Dispatcher {
       const handler = HANDLERS[row.message_type];
       const msg = row as unknown as OutboxRow;
       if (!handler) {
-        await this.settle(trx, row.id, row.possibly_accepted ? 'UNCONFIRMED' : 'FAILED', 'permanent_error', now, 'no_handler');
+        await this.settle(
+          trx,
+          row.id,
+          row.possibly_accepted ? 'UNCONFIRMED' : 'FAILED',
+          'permanent_error',
+          now,
+          'no_handler',
+        );
         continue;
       }
       await sql`SAVEPOINT claim_one`.execute(trx);
@@ -90,26 +114,55 @@ export class Dispatcher {
         if (!freshness.fresh) {
           // D-12: DROPPED only when nothing may have been submitted.
           if (freshness.reason === 'link_expiry') {
-            await this.settle(trx, row.id, row.possibly_accepted ? 'UNCONFIRMED' : 'FAILED', 'link_expiry', now);
+            await this.settle(
+              trx,
+              row.id,
+              row.possibly_accepted ? 'UNCONFIRMED' : 'FAILED',
+              'link_expiry',
+              now,
+            );
           } else {
-            await this.settle(trx, row.id, row.possibly_accepted ? 'UNCONFIRMED' : 'DROPPED', freshness.reason, now);
+            await this.settle(
+              trx,
+              row.id,
+              row.possibly_accepted ? 'UNCONFIRMED' : 'DROPPED',
+              freshness.reason,
+              now,
+            );
           }
           continue;
         }
         const attemptNo = row.attempt_no + 1;
         await trx
           .updateTable('app.outbox_messages')
-          .set({ status: 'SENDING', attempt_no: attemptNo, lease_expires_at: new Date(now.getTime() + LEASE_MS), preclaim_failures: 0 })
+          .set({
+            status: 'SENDING',
+            attempt_no: attemptNo,
+            lease_expires_at: new Date(now.getTime() + LEASE_MS),
+            preclaim_failures: 0,
+          })
           .where('id', '=', row.id)
           .execute();
         await trx
           .insertInto('app.outbox_generations')
-          .values({ outbox_id: row.id, generation: 1, provider_key: `${row.logical_key}:g1`, created_at: now })
+          .values({
+            outbox_id: row.id,
+            generation: 1,
+            provider_key: `${row.logical_key}:g1`,
+            created_at: now,
+          })
           .onConflict((oc) => oc.columns(['outbox_id', 'generation']).doNothing())
           .execute();
         await trx
           .insertInto('app.outbox_attempts')
-          .values({ outbox_id: row.id, generation: 1, attempt_no: attemptNo, worker_id: this.workerId, claimed_at: now, lease_expires_at: new Date(now.getTime() + LEASE_MS) })
+          .values({
+            outbox_id: row.id,
+            generation: 1,
+            attempt_no: attemptNo,
+            worker_id: this.workerId,
+            claimed_at: now,
+            lease_expires_at: new Date(now.getTime() + LEASE_MS),
+          })
           .execute();
         // Raw tokens stay in this process's memory until the provider call returns (D-2).
         const tokens = await handler.issueTokens(trx, msg, now, attemptNo);
@@ -128,10 +181,24 @@ export class Dispatcher {
     return claimed;
   }
 
-  private async settle(trx: Tx, id: string, status: 'DROPPED' | 'FAILED' | 'UNCONFIRMED' | 'ACCEPTED', reason: string, now: Date, errorCode?: string) {
+  private async settle(
+    trx: Tx,
+    id: string,
+    status: 'DROPPED' | 'FAILED' | 'UNCONFIRMED' | 'ACCEPTED',
+    reason: string,
+    now: Date,
+    errorCode?: string,
+  ) {
     await trx
       .updateTable('app.outbox_messages')
-      .set({ status, settle_reason: reason, settled_at: now, lease_expires_at: null, preclaim_failures: 0, ...(errorCode ? { last_error_code: errorCode } : {}) })
+      .set({
+        status,
+        settle_reason: reason,
+        settled_at: now,
+        lease_expires_at: null,
+        preclaim_failures: 0,
+        ...(errorCode ? { last_error_code: errorCode } : {}),
+      })
       .where('id', '=', id)
       .execute();
   }
@@ -152,7 +219,13 @@ export class Dispatcher {
         .where('id', '=', msg.id)
         .forUpdate()
         .executeTakeFirst();
-      if (!current || current.status !== 'SENDING' || current.attempt_no !== attemptNo || !current.lease_expires_at || current.lease_expires_at <= now) {
+      if (
+        !current ||
+        current.status !== 'SENDING' ||
+        current.attempt_no !== attemptNo ||
+        !current.lease_expires_at ||
+        current.lease_expires_at <= now
+      ) {
         return null;
       }
       await trx
@@ -202,7 +275,10 @@ export class Dispatcher {
         .where('attempt_no', '=', attemptNo)
         .execute();
       const accepted = category === 'accepted' || category === 'replayed';
-      if (accepted && ['SENDING', 'WAITING_RETRY', 'AWAITING_EVIDENCE', 'UNCONFIRMED'].includes(current.status)) {
+      if (
+        accepted &&
+        ['SENDING', 'WAITING_RETRY', 'AWAITING_EVIDENCE', 'UNCONFIRMED'].includes(current.status)
+      ) {
         await this.settle(trx, msg.id, 'ACCEPTED', 'accepted', now);
         await trx
           .updateTable('app.outbox_generations')
@@ -216,7 +292,12 @@ export class Dispatcher {
       if (category === 'idempotent_key_conflict') {
         await trx
           .updateTable('app.outbox_messages')
-          .set({ status: 'AWAITING_EVIDENCE', possibly_accepted: true, awaiting_evidence_since: now, lease_expires_at: null })
+          .set({
+            status: 'AWAITING_EVIDENCE',
+            possibly_accepted: true,
+            awaiting_evidence_since: now,
+            lease_expires_at: null,
+          })
           .where('id', '=', msg.id)
           .execute();
         return;
@@ -224,7 +305,13 @@ export class Dispatcher {
       const delay = BACKOFF_MS[Math.min(attemptNo - 1, BACKOFF_MS.length - 1)]!;
       await trx
         .updateTable('app.outbox_messages')
-        .set({ status: 'WAITING_RETRY', possibly_accepted: true, lease_expires_at: null, next_attempt_at: new Date(now.getTime() + delay), last_error_code: 'ambiguous' })
+        .set({
+          status: 'WAITING_RETRY',
+          possibly_accepted: true,
+          lease_expires_at: null,
+          next_attempt_at: new Date(now.getTime() + delay),
+          last_error_code: 'ambiguous',
+        })
         .where('id', '=', msg.id)
         .execute();
     });
@@ -244,7 +331,9 @@ export class Dispatcher {
         FROM expired e WHERE m.id = e.id`.execute(trx);
       await sql`UPDATE app.outbox_attempts a SET lease_expired_at = ${now}
         FROM app.outbox_messages m WHERE a.outbox_id = m.id AND a.attempt_no = m.attempt_no
-          AND a.lease_expired_at IS NULL AND a.result_at IS NULL AND m.status = 'WAITING_RETRY' AND a.lease_expires_at < ${now}`.execute(trx);
+          AND a.lease_expired_at IS NULL AND a.result_at IS NULL AND m.status = 'WAITING_RETRY' AND a.lease_expires_at < ${now}`.execute(
+        trx,
+      );
       // Retry horizon (NFR-REL-4) and the pre-claim bound (NFR-REL-13 h).
       for (const [condition, reason] of [
         [sql`horizon_at <= ${now}`, 'horizon_reached'],

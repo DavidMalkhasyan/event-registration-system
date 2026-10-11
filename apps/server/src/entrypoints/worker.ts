@@ -16,7 +16,12 @@ try {
 }
 const db = createDatabase(config.DATABASE_URL);
 const workerId = `${hostname()}:${process.pid}:${randomUUID().slice(0, 8)}`;
-const dispatcher = new Dispatcher(db, new FakeEmailProvider(config.DEV_MAILBOX_DIR), config.PUBLIC_ORIGIN, workerId);
+const dispatcher = new Dispatcher(
+  db,
+  new FakeEmailProvider(config.DEV_MAILBOX_DIR),
+  config.PUBLIC_ORIGIN,
+  workerId,
+);
 
 let running = true;
 process.on('SIGINT', () => (running = false));

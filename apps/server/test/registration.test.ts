@@ -28,7 +28,11 @@ describe('registration, verification and capacity (P0 #2, #4, #5, #7, #15)', () 
     const event = await createEvent(h, s, { capacity: 2, startsInHours: 72 });
     const token = await registerAndGetVerifyToken(h, event.publicId, 'alice@example.test');
 
-    const view = await h.app.inject({ method: 'GET', url: '/api/links/verify', headers: { authorization: `Link ${token}` } });
+    const view = await h.app.inject({
+      method: 'GET',
+      url: '/api/links/verify',
+      headers: { authorization: `Link ${token}` },
+    });
     expect(view.statusCode).toBe(200);
     expect(view.json().state).toBe('awaiting_confirmation');
 
@@ -57,9 +61,17 @@ describe('registration, verification and capacity (P0 #2, #4, #5, #7, #15)', () 
     expect(again.json()).toEqual({ status: 'check_your_email' });
     await drain(h);
 
-    const rows = await h.db.selectFrom('app.registrations').select(['state']).where('event_id', '=', event.id).execute();
+    const rows = await h.db
+      .selectFrom('app.registrations')
+      .select(['state'])
+      .where('event_id', '=', event.id)
+      .execute();
     expect(rows).toHaveLength(1);
-    const confirmed = await h.db.selectFrom('app.events').select('confirmed_count').where('id', '=', event.id).executeTakeFirstOrThrow();
+    const confirmed = await h.db
+      .selectFrom('app.events')
+      .select('confirmed_count')
+      .where('id', '=', event.id)
+      .executeTakeFirstOrThrow();
     expect(confirmed.confirmed_count).toBe(1);
     // The address owner received an access email instead (FR-REG-8).
     expect(mailFor(h, 'bob@example.test').some((m) => m.subject.startsWith('Your registration'))).toBe(true);
@@ -81,18 +93,24 @@ describe('registration, verification and capacity (P0 #2, #4, #5, #7, #15)', () 
     const s = await signIn(h, 'organizer@example.test');
     const event = await createEvent(h, s, { capacity: 1, startsInHours: 72 });
     const tokens: string[] = [];
-    for (let i = 0; i < 12; i += 1) tokens.push(await registerAndGetVerifyToken(h, event.publicId, `racer${i}@example.test`));
+    for (let i = 0; i < 12; i += 1)
+      tokens.push(await registerAndGetVerifyToken(h, event.publicId, `racer${i}@example.test`));
 
     const responses = await Promise.all(tokens.map((t) => confirm(h, t)));
     const results = responses.map((r) => r.json());
     expect(results.filter((r) => r.result === 'confirmed')).toHaveLength(1);
-    const positions = results.filter((r) => r.result === 'waitlisted').map((r) => r.position).sort((a, b) => a - b);
+    const positions = results
+      .filter((r) => r.result === 'waitlisted')
+      .map((r) => r.position)
+      .sort((a, b) => a - b);
     expect(positions).toEqual(Array.from({ length: 11 }, (_, i) => i + 1));
 
     // The trigger-maintained counter equals the actual number of confirmed rows (NFR-CON-5, AC-134).
     const check = await sql<{ drift: number }>`
       SELECT count(*)::int AS drift FROM app.events e
-      WHERE e.confirmed_count <> (SELECT count(*) FROM app.registrations r WHERE r.event_id = e.id AND r.state = 'CONFIRMED')`.execute(h.db);
+      WHERE e.confirmed_count <> (SELECT count(*) FROM app.registrations r WHERE r.event_id = e.id AND r.state = 'CONFIRMED')`.execute(
+      h.db,
+    );
     expect(check.rows[0]!.drift).toBe(0);
   });
 
@@ -102,7 +120,11 @@ describe('registration, verification and capacity (P0 #2, #4, #5, #7, #15)', () 
     const token = await registerAndGetVerifyToken(h, event.publicId, 'double@example.test');
     const [a, b] = await Promise.all([confirm(h, token), confirm(h, token)]);
     expect([a.json().result, b.json().result].sort()).toEqual(['already_confirmed', 'confirmed']);
-    const tickets = await h.db.selectFrom('app.tickets').select('id').where('event_id', '=', event.id).execute();
+    const tickets = await h.db
+      .selectFrom('app.tickets')
+      .select('id')
+      .where('event_id', '=', event.id)
+      .execute();
     expect(tickets).toHaveLength(1);
   });
 
@@ -113,7 +135,11 @@ describe('registration, verification and capacity (P0 #2, #4, #5, #7, #15)', () 
     await registerAndGetVerifyToken(h, event.publicId, 'carol@example.test'); // resubmission replaces the first link
 
     for (const auth of [`Link ${first}`, 'Link not-a-token', `Link ${'A'.repeat(43)}`, '']) {
-      const response = await h.app.inject({ method: 'GET', url: '/api/links/verify', headers: { authorization: auth } });
+      const response = await h.app.inject({
+        method: 'GET',
+        url: '/api/links/verify',
+        headers: { authorization: auth },
+      });
       expect(response.statusCode).toBe(404);
       expect(response.body).toBe(GENERIC_INVALID_LINK_BODY);
     }

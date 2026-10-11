@@ -12,9 +12,7 @@ export function isValidTimeZone(zone: string): boolean {
 }
 
 export type LocalStartResult =
-  | { kind: 'ok'; instant: Date }
-  | { kind: 'nonexistent' }
-  | { kind: 'ambiguous'; offsets: string[] };
+  { kind: 'ok'; instant: Date } | { kind: 'nonexistent' } | { kind: 'ambiguous'; offsets: string[] };
 
 function formatOffset(minutes: number): string {
   const sign = minutes < 0 ? '-' : '+';

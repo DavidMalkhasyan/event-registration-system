@@ -20,7 +20,11 @@ export interface WebAppOptions {
 }
 
 /** Builds the web process (HTTP API, live counts, dev mailbox, built client). */
-export async function buildWebApp(config: Config, db: Database, options: WebAppOptions = {}): Promise<FastifyInstance> {
+export async function buildWebApp(
+  config: Config,
+  db: Database,
+  options: WebAppOptions = {},
+): Promise<FastifyInstance> {
   const app = Fastify({
     genReqId: () => randomUUID(),
     logger:
@@ -29,7 +33,12 @@ export async function buildWebApp(config: Config, db: Database, options: WebAppO
         : {
             level: config.NODE_ENV === 'production' ? 'info' : 'debug',
             // ENG-ERR-6: credential headers are never logged; URLs never carry link tokens (ADR-011).
-            redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers["x-csrf-token"]', 'res.headers["set-cookie"]'],
+            redact: [
+              'req.headers.authorization',
+              'req.headers.cookie',
+              'req.headers["x-csrf-token"]',
+              'res.headers["set-cookie"]',
+            ],
           },
   });
   await app.register(fastifyCookie);
@@ -48,15 +57,24 @@ export async function buildWebApp(config: Config, db: Database, options: WebAppO
     return { schemaVersion: Number(row?.v ?? 0), database: 'ok' };
   });
 
-  if (config.NODE_ENV !== 'production' && config.EMAIL_PROVIDER === 'fake') registerDevMailbox(app, config.DEV_MAILBOX_DIR);
+  if (config.NODE_ENV !== 'production' && config.EMAIL_PROVIDER === 'fake')
+    registerDevMailbox(app, config.DEV_MAILBOX_DIR);
 
   // Serve the built client on the same origin (ADR-013); each path family gets its HTML entry.
   if (config.CLIENT_DIST_DIR && existsSync(config.CLIENT_DIST_DIR)) {
-    await app.register(fastifyStatic, { root: resolve(config.CLIENT_DIST_DIR), index: false, wildcard: false });
-    const entry = (file: string) => async (_req: unknown, reply: { sendFile: (f: string) => unknown }) => reply.sendFile(file);
-    for (const path of ['/e/*', '/verify', '/manage', '/ticket', '/sign-in']) app.get(path, entry('public.html'));
+    await app.register(fastifyStatic, {
+      root: resolve(config.CLIENT_DIST_DIR),
+      index: false,
+      wildcard: false,
+    });
+    const entry = (file: string) => async (_req: unknown, reply: { sendFile: (f: string) => unknown }) =>
+      reply.sendFile(file);
+    for (const path of ['/e/*', '/verify', '/manage', '/ticket', '/sign-in'])
+      app.get(path, entry('public.html'));
     for (const path of ['/', '/organizer', '/organizer/*']) app.get(path, entry('organizer.html'));
-    app.get('/assets/*', async (request, reply) => reply.sendFile((request.params as { '*': string })['*'], resolve(config.CLIENT_DIST_DIR!, 'assets')));
+    app.get('/assets/*', async (request, reply) =>
+      reply.sendFile((request.params as { '*': string })['*'], resolve(config.CLIENT_DIST_DIR!, 'assets')),
+    );
   }
   return app;
 }

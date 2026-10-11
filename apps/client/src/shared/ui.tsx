@@ -16,7 +16,15 @@ export function formatLocal(iso: string, timeZone: string): string {
   return `${text} (${timeZone})`;
 }
 
-export function Page({ title, children, actions }: { title: string; children: ReactNode; actions?: ReactNode }) {
+export function Page({
+  title,
+  children,
+  actions,
+}: {
+  title: string;
+  children: ReactNode;
+  actions?: ReactNode;
+}) {
   return (
     <main className="page">
       <header className="page-header">
@@ -37,7 +45,13 @@ export function Card({ children, title }: { children: ReactNode; title?: string 
   );
 }
 
-export function Alert({ kind = 'error', children }: { kind?: 'error' | 'info' | 'success'; children: ReactNode }) {
+export function Alert({
+  kind = 'error',
+  children,
+}: {
+  kind?: 'error' | 'info' | 'success';
+  children: ReactNode;
+}) {
   return (
     <div className={`alert alert-${kind}`} role={kind === 'error' ? 'alert' : 'status'}>
       {children}
@@ -90,8 +104,11 @@ export function DevMailboxHint() {
   if (!available) return null;
   return (
     <p className="muted">
-      Demo setup: emails are delivered to the <a href="/dev/mailbox" target="_blank" rel="noreferrer">development mailbox</a>,
-      not to real inboxes.
+      Demo setup: emails are delivered to the{' '}
+      <a href="/dev/mailbox" target="_blank" rel="noreferrer">
+        development mailbox
+      </a>
+      , not to real inboxes.
     </p>
   );
 }
