@@ -6,7 +6,8 @@ import { RULES } from '../../platform/ratelimit.js';
 import type { CheckInOutcome } from '../../platform/schema.js';
 import { checkInWindow } from '../../platform/time.js';
 import { withEventLock } from '../../platform/tx.js';
-import { sessionStillValid, type OrganizerPrincipal } from '../identity/sessions.js';
+import { sessionStillValid } from '../identity/sessions.js';
+import { staffStillValid, type EventPrincipal } from '../identity/staff-sessions.js';
 
 export const checkInSchema = z.object({ code: z.string().min(1).max(32), requestId: z.uuid() }).strict();
 
@@ -15,15 +16,21 @@ export interface CheckInResult {
   firstCheckedInAt?: string;
 }
 
-/** TX-C01: atomic check-in, idempotent by request ID (FR-CHK-1 to FR-CHK-5, BR-7, D-5). Owner path. */
-export async function checkInAsOwner(
+/**
+ * TX-C01: atomic check-in, idempotent by request ID (FR-CHK-1 to FR-CHK-5, BR-7, D-5), for the event's
+ * owner or one of its staff sessions (FR-STAFF-2). The principal is re-checked after the event lock,
+ * so no check-in commits after a revocation has committed (AC-156). The result never contains
+ * participant identity (API_DESIGN §12 check 6).
+ */
+export async function checkIn(
   ctx: AppContext,
-  principal: OrganizerPrincipal,
+  principal: EventPrincipal,
   eventId: string,
   input: z.infer<typeof checkInSchema>,
 ): Promise<CheckInResult> {
   if (!z.uuid().safeParse(eventId).success) throw new AppError(404, 'not_found');
   const code = normalizeTicketCode(input.code);
+  const principalId = principal.kind === 'owner' ? principal.sessionId : principal.staffSessionId;
   // Plain lookup before the transaction (NFR-CON-4 b).
   const ticket = await ctx.db
     .selectFrom('app.tickets')
@@ -32,8 +39,13 @@ export async function checkInAsOwner(
     .executeTakeFirst();
 
   const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
-    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
-    if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
+    if (principal.kind === 'owner') {
+      if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+      if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
+    } else {
+      if (principal.eventId !== eventId) return 'not_found' as const;
+      if (!(await staffStillValid(trx, principal.staffSessionId, now))) return 'unauthenticated' as const;
+    }
 
     const previous = await trx
       .selectFrom('app.check_in_requests')
@@ -42,7 +54,7 @@ export async function checkInAsOwner(
       .where('request_id', '=', input.requestId)
       .executeTakeFirst();
     if (previous) {
-      if (previous.principal_id !== principal.sessionId) return 'conflict' as const;
+      if (previous.principal_id !== principalId) return 'conflict' as const;
       return {
         outcome: previous.outcome,
         ...(previous.first_checked_in_at
@@ -72,8 +84,9 @@ export async function checkInAsOwner(
             ticket_id: ticket.id,
             event_id: eventId,
             checked_in_at: now,
-            actor_kind: 'owner',
-            actor_account_id: principal.accountId,
+            ...(principal.kind === 'owner'
+              ? { actor_kind: 'owner' as const, actor_account_id: principal.accountId }
+              : { actor_kind: 'staff' as const, actor_staff_session_id: principal.staffSessionId }),
           })
           .onConflict((oc) => oc.column('ticket_id').where('undone_at', 'is', null).doNothing())
           .returning('checked_in_at')
@@ -96,8 +109,8 @@ export async function checkInAsOwner(
       .values({
         event_id: eventId,
         request_id: input.requestId,
-        principal_kind: 'owner',
-        principal_id: principal.sessionId,
+        principal_kind: principal.kind,
+        principal_id: principalId,
         ticket_id: ticket && ticket.event_id === eventId ? ticket.id : null,
         outcome,
         first_checked_in_at: firstCheckedInAt,
@@ -111,7 +124,7 @@ export async function checkInAsOwner(
   if (result === 'unauthenticated') throw new AppError(401, 'unauthenticated');
   if (result === 'conflict') throw new AppError(409, 'request_id_conflict');
   if (result.outcome === 'INVALID_CODE' || result.outcome === 'WRONG_EVENT') {
-    const limit = await ctx.limiter.hit(RULES.failedCheckInsPerSession, principal.sessionId);
+    const limit = await ctx.limiter.hit(RULES.failedCheckInsPerSession, principalId);
     if (!limit.allowed)
       throw new AppError(429, 'rate_limited', { retryAfterSeconds: limit.retryAfterSeconds });
   }

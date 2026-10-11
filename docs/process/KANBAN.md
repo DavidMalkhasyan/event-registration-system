@@ -4,7 +4,7 @@
 |---|---|
 | **Columns** | Backlog → To Do → In Progress → Review → Done, plus **Deferred** for extended scope that was intentionally not built |
 | **Work-in-progress limits** | In Progress ≤ 2, Review ≤ 3 |
-| **Last updated** | 2026-10-12, session S-10 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
+| **Last updated** | 2026-10-12, session S-11 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
 | **Scope** | Re-planned in S-02 by the final delivery strategy (PD-15): P0 is mandatory, then P1, with P2 deferred. Requirement-level status is in [ASSIGNMENT_SCOPE.md](../../ASSIGNMENT_SCOPE.md). |
 
 ## Rules
@@ -45,13 +45,14 @@
 | K-302b Re-authentication (FR-ORG-5, AC-149, ADR-010 §8) | M3 | `c866ae0`, `70eb8da`, `adde442`, `55943cc`; [PR #4](https://github.com/DavidMalkhasyan/event-registration-system/pull/4) into `dev`; CI runs [38153782544](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38153782544) and [38154065724](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38154065724) passed (53/53, 5/5, 7/7); merged 2026-10-11 20:08:54 as `88399fd`. Not in `main`. |
 | K-304c Event cancellation (FR-EVT-9, BR-16, BR-23, TX-E05, AC-18, AC-19, AC-59; D1–D7) | M3 | `b3379f5`, `7575432`, `44b453e`, `754621c`; [PR #5](https://github.com/DavidMalkhasyan/event-registration-system/pull/5) into `dev`; CI runs [38162451724](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38162451724) and [38162851806](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38162851806) passed (73/73, 5/5, 9/9); merged 2026-10-11 22:15:17 as `fef8a81`. Not in `main`. |
 | K-304d Event deletion (FR-EVT-10, 11, 13, 14; TX-E06; API #37, #38) | M3 | `13ba1eb`, `17d85f4`, `39f1159`, `e235112`; [PR #6](https://github.com/DavidMalkhasyan/event-registration-system/pull/6) into `dev`; CI runs [38164273828](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38164273828) and [38164505147](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38164505147) passed (4 migrations; 83/83, 5/5, 12/12); merged 2026-10-11 22:39:04 as `d90062e`. Not in `main`. |
+| K-405 Participant self-service: ticket resend, share links, management and share rotation (FR-SELF-4, FR-SHR-1, FR-ROT-1 to FR-ROT-11; TX-P01 to TX-P03) | M4 | `c1ba465`, `da1ee09`, `704c241`, `8567170`; [PR #7](https://github.com/DavidMalkhasyan/event-registration-system/pull/7) into `dev`; CI runs [38174098814](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38174098814) and [38174318350](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38174318350) passed (5 migrations; 99/99, 6/6, 14/14); merged 2026-10-12 00:59:52 as `35d9213`. Not in `main`. |
 | K-505 Playwright suites, **reduced scope** | M5 | `b7a164f`: 4 tests, including two simultaneous clients. 4/4 passed in 3 runs; a mutation check proved the live-count test fails when the feature breaks. |
 
 ## Review
 
 | Card | Milestone | Awaiting |
 |---|---|---|
-| K-405 Participant self-service: ticket resend, share-link issuance, management and share rotation (FR-SELF-4, FR-SHR-1, FR-ROT-1 to FR-ROT-11; TX-P01 to TX-P03; API #9 to #11) | M4 | Done on `feature/k-405-participant-self-service` (`da1ee09` server, migration `0005` and tests, `704c241` UI and E2E): 16 integration tests (AC-75 genuinely concurrent, forced rollback, no raw token in logs or database), 1 client unit test, 2 E2E tests, mutation checks. [PR #7](https://github.com/DavidMalkhasyan/event-registration-system/pull/7) into `dev`; CI [run 38174098814](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38174098814) passed (5 migrations; 99/99, 6/6, 14/14). **Awaiting:** merge into `dev`; Done is recorded after the merge. |
+| K-406 Staff invitations and sessions (FR-STAFF-1 to FR-STAFF-7; TX-S01 to TX-S03; API #14 to #16, #41, #42, #45 to #50), including the K-304c dependency | M4 | Done on `feature/k-406-staff-invitations` (`c6437d6` server, migration `0006` and tests, `465acbf` UI and E2E): 11 integration tests (AC-156 forced orders and lock-held races, AC-186 a on a real server), 1 E2E test, mutation checks. [PR #8](https://github.com/DavidMalkhasyan/event-registration-system/pull/8) into `dev`; CI [run 38176421220](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38176421220) passed (6 migrations; 110/110, 6/6, 15/15). **Awaiting:** merge into `dev`; Done is recorded after the merge. |
 | K-001 Apply R60; synchronize the documents | M0 | Stakeholder check (commit `3fe9cb7`) |
 | K-004 Process documentation | M0 | Stakeholder review |
 
@@ -77,7 +78,7 @@
 | K-403 Notifications | 9 of 17 message types | The rest, with their features |
 | K-404 Jobs | Reminder fan-out (P0 #13); cutoff job (K-404b, done in `dev`) | — |
 | K-408 Email providers | Fake provider | Resend adapter (P2) |
-| K-504 Scanner and live count | Owner check-in screen with live count | Staff scanner (P1) |
+| K-504 Scanner and live count | Owner check-in screen with live count; minimal staff check-in screen at `/staff` (K-406, PD-57) | A dedicated staff entry and scanner polish (UI work) |
 
 ## Backlog
 
@@ -95,4 +96,3 @@
 |---|---|
 | K-205 `migrate budget-sync` | P2 |
 | K-402 Webhooks, provider-event log, delivery facts | P2 |
-| K-406 Staff invitations and sessions. **Carries a dependency from K-304c (D5, PD-40):** event cancellation must revoke active invitations in the cancellation transaction and make existing staff sessions unusable (FR-STAFF-4, FR-STAFF-5). | P1 |

@@ -130,6 +130,7 @@ export interface AccessTokensTable {
   hash_alg: Generated<number>;
   registration_id: string | null;
   sign_in_request_id: string | null;
+  staff_invitation_id: Generated<string | null>;
   event_id: string | null;
   issued_at: Timestamp;
   issued_via: 'page' | 'email';
@@ -262,6 +263,30 @@ export interface ReminderSlotsTable {
   created_at: Timestamp;
 }
 
+export interface StaffInvitationsTable {
+  id: Generated<string>;
+  event_id: string;
+  invited_email: string;
+  status: Generated<'pending' | 'accepted' | 'revoked' | 'replaced'>;
+  created_at: Timestamp;
+  expires_at: Timestamp;
+  accepted_at: Timestamp | null;
+  ended_at: Timestamp | null;
+}
+
+export interface StaffSessionsTable {
+  id: Generated<string>;
+  event_id: string;
+  invitation_id: string;
+  session_hash: Buffer;
+  hash_alg: Generated<number>;
+  created_at: Timestamp;
+  last_seen_at: Timestamp;
+  absolute_expires_at: Timestamp;
+  revoked_at: Timestamp | null;
+  revoke_reason: 'owner_revoked' | null;
+}
+
 export interface RotationRequestsTable {
   id: Generated<string>;
   registration_id: string;
@@ -322,4 +347,6 @@ export interface DB {
   'app.scheduled_tasks': ScheduledTasksTable;
   'app.deletion_markers': DeletionMarkersTable;
   'app.rotation_requests': RotationRequestsTable;
+  'app.staff_invitations': StaffInvitationsTable;
+  'app.staff_sessions': StaffSessionsTable;
 }

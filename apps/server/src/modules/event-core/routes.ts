@@ -4,7 +4,8 @@ import type { AppContext } from '../../composition/context.js';
 import { linkToken } from '../../platform/http.js';
 import { withLinkRateLimit } from '../access-tokens/link-guard.js';
 import { requireOrganizer } from '../identity/sessions.js';
-import { checkInAsOwner, checkInSchema } from './checkin.js';
+import { requireEventPrincipal } from '../identity/staff-sessions.js';
+import { checkIn, checkInSchema } from './checkin.js';
 import {
   createEvent,
   dashboard,
@@ -143,13 +144,10 @@ export function registerEventCoreRoutes(app: FastifyInstance, ctx: AppContext): 
     return getOwnedEvent(ctx, principal, eventId);
   });
 
+  // checkIn (API #45): the owner or a staff session of this event (FR-STAFF-2, PD-56).
   app.post('/api/events/:eventId/check-ins', async (request) => {
-    const principal = await requireOrganizer(ctx, request, { csrf: true });
-    return checkInAsOwner(
-      ctx,
-      principal,
-      params.parse(request.params).eventId,
-      checkInSchema.parse(request.body),
-    );
+    const eventId = params.parse(request.params).eventId;
+    const principal = await requireEventPrincipal(ctx, request, eventId, { csrf: true });
+    return checkIn(ctx, principal, eventId, checkInSchema.parse(request.body));
   });
 }

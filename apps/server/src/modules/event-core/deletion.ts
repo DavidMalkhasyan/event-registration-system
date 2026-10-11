@@ -225,6 +225,9 @@ export async function deleteEvent(
     await trx.deleteFrom('app.check_ins').where('event_id', '=', eventId).execute();
     await trx.deleteFrom('app.tickets').where('event_id', '=', eventId).execute();
     await trx.deleteFrom('app.registrations').where('event_id', '=', eventId).execute();
+    // FR-STAFF-4: staff access ends with the event (§8.4 steps 8 and 9).
+    await trx.deleteFrom('app.staff_sessions').where('event_id', '=', eventId).execute();
+    await trx.deleteFrom('app.staff_invitations').where('event_id', '=', eventId).execute();
     await trx.deleteFrom('app.events').where('id', '=', eventId).execute();
     return { error: null };
   });

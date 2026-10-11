@@ -79,6 +79,7 @@ export class Dispatcher {
         'registration_id',
         'sign_in_request_id',
         'verification_generation',
+        'request_ref',
         'schedule_version',
         'recipient_email',
         'payload',

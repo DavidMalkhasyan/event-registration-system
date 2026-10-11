@@ -15,6 +15,7 @@ import {
   type OrganizerPrincipal,
 } from '../identity/sessions.js';
 import { enqueue, type MessageType } from '../messaging/outbox.js';
+import { revokeInvitationsOnCancellation } from '../staff/staff.js';
 
 const DAY_MS = 24 * 3_600_000;
 export const TRANSFER_STATEMENT = 'This ticket can be transferred, but it admits one person, once.';
@@ -425,6 +426,8 @@ export async function cancelEvent(
         correlationId,
       });
     }
+    // PD-58 (K-304c dependency, FR-STAFF-5): pending staff invitations and their links end with the event.
+    await revokeInvitationsOnCancellation(trx, eventId, now);
     const count = (state: string) => ended.rows.find((r) => r.state === state)?.n ?? 0;
     await recordAudit(trx, {
       now,

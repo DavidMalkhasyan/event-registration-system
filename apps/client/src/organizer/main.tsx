@@ -388,6 +388,7 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
       {event.status === 'SCHEDULED' && <RecentSignIn session={session} />}
       <CancelEvent session={session} event={event} onDone={load} />
       <DeleteEvent session={session} event={event} />
+      <StaffCard session={session} event={event} />
       <Card title={`Participants (${participants.length})`}>
         <table>
           <thead>
@@ -513,6 +514,146 @@ function CancelEvent({ session, event, onDone }: { session: Session; event: Even
         </div>
       )}
       {error && <Alert>{error}</Alert>}
+    </Card>
+  );
+}
+
+interface StaffOverview {
+  invitations: {
+    id: string;
+    email: string;
+    status: string;
+    createdAt: string;
+    expiresAt: string;
+    acceptedAt?: string;
+    canReinvite: boolean;
+  }[];
+  sessions: { id: string; createdAt: string; lastSeenAt: string }[];
+}
+
+const INVITATION_STATUS: Record<string, string> = {
+  pending: 'Invited',
+  accepted: 'Accepted',
+  expired: 'Expired',
+  revoked: 'Revoked',
+  replaced: 'Replaced',
+};
+
+/** Staff invitations and device sessions (FR-STAFF-1, FR-STAFF-3, FR-STAFF-5 to FR-STAFF-7). */
+function StaffCard({ session, event }: { session: Session; event: EventItem }) {
+  const [overview, setOverview] = useState<StaffOverview>();
+  const [email, setEmail] = useState('');
+  const [message, setMessage] = useState<{ kind: 'success' | 'error'; text: string }>();
+  const load = useCallback(() => {
+    api<StaffOverview>(`/api/events/${event.id}/staff`)
+      .then(setOverview)
+      .catch(() => undefined);
+  }, [event.id]);
+  useEffect(load, [load]);
+  if (event.status !== 'SCHEDULED') return null;
+  const act = async (path: string, body: unknown, done: string) => {
+    setMessage(undefined);
+    try {
+      await api(path, { method: 'POST', csrf: session.csrfToken, ...(body ? { body } : {}) });
+      setMessage({ kind: 'success', text: done });
+      load();
+    } catch (err) {
+      setMessage({ kind: 'error', text: errorMessage(err) });
+    }
+  };
+  const invite = (address: string) =>
+    act(`/api/events/${event.id}/staff-invitations`, { email: address }, `Invitation sent to ${address}.`);
+  return (
+    <Card title="Staff">
+      <p className="muted">
+        Staff can only check tickets in and see the checked-in count, for this event, during the check-in
+        window. Each invitation link works once, on one device, and expires after 7 days.
+      </p>
+      <form
+        className="row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void invite(email).then(() => setEmail(''));
+        }}
+      >
+        <label>
+          Staff email address
+          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        </label>
+        <button style={{ flex: '0 0 auto' }}>Send invitation</button>
+      </form>
+      {message && <Alert kind={message.kind}>{message.text}</Alert>}
+      {overview && overview.invitations.length > 0 && (
+        <table>
+          <thead>
+            <tr>
+              <th>Invited</th>
+              <th>Status</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {overview.invitations.map((i) => (
+              <tr key={i.id}>
+                <td>{i.email}</td>
+                <td>
+                  {INVITATION_STATUS[i.status] ?? i.status}
+                  {i.acceptedAt ? ` ${new Date(i.acceptedAt).toLocaleString()}` : ''}
+                </td>
+                <td>
+                  {i.status === 'pending' && (
+                    <button
+                      className="secondary"
+                      onClick={() =>
+                        act(
+                          `/api/events/${event.id}/staff-invitations/${i.id}/revocation`,
+                          null,
+                          'Invitation revoked.',
+                        )
+                      }
+                    >
+                      Revoke
+                    </button>
+                  )}
+                  {i.canReinvite && (
+                    <button className="secondary" onClick={() => invite(i.email)}>
+                      Re-invite
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {overview && overview.sessions.length > 0 && (
+        <>
+          <h3>Active staff devices</h3>
+          <ul className="stack">
+            {overview.sessions.map((d) => (
+              <li key={d.id} className="row">
+                <span>
+                  Since {new Date(d.createdAt).toLocaleString()} · last seen{' '}
+                  {new Date(d.lastSeenAt).toLocaleTimeString()}
+                </span>
+                <button
+                  className="danger"
+                  style={{ flex: '0 0 auto' }}
+                  onClick={() =>
+                    act(
+                      `/api/events/${event.id}/staff-sessions/${d.id}/revocation`,
+                      null,
+                      'Staff access revoked.',
+                    )
+                  }
+                >
+                  Revoke access
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </Card>
   );
 }
@@ -856,7 +997,26 @@ declare global {
   }
 }
 
-function CheckIn({ session, eventId }: { session: Session; eventId: string }) {
+interface StaffEventInfo {
+  title: string;
+  timeZone: string;
+  opensAt: string;
+  closesAt: string;
+}
+
+/**
+ * Entrance check-in (FR-CHK). Used by the owner (event details from the organizer API) and by staff
+ * devices (details from /api/staff/session, PD-57); staff never call organizer endpoints.
+ */
+function CheckIn({
+  csrfToken,
+  eventId,
+  staff,
+}: {
+  csrfToken: string;
+  eventId: string;
+  staff?: StaffEventInfo;
+}) {
   const [event, setEvent] = useState<EventItem>();
   const [code, setCode] = useState('');
   const [result, setResult] = useState<{ outcome: string; firstCheckedInAt?: string } | 'offline'>();
@@ -866,8 +1026,9 @@ function CheckIn({ session, eventId }: { session: Session; eventId: string }) {
   const live = useLiveCount(eventId);
 
   useEffect(() => {
+    if (staff) return;
     void api<EventItem>(`/api/events/${eventId}`).then(setEvent);
-  }, [eventId]);
+  }, [eventId, staff]);
 
   const submit = useCallback(
     async (value: string) => {
@@ -881,7 +1042,7 @@ function CheckIn({ session, eventId }: { session: Session; eventId: string }) {
             `/api/events/${eventId}/check-ins`,
             {
               method: 'POST',
-              csrf: session.csrfToken,
+              csrf: csrfToken,
               body: { code: value.trim(), requestId },
             },
           );
@@ -900,7 +1061,7 @@ function CheckIn({ session, eventId }: { session: Session; eventId: string }) {
       setResult('offline');
       setBusy(false);
     },
-    [eventId, session.csrfToken],
+    [eventId, csrfToken],
   );
 
   // Camera scanning where the browser provides BarcodeDetector; manual entry always works.
@@ -932,8 +1093,8 @@ function CheckIn({ session, eventId }: { session: Session; eventId: string }) {
   const ok = result !== 'offline' && result?.outcome === 'CHECKED_IN';
   return (
     <Page
-      title={event ? `Check-in: ${event.title}` : 'Check-in'}
-      actions={<Link to={`/organizer/events/${eventId}`}>← Dashboard</Link>}
+      title={event ? `Check-in: ${event.title}` : staff ? `Check-in: ${staff.title}` : 'Check-in'}
+      actions={staff ? undefined : <Link to={`/organizer/events/${eventId}`}>← Dashboard</Link>}
     >
       <div className="stats">
         <div className="stat">
@@ -986,14 +1147,61 @@ function CheckIn({ session, eventId }: { session: Session; eventId: string }) {
             )}
           </div>
         )}
-        {event && (
+        {(event || staff) && (
           <p className="muted">
-            Check-in window: {formatLocal(event.checkInOpensAt, event.timeZone)} to{' '}
-            {formatLocal(event.checkInClosesAt, event.timeZone)}.
+            Check-in window:{' '}
+            {event
+              ? `${formatLocal(event.checkInOpensAt, event.timeZone)} to ${formatLocal(event.checkInClosesAt, event.timeZone)}`
+              : `${formatLocal(staff!.opensAt, staff!.timeZone)} to ${formatLocal(staff!.closesAt, staff!.timeZone)}`}
+            .
           </p>
         )}
       </Card>
     </Page>
+  );
+}
+
+// ---------------------------------------------------------------- staff device (FR-STAFF-2)
+function StaffApp() {
+  const [view, setView] = useState<
+    | {
+        eventId: string;
+        event: { title: string; startsAt: string; timeZone: string };
+        windowOpensAt: string;
+        windowClosesAt: string;
+        csrfToken: string;
+      }
+    | null
+    | undefined
+  >();
+  useEffect(() => {
+    api<NonNullable<typeof view>>('/api/staff/session')
+      .then(setView)
+      .catch(() => setView(null));
+  }, []);
+  if (view === undefined) return <Page title="Loading…">{null}</Page>;
+  if (view === null)
+    return (
+      <Page title="No check-in access">
+        <Card>
+          <p>
+            This device has no check-in access, or it has ended (the check-in window closed, the event was
+            cancelled, or the organizer revoked it). Ask the organizer for a new invitation.
+          </p>
+        </Card>
+      </Page>
+    );
+  return (
+    <CheckIn
+      csrfToken={view.csrfToken}
+      eventId={view.eventId}
+      staff={{
+        title: view.event.title,
+        timeZone: view.event.timeZone,
+        opensAt: view.windowOpensAt,
+        closesAt: view.windowClosesAt,
+      }}
+    />
   );
 }
 
@@ -1010,10 +1218,11 @@ function App() {
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
+  if (path === '/staff') return <StaffApp />;
   if (session === undefined) return <Page title="Loading…">{null}</Page>;
   if (session === null) return <SignInRequest />;
   const checkIn = /^\/organizer\/events\/([0-9a-f-]{36})\/check-in$/.exec(path);
-  if (checkIn) return <CheckIn session={session} eventId={checkIn[1]!} />;
+  if (checkIn) return <CheckIn csrfToken={session.csrfToken} eventId={checkIn[1]!} />;
   const detail = /^\/organizer\/events\/([0-9a-f-]{36})$/.exec(path);
   if (detail) return <EventDetail session={session} eventId={detail[1]!} />;
   return <EventsPage session={session} />;
