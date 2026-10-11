@@ -27,6 +27,7 @@ import {
   shareView,
   updateEventDetails,
 } from './lifecycle.js';
+import { deleteEvent, deleteEventSchema, getDeletionPreview } from './deletion.js';
 import { confirmVerification, resolveVerification, submitRegistration } from './registrations.js';
 
 const registrationSchema = z.object({ email: z.email().max(254) }).strict();
@@ -102,6 +103,19 @@ export function registerEventCoreRoutes(app: FastifyInstance, ctx: AppContext): 
     const eventId = params.parse(request.params).eventId;
     await rescheduleEvent(ctx, principal, eventId, rescheduleSchema.parse(request.body), request.id);
     return getOwnedEvent(ctx, principal, eventId);
+  });
+
+  // getDeletionPreview (API #37) and deleteEvent (API #38): recent authentication; TX-E06.
+  app.get('/api/events/:eventId/deletion-preview', async (request) => {
+    const principal = await requireOrganizer(ctx, request, { csrf: false });
+    return getDeletionPreview(ctx, principal, params.parse(request.params).eventId);
+  });
+
+  app.post('/api/events/:eventId/deletion', async (request, reply) => {
+    const principal = await requireOrganizer(ctx, request, { csrf: true });
+    const eventId = params.parse(request.params).eventId;
+    await deleteEvent(ctx, principal, eventId, deleteEventSchema.parse(request.body ?? {}));
+    return reply.code(204).send();
   });
 
   // cancelEvent (API catalogue #36): confirmed, recent authentication; a repeat returns 200 (TX-E05).

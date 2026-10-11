@@ -36,6 +36,7 @@ export async function createHarness(): Promise<Harness> {
     CSRF_SECRET: process.env.CSRF_SECRET ?? secret(),
     PRESESSION_SECRET: process.env.PRESESSION_SECRET ?? secret(),
     RATE_LIMIT_SECRET: process.env.RATE_LIMIT_SECRET ?? secret(),
+    PREVIEW_SECRET: process.env.PREVIEW_SECRET ?? secret(),
     EMAIL_PROVIDER: 'fake',
     DEV_MAILBOX_DIR: mailboxDir,
   });

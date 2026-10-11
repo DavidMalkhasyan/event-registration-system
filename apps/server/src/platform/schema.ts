@@ -262,6 +262,18 @@ export interface ReminderSlotsTable {
   created_at: Timestamp;
 }
 
+export interface DeletionMarkersTable {
+  event_id: string;
+  owner_account_id: string;
+  scheduled_start: Timestamp;
+  time_zone: string;
+  deleted_at: Timestamp;
+  deleted_by_account_id: string;
+  registrations_deleted: number;
+  failed_required_notices: number;
+  unconfirmed_required_notices: number;
+}
+
 export interface ScheduledTasksTable {
   id: Generated<string>;
   kind: 'reminder_fanout' | 'cutoff_processing';
@@ -296,4 +308,5 @@ export interface DB {
   'app.schema_migrations': SchemaMigrationsTable;
   'app.reminder_slots': ReminderSlotsTable;
   'app.scheduled_tasks': ScheduledTasksTable;
+  'app.deletion_markers': DeletionMarkersTable;
 }

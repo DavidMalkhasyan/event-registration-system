@@ -229,6 +229,7 @@ function CreateEvent({ session, onCreated }: { session: Session; onCreated: () =
 }
 
 function EventsPage({ session }: { session: Session }) {
+  const [deletedNotice] = useState(() => new URLSearchParams(window.location.search).has('deleted'));
   const [events, setEvents] = useState<EventItem[]>();
   const [error, setError] = useState<string>();
   const load = useCallback(() => {
@@ -239,6 +240,12 @@ function EventsPage({ session }: { session: Session }) {
   useEffect(load, [load]);
   return (
     <Page title="Your events" actions={<SignOut session={session} />}>
+      {deletedNotice && (
+        <Alert kind="success">
+          The event was deleted. A deletion record and the audit history are kept; no personal data is in
+          them.
+        </Alert>
+      )}
       <CreateEvent session={session} onCreated={load} />
       <Card title="Events">
         {error && <Alert>{error}</Alert>}
@@ -380,6 +387,7 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
       <Reschedule session={session} event={event} onDone={load} />
       {event.status === 'SCHEDULED' && <RecentSignIn session={session} />}
       <CancelEvent session={session} event={event} onDone={load} />
+      <DeleteEvent session={session} event={event} />
       <Card title={`Participants (${participants.length})`}>
         <table>
           <thead>
@@ -505,6 +513,134 @@ function CancelEvent({ session, event, onDone }: { session: Session; event: Even
         </div>
       )}
       {error && <Alert>{error}</Alert>}
+    </Card>
+  );
+}
+
+interface DeletionPreview {
+  eligible: boolean;
+  blockers: string[];
+  requiredNoticeIssues: { registrationId: string; messageType: string; sendState: string; label: string }[];
+  previewToken: string;
+}
+
+const BLOCKER_TEXT: Record<string, string> = {
+  has_confirmed_registrations:
+    'It still has confirmed participants. Only events without confirmed or waiting participants can be deleted; you can cancel the event instead.',
+  has_waitlisted_registrations: 'It still has participants on the waiting list.',
+  notifications_pending: 'Notifications are still being sent; try again later.',
+  event_cancelled: "Cancelled events can't be deleted.",
+};
+
+const NOTICE_TEXT: Record<string, string> = {
+  failed: 'failed',
+  delivery_outcome_unknown: 'delivery outcome unknown',
+};
+
+/**
+ * Event deletion (FR-EVT-10, FR-EVT-14): the preview shows exactly what will be deleted and why it may
+ * be blocked; the confirmation sends the preview token, so the server deletes only that state. Needs a
+ * recent sign-in (FR-ORG-5). Not offered for cancelled events (FR-EVT-11).
+ */
+function DeleteEvent({ session, event }: { session: Session; event: EventItem }) {
+  const [step, setStep] = useState<'idle' | 'loading' | 'preview' | 'deleting' | 'reauth'>('idle');
+  const [view, setView] = useState<DeletionPreview>();
+  const [message, setMessage] = useState<string>();
+  if (event.status !== 'SCHEDULED') return null;
+
+  const loadPreview = async (note?: string) => {
+    setStep('loading');
+    setMessage(note);
+    try {
+      setView(await api<DeletionPreview>(`/api/events/${event.id}/deletion-preview`));
+      setStep('preview');
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'reauthentication_required') setStep('reauth');
+      else {
+        setMessage(errorMessage(err));
+        setStep('idle');
+      }
+    }
+  };
+  const remove = async () => {
+    setStep('deleting');
+    try {
+      await api(`/api/events/${event.id}/deletion`, {
+        method: 'POST',
+        csrf: session.csrfToken,
+        body: { confirmed: true, previewToken: view!.previewToken },
+      });
+      window.location.assign('/organizer?deleted=1');
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'reauthentication_required') setStep('reauth');
+      else if (
+        err instanceof ApiError &&
+        ['preview_invalid', 'deletion_blocked', 'notifications_pending'].includes(err.code)
+      )
+        await loadPreview('The event changed since you opened this check. Review the current state below.');
+      else {
+        setMessage(errorMessage(err));
+        setStep('preview');
+      }
+    }
+  };
+
+  return (
+    <Card title="Delete event">
+      <p className="muted">
+        Deleting removes the event and its unconfirmed registrations permanently. It is only possible while
+        nobody is confirmed or waiting.
+      </p>
+      {step === 'reauth' && (
+        <ReauthPrompt
+          session={session}
+          intro="For your security, deleting needs a sign-in from the last 15 minutes. Confirm it’s you by email; nothing is deleted until you confirm the deletion again."
+        />
+      )}
+      {(step === 'idle' || step === 'loading') && (
+        <button className="danger" onClick={() => loadPreview()} disabled={step === 'loading'}>
+          {step === 'loading' ? 'Checking…' : 'Delete this event…'}
+        </button>
+      )}
+      {message && <Alert kind="info">{message}</Alert>}
+      {(step === 'preview' || step === 'deleting') && view && (
+        <div className="stack">
+          {view.requiredNoticeIssues.length > 0 && (
+            <Alert kind="info">
+              Some cancellation confirmations could not be confirmed as sent:{' '}
+              {view.requiredNoticeIssues.map((i) => NOTICE_TEXT[i.label] ?? i.label).join(', ')}. They are
+              kept in the records.
+            </Alert>
+          )}
+          {view.eligible ? (
+            <>
+              <Alert kind="error">Delete “{event.title}” permanently? This cannot be undone.</Alert>
+              <div className="row">
+                <button className="danger" onClick={remove} disabled={step === 'deleting'}>
+                  {step === 'deleting' ? 'Deleting…' : 'Yes, delete the event permanently'}
+                </button>
+                <button className="secondary" onClick={() => setStep('idle')} disabled={step === 'deleting'}>
+                  Keep the event
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <Alert>
+                This event can’t be deleted now:
+                <ul>
+                  {view.blockers.map((b) => (
+                    <li key={b}>{BLOCKER_TEXT[b] ?? b}</li>
+                  ))}
+                </ul>
+              </Alert>
+              <button className="secondary" onClick={() => setStep('idle')}>
+                Close
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </Card>
   );
 }
