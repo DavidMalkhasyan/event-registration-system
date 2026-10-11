@@ -6,7 +6,7 @@ import { withLinkRateLimit } from '../access-tokens/link-guard.js';
 import { requireOrganizer } from '../identity/sessions.js';
 import { checkInAsOwner, checkInSchema } from './checkin.js';
 import { createEvent, dashboard, eventCreateSchema, getOwnedEvent, getPublicEvent, listEvents, listParticipants } from './events.js';
-import { cancelByManagementLink, managementView, rescheduleEvent, rescheduleSchema } from './lifecycle.js';
+import { cancelByManagementLink, managementView, rescheduleEvent, rescheduleSchema, shareView } from './lifecycle.js';
 import { confirmVerification, resolveVerification, submitRegistration } from './registrations.js';
 
 const registrationSchema = z.object({ email: z.email().max(254) }).strict();
@@ -42,6 +42,8 @@ export function registerEventCoreRoutes(app: FastifyInstance, ctx: AppContext): 
   app.post('/api/links/manage/cancel', async (request) =>
     withLinkRateLimit(ctx, request, () => cancelByManagementLink(ctx, linkToken(request), request.body, request.id)),
   );
+
+  app.get('/api/links/ticket', async (request) => withLinkRateLimit(ctx, request, () => shareView(ctx, linkToken(request))));
 
   // ---- organizer
   app.get('/api/events', async (request) => listEvents(ctx, await requireOrganizer(ctx, request, { csrf: false })));

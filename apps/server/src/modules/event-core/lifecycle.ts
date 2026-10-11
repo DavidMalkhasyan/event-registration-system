@@ -205,6 +205,26 @@ export async function managementView(ctx: AppContext, raw: string) {
   };
 }
 
+/** GET /api/links/ticket: read-only share view (FR-SHR-2, FR-SHR-4, FR-SHR-8). Never checks in. */
+export async function shareView(ctx: AppContext, raw: string) {
+  const token = await findToken(ctx.db, 'share', raw);
+  if (!token?.registration_id || token.revoked_at) throw new InvalidLinkError();
+  const row = await ctx.db
+    .selectFrom('app.registrations as r')
+    .innerJoin('app.events as e', 'e.id', 'r.event_id')
+    .leftJoin('app.tickets as t', 't.registration_id', 'r.id')
+    .leftJoin('app.check_ins as c', (join) => join.onRef('c.ticket_id', '=', 't.id').on('c.undone_at', 'is', null))
+    .select(['r.state', 'e.title', 'e.starts_at', 'e.time_zone', 'e.status', 't.code', 'c.id as check_in_id'])
+    .where('r.id', '=', token.registration_id)
+    .executeTakeFirst();
+  const now = await decisionTime(ctx.db);
+  if (!row || now > checkInWindow(row.starts_at).closes) throw new InvalidLinkError(); // FR-LNK-5
+  const event = { title: row.title, startsAt: row.starts_at.toISOString(), timeZone: row.time_zone };
+  if (row.state !== 'CONFIRMED' || row.status !== 'SCHEDULED' || !row.code) return { state: 'not_available' as const, event };
+  if (row.check_in_id) return { state: 'checked_in' as const, event, transferStatement: TRANSFER_STATEMENT };
+  return { state: 'valid' as const, event, ticket: { code: row.code }, transferStatement: TRANSFER_STATEMENT };
+}
+
 /** TX-R03: participant cancellation with FIFO promotion in the same transaction (FR-SELF-2, FR-WL-2, BR-5). */
 export async function cancelByManagementLink(ctx: AppContext, raw: string, body: unknown, correlationId: string) {
   const found = await managedRegistration(ctx.db, raw);
