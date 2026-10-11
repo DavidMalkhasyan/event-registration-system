@@ -501,3 +501,46 @@
 | `17d85f4` | 22:24:22 | feat(events): event deletion with preview, marker and audit survival (K-304d) |
 | `39f1159` | 22:32:30 | feat(client): delete an event from the dashboard (K-304d) |
 | *(closing commit)* | after 22:34 | docs: record K-304d. Pushed to PR #6; its CI result and the merge are recorded at the start of the next branch. |
+
+---
+
+## S-10: K-405 Participant self-service
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-12 00:30:37 +04:00 |
+| **End** | 2026-10-12, at the closing documentation commit on `feature/k-405-participant-self-service`. The activity table ends at 00:55. |
+| **Cards** | K-304d (Review → Done), K-405 (To Do → In Progress → Review) |
+| **Tools and model** | Claude Code 2.1.296, model `claude-opus-5-5`; GitHub CLI 2.101.0; the S-02 toolchain |
+| **Significant prompt** | "CONTINUE OUR EXISTING … DEVELOPMENT": do not merge `dev` into `main`; record K-304d Done; implement K-405 per FR-SELF-1 to FR-SELF-4, FR-LNK-1 to FR-LNK-10, FR-ROT-1 to FR-ROT-11 and FR-SHR, with integration, concurrency, rollback and no-raw-token tests and browser tests; a pull request into `dev`; then K-406 in a separate pull request. |
+
+**Activity:**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 00:30:37 | Verified `dev` = `origin/dev` = `d90062e`, `main` = `8c1247d`; PR #5 and PR #6 merged; final runs 38162851806 and 38164505147 `success`; dev database schema 4 | — |
+| 00:30:50 | `feature/k-405-participant-self-service` from `origin/dev` | — |
+| 00:30–00:32 | Read FR-SELF, FR-ROT, FR-LNK, FR-SHR, FR-NTF-10 to FR-NTF-14; the §4.9 rows "Ticket resend" and "Management link replaced"; API #9 to #11, API_DESIGN §7.3; TX-P01 to TX-P03; `rotation_requests`; U-20, FK-16 to FK-18; the `access_tokens` guard trigger | FK-17 and FK-18 are `NO ACTION` and not deferrable, so the §8.4 deletion order needs rotation requests first (PD-47) |
+| 00:32:39 | Commit | `c1ba465` docs(process): K-304d Done; PD-47 to PD-51 |
+| 00:33–00:35 | Migration `0005`, schema type, six error codes, two rate rules, the deletion-order change, `issueTokenWithId`, `participant-portal/portal.ts` and `routes.ts`, the `ticket_resend` and "management link replaced" handlers, the optional log destination | Typecheck and lint pass |
+| 00:35:06 | `pnpm migrate` on `ers_dev` ("applied 0005_rotation_requests.sql"); web and worker restarted | `/healthz` schema version 5 |
+| 00:36:43 | `portal.test.ts` (16 tests) | **16 failed** within milliseconds, from one shared cause: the harness `resetData` truncates a fixed table list that lacked the new `rotation_requests` table (referencing `access_tokens`). `rotation_requests` and `deletion_markers` were added to it. |
+| 00:37:10 | Rerun | **15 passed, 1 failed:** the AC-75 test. The second of two simultaneous rotations got the generic 404, because the first had revoked every management token, including the second's. AC-75 requires both to commit (PD-52). |
+| 00:38:04 | Implemented PD-52 (token validity at submission; revoked meanwhile only by a concurrent rotation) | Still 404. Tracing showed the second request's token lookup ran after the first had committed: the in-process requests were not really concurrent, so the test did not exercise AC-75. |
+| 00:39:44–00:40:59 | The test now holds the event lock until both requests wait on it (polling `pg_stat_activity`). The first attempt polled as the owner role, which cannot see the runtime role's wait states; fixed by polling as the runtime role. | **16/16 four times** |
+| 00:42:08 | Five mutation checks | No AC-75 allowance → 1 test fails; new token revoked too → 7; both types revoked → 3; no FR-ROT-11 check → 2; no resend limit → 1. Source restored. |
+| 00:45:26 | Server suite **99/99**; commit | `da1ee09` feat(portal): ticket resend, share links and link rotation (K-405) |
+| 00:45–00:47 | UI: "Your ticket" and "Replace your links" cards, `replaceLinkToken`; client unit test; `portal.spec.ts` | Client 6/6; typecheck and lint pass |
+| 00:47:34–00:53:16 | Full suite | `format:check`, `lint`, `typecheck`, `test` (server 99/99, client 6/6) and `build` exit 0; **E2E 14/14 three times**. Commit `704c241`. |
+| 00:53:31 | Pushed; [PR #7](https://github.com/DavidMalkhasyan/event-registration-system/pull/7), `dev` ← `feature/k-405-participant-self-service` | CI [run 38174098814](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38174098814) **passed** in 2 min 39 s: **5 migrations** on a fresh database; 99/99, 6/6, 14/14 |
+
+**Commits in S-10:**
+
+| Hash | Time (+04:00) | Message |
+|---|---|---|
+| `e235112` | 2026-10-11 22:35:57 | docs: record K-304d … S-09's closing commit |
+| `d90062e` | 2026-10-11 22:39:03 (GitHub) | Merge K-304d: event deletion (#6) |
+| `c1ba465` | 00:32:39 | docs(process): K-304d Done; K-405 started with decisions PD-47 to PD-51 |
+| `da1ee09` | 00:45:26 | feat(portal): ticket resend, share links and link rotation (K-405) |
+| `704c241` | 00:53:16 | feat(client): participant self-service on the management page (K-405) |
+| *(closing commit)* | after 00:55 | docs: record K-405. Pushed to PR #7; the CI result and the merge are recorded at the start of the next branch. |

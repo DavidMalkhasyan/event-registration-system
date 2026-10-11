@@ -51,6 +51,7 @@
 
 | Card | Milestone | Awaiting |
 |---|---|---|
+| K-405 Participant self-service: ticket resend, share-link issuance, management and share rotation (FR-SELF-4, FR-SHR-1, FR-ROT-1 to FR-ROT-11; TX-P01 to TX-P03; API #9 to #11) | M4 | Done on `feature/k-405-participant-self-service` (`da1ee09` server, migration `0005` and tests, `704c241` UI and E2E): 16 integration tests (AC-75 genuinely concurrent, forced rollback, no raw token in logs or database), 1 client unit test, 2 E2E tests, mutation checks. [PR #7](https://github.com/DavidMalkhasyan/event-registration-system/pull/7) into `dev`; CI [run 38174098814](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38174098814) passed (5 migrations; 99/99, 6/6, 14/14). **Awaiting:** merge into `dev`; Done is recorded after the merge. |
 | K-001 Apply R60; synchronize the documents | M0 | Stakeholder check (commit `3fe9cb7`) |
 | K-004 Process documentation | M0 | Stakeholder review |
 
@@ -58,7 +59,6 @@
 
 | Card | Milestone | State |
 |---|---|---|
-| K-405 Participant self-service: ticket resend, share-link issuance, management and share rotation (FR-SELF-4, FR-SHR-1, FR-ROT-1 to FR-ROT-11, FR-LNK; TX-P01 to TX-P03; API #9 to #11) | M4 | **In progress** on `feature/k-405-participant-self-service` (PD-47 to PD-51) |
 | K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Updated in S-07 |
 
 ## To Do
