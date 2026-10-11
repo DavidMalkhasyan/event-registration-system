@@ -459,3 +459,45 @@
 | `7575432` | 22:01:06 | feat(events): event cancellation (K-304c) |
 | `44b453e` | 22:06:36 | feat(client): cancel an event from the dashboard (K-304c) |
 | *(closing commit)* | after 22:10 | docs: record K-304c. Pushed to PR #5. |
+
+---
+
+## S-09: K-304c merged; K-304d Event deletion
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-11 22:12:00 +04:00 (continuation of the S-08 prompt: "After K-304c is successfully merged into dev, proceed with … K-304d … only if its documented requirements and dependencies are sufficiently resolved") |
+| **End** | 2026-10-11, at the closing documentation commit on `feature/k-304d-event-deletion`. The activity table ends at 22:34. |
+| **Cards** | K-304c (Review → Done), K-304d (To Do → In Progress → Review) |
+| **Tools and model** | Claude Code 2.1.296, model `claude-opus-5-5`; GitHub CLI 2.101.0; the S-02 toolchain |
+
+**Activity:**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 22:12:32 | K-304c documentation commit `754621c` pushed to PR #5; diff reviewed (15 files, no secrets, two replaced source lines) | — |
+| 22:13–22:15 | Final PR #5 CI [run 38162851806](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38162851806) | **Passed**: 3 migrations; 73/73, 5/5, 9/9 |
+| 22:15:17 | `gh pr merge 5 --merge` | Merge commit `fef8a81` on `dev`; tree equals the tested head; `main` unchanged |
+| 22:15–22:16 | K-304d design read: §8.4 deletion order; foreign keys (events and registrations cascade; outbox, audit and tasks are soft references); `events_tr05` refuses deleting a cancelled event; `audit_records` append-only; Glossary "pending message" and "required notice"; `DeletionPreview`, `DeleteEventInput` and blocker enums; ADR-010 §7 `K_preview`; the horizon sweep | No open product or security decision (PD-43) |
+| 22:16:47 | `feature/k-304d-event-deletion` from `origin/dev`; `PREVIEW_SECRET` appended to the local, git-ignored `.env` (random) | — |
+| 22:17:15 | Commit | `13ba1eb` docs(process): K-304c Done; PD-43 to PD-46 |
+| 22:17–22:18 | Migration `0004`, schema type, config secret (also `.env.example` and CI), four error codes, `deletion.ts`, routes | Typecheck and lint pass. While writing the module, the check order was corrected (PD-46): the token is verified against the *current* snapshot, so the cancelled-event check must come first. |
+| 22:19:21 | `pnpm migrate` on `ers_dev` ("applied 0004_deletion_markers.sql"); web and worker restarted | `/healthz` schema version 4 |
+| 22:21:14 | `deletion.test.ts` (10 tests) | **9 passed, 1 failed.** In the AC-184 test, the harness `signIn` drains the outbox and so delivered the freshly queued verification the test wanted to see dropped. The resubmission was moved after the sign-in. |
+| 22:21:39 | Rerun three times | 10/10 each |
+| 22:22:19 | Five mutation checks | No recent auth on delete → 1 fails; no cancelled check → 1; snapshot outside the MAC → 2; pending required notices ignored → 2; always `DROPPED` → 1. Source restored. |
+| 22:24:22 | Server suite **83/83**; commit | `17d85f4` feat(events): event deletion with preview, marker and audit survival |
+| 22:24–22:26 | "Delete event" card; one-time notice on the events list; `deletion.spec.ts` | Client typecheck and lint pass |
+| 22:26:03–22:32:30 | Full suite | `format:check`, `lint`, `typecheck`, `test` (server 83/83, client 5/5) and `build` exit 0; **E2E 12/12 three times**. Commit `39f1159`. |
+| 22:32:48 | Pushed; [PR #6](https://github.com/DavidMalkhasyan/event-registration-system/pull/6), `dev` ← `feature/k-304d-event-deletion` | CI [run 38164273828](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38164273828) **passed** in 2 min 26 s: **4 migrations** on a fresh database; 83/83, 5/5, 12/12 |
+
+**Commits in S-09:**
+
+| Hash | Time (+04:00) | Message |
+|---|---|---|
+| `754621c` | 22:12:32 | docs: record K-304c … S-08's closing commit |
+| `fef8a81` | 22:15:17 (GitHub) | Merge K-304c: event cancellation (#5) |
+| `13ba1eb` | 22:17:15 | docs(process): K-304c Done; K-304d started with decisions PD-43 to PD-46 |
+| `17d85f4` | 22:24:22 | feat(events): event deletion with preview, marker and audit survival (K-304d) |
+| `39f1159` | 22:32:30 | feat(client): delete an event from the dashboard (K-304d) |
+| *(closing commit)* | after 22:34 | docs: record K-304d. Pushed to PR #6; its CI result and the merge are recorded at the start of the next branch. |

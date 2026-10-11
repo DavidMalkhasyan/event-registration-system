@@ -50,6 +50,7 @@
 
 | Card | Milestone | Awaiting |
 |---|---|---|
+| K-304d Event deletion (FR-EVT-10, 11, 13, 14; TX-E06; API #37, #38) | M3 | Done on `feature/k-304d-event-deletion` (`17d85f4` server, migration `0004` and tests, `39f1159` UI and E2E): 10 integration tests (AC-88 races, deterministic AC-98), 3 E2E tests, mutation checks. [PR #6](https://github.com/DavidMalkhasyan/event-registration-system/pull/6) into `dev`; CI [run 38164273828](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38164273828) passed (4 migrations; 83/83, 5/5, 12/12). **Awaiting:** merge into `dev`; Done is recorded after the merge. |
 | K-001 Apply R60; synchronize the documents | M0 | Stakeholder check (commit `3fe9cb7`) |
 | K-004 Process documentation | M0 | Stakeholder review |
 
@@ -57,7 +58,6 @@
 
 | Card | Milestone | State |
 |---|---|---|
-| K-304d Event deletion (FR-EVT-10, 11, 13, 14; TX-E06; API #37, #38) | M3 | **In progress** on `feature/k-304d-event-deletion` (PD-43 to PD-46) |
 | K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Updated in S-07 |
 
 ## To Do
@@ -70,7 +70,7 @@
 
 | Card | Done | Remaining |
 |---|---|---|
-| K-304 Event lifecycle | Idempotent create; reschedule (P0 #1, #14); capacity change (K-304a), title and description edit (K-304b), cancellation (K-304c), all done in `dev` | Deletion: K-304d, in progress |
+| K-304 Event lifecycle | Create, reschedule (P0); capacity (K-304a), details (K-304b), cancellation (K-304c), all in `dev`; deletion (K-304d, in Review) | — |
 | K-306 Check-in | Check-in with replay, window and outcomes (P0 #9, #10) | Undo |
 | K-401 Messaging | Outbox claim, fenced send, reaper, sweeps, pre-claim counter | Budget, pause, render-time re-check |
 | K-403 Notifications | 9 of 17 message types | The rest, with their features |
