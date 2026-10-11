@@ -2,6 +2,7 @@ import { linkToken } from './bootstrap-token'; // must stay the first import (FR
 import { useEffect, useState, type FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ApiError, api, errorMessage } from '../shared/api';
+import { takeReturnTo } from '../shared/return-to';
 import {
   Alert,
   Card,
@@ -370,12 +371,14 @@ function TicketPage() {
 // ---------------------------------------------------------------- sign-in link confirmation
 function SignInPage() {
   const token = linkToken();
-  const [view, setView] = useState<{ maskedEmail: string; preSessionToken: string }>();
+  const [view, setView] = useState<{ maskedEmail: string; purpose: string; preSessionToken: string }>();
   const [invalid, setInvalid] = useState(!token);
   const [error, setError] = useState<string>();
   useEffect(() => {
     if (!token) return;
-    api<{ maskedEmail: string; preSessionToken: string }>('/api/links/sign-in', { linkToken: token })
+    api<{ maskedEmail: string; purpose: string; preSessionToken: string }>('/api/links/sign-in', {
+      linkToken: token,
+    })
       .then(setView)
       .catch(() => setInvalid(true));
   }, [token]);
@@ -386,7 +389,8 @@ function SignInPage() {
         linkToken: token,
         csrf: view!.preSessionToken,
       });
-      window.location.assign('/organizer');
+      // A full page load: the new session brings a new anti-forgery token (ADR-010 §8).
+      window.location.assign((view!.purpose === 'reauth' ? takeReturnTo() : null) ?? '/organizer');
     } catch (e) {
       if (e instanceof ApiError && e.code === 'invalid_link') setInvalid(true);
       else setError(errorMessage(e));
@@ -394,6 +398,23 @@ function SignInPage() {
   };
   if (invalid) return <InvalidLink />;
   if (!view) return <Loading />;
+  if (view.purpose === 'reauth') {
+    return (
+      <Page title="Confirm it’s you">
+        <Card>
+          <p>
+            Confirm that you are <strong>{view.maskedEmail}</strong>?
+          </p>
+          <p>
+            This only signs you in again. It does not cancel, delete or change any event. Afterwards you go
+            back to the page you came from and confirm the action yourself.
+          </p>
+          <button onClick={confirm}>Confirm it is you</button>
+          {error && <Alert>{error}</Alert>}
+        </Card>
+      </Page>
+    );
+  }
   return (
     <Page title="Sign in">
       <Card>

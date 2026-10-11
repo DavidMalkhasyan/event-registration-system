@@ -367,3 +367,46 @@
 | *(closing commit)* | after 18:41 | docs: record K-304b. Pushed to PR #3. |
 
 **Next:** merge PR #3 into `dev` once the final CI run is green; record K-304b as Done at the start of the next branch. K-304c waits for the stakeholder's review of the re-authentication assessment.
+
+---
+
+## S-07: K-302b Re-authentication; K-304c plan
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-11 19:43:12 +04:00 |
+| **End** | 2026-10-11, at the closing documentation commit on `feature/k-302-reauthentication`. The activity table ends at 20:05. |
+| **Cards** | K-304b (Review → Done), K-302b (To Do → In Progress → Review), K-304c (plan only) |
+| **Tools and model** | Claude Code 2.1.296, model `claude-opus-5-5`; GitHub CLI 2.101.0; the S-02 toolchain; `pg` 8.23.1 added to the E2E package |
+| **Significant prompt** | "DECISION APPROVED — IMPLEMENT RE-AUTHENTICATION FIRST." Record K-304b as Done; implement K-302b (FR-ORG-5, AC-149, ADR-010) with a reusable recent-authentication helper used inside locked transactions, a minimal UI, and integration tests (boundary, race, second device, no action); a browser test using controlled test-database setup and no backdoors; a pull request into `dev`, merged when green. Then report the K-304c plan without implementing it. |
+
+**Activity:**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 19:43:12 | `dev` synced (`a99c44d`); PR #3 confirmed merged, run 38148193367 `success`; `feature/k-302-reauthentication` from `origin/dev` | `main` unchanged at `8c1247d` |
+| 19:43:34 | Commit | `c866ae0` docs(process): K-304b Done; K-302b in progress |
+| 19:43–19:44 | Read the API #27 contract (`202 CheckYourEmail`, session and CSRF, no body), API_DESIGN §5 and §11, ADR-010 §8, TX-A01, TX-A02, and the identity code | Already in place: the schema (`purpose 'reauth'`, `reauth_session_id`, `authenticated_at`, `reauth_replaced`), the revocation in TX-A02, `RECENT_AUTH_MS`, `recentAuthUntil` and the `reauthentication_required` error code. **No migration needed.** |
+| 19:44–19:45 | Shared TX-A01 insert; `requestReauthentication`; `reauthPerAccount` rate rule (PD-32); `recentAuthentication` and `requireRecentAuthentication` (PD-33); route; re-authentication email text | Typecheck and lint pass; existing server suite **41/41** after the refactor |
+| 19:47:42 | `reauth.test.ts` (12 tests) | **12/12** on the first run |
+| 19:48:13 | Mutation checks: no `FOR SHARE`, `<=` at the boundary, no revocation on confirm, no rate limit | Each fails at least one test. A test-robustness flaw showed up: with no `FOR SHARE`, the failing race test left its gated transaction open, stalling the next test for 60 s. |
+| 19:53:50 | The race test releases its gate in `finally` | That mutation now fails cleanly in 8.8 s; 12/12 with the source restored |
+| 19:55:51 | Server suite **53/53**; commit | `70eb8da` feat(identity): re-authentication for protected actions |
+| 19:56–19:57 | UI: `ReauthPrompt`, the "Recent sign-in" card, the re-authentication variant of the link page, the return path (PD-34) | ESLint `react-hooks/purity` rejected `Date.now()` during render; replaced with lazy state refreshed every 30 s. Client unit tests 5/5 (2 new: return path, open redirect). |
+| 19:57–19:58 | `apps/e2e/tests/db.ts` (test-database fixture, PD-35) and `reauth.spec.ts` | — |
+| 19:58:07–20:01:55 | Full suite | `format:check`, `lint`, `typecheck`, `test` (**server 53/53, client 5/5**) and `build` exit 0; **E2E 7/7** three times. Commit `adde442`. |
+| 20:02:09 | Pushed; [PR #4](https://github.com/DavidMalkhasyan/event-registration-system/pull/4), `dev` ← `feature/k-302-reauthentication` | CI [run 38153782544](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38153782544) **passed** in 2 min 7 s: 3 migrations; 53/53, 5/5, 7/7 |
+| 20:02–20:03 | K-304c reading: BR-16, TX-E05, API #36 `cancelEvent` (`ConfirmedAction`, `x-recent-authentication`, state idempotency), §4.9 "Event cancellation", AC-18, AC-19, AC-59, EC-20, FR-LNK-6, FR-SHR-4, FR-STAFF-5; existing code paths | Plan and open decisions reported to the stakeholder; no implementation |
+
+**Commits in S-07:**
+
+| Hash | Time (+04:00) | Message |
+|---|---|---|
+| `c2280d1` | 18:41:08 | docs: record K-304b … S-06's closing commit |
+| `a99c44d` | 18:43:41 (GitHub) | Merge K-304b: edit event title and description (#3) |
+| `c866ae0` | 19:43:34 | docs(process): K-304b Done; K-302b re-authentication in progress |
+| `70eb8da` | 19:55:51 | feat(identity): re-authentication for protected actions (K-302b) |
+| `adde442` | 20:01:55 | feat(client): minimal re-authentication flow (K-302b) |
+| *(closing commit)* | after 20:05 | docs: record K-302b. Pushed to PR #4. |
+
+**Next:** merge PR #4 into `dev` once its final CI run is green; record K-302b as Done at the start of the next branch; K-304c after the stakeholder reviews its plan.

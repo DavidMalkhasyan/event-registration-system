@@ -1,12 +1,15 @@
 import { StrictMode, useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ApiError, api, errorMessage } from '../shared/api';
+import { saveReturnTo } from '../shared/return-to';
 import { Alert, Card, CopyLink, DevMailboxHint, Page, formatLocal } from '../shared/ui';
 
 interface Session {
   accountId: string;
   email: string;
   csrfToken: string;
+  /** Display only; the server decides inside the protected operation's transaction (FR-ORG-5). */
+  recentAuthUntil: string;
 }
 
 interface EventItem {
@@ -367,6 +370,7 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
       <DetailsEditor session={session} event={event} onDone={load} />
       <CapacityEditor session={session} event={event} onDone={load} />
       <Reschedule session={session} event={event} onDone={load} />
+      <RecentSignIn session={session} />
       <Card title={`Participants (${participants.length})`}>
         <table>
           <thead>
@@ -394,6 +398,70 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
         </table>
       </Card>
     </Page>
+  );
+}
+
+/**
+ * Re-authentication (FR-ORG-5, AC-149): protected actions such as cancelling or deleting an event
+ * need a sign-in confirmed within the last 15 minutes. The emailed link only signs in again; the
+ * organizer comes back here and confirms the action again.
+ */
+export function ReauthPrompt({ session, intro }: { session: Session; intro: string }) {
+  const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const [error, setError] = useState<string>();
+  const send = async () => {
+    setState('sending');
+    setError(undefined);
+    try {
+      saveReturnTo(window.location.pathname);
+      await api('/api/auth/reauthentication', { method: 'POST', csrf: session.csrfToken });
+      setState('sent');
+    } catch (err) {
+      setError(errorMessage(err));
+      setState('idle');
+    }
+  };
+  if (state === 'sent')
+    return (
+      <Alert kind="info">
+        We emailed a confirmation link to {session.email}. Opening it signs you in again and brings you back
+        here; it does not cancel, delete or change anything. Then confirm the action again.
+      </Alert>
+    );
+  return (
+    <div className="stack">
+      <p>{intro}</p>
+      <button className="secondary" onClick={send} disabled={state === 'sending'}>
+        {state === 'sending' ? 'Sending…' : 'Confirm it’s you'}
+      </button>
+      {error && <Alert>{error}</Alert>}
+    </div>
+  );
+}
+
+function RecentSignIn({ session }: { session: Session }) {
+  const until = new Date(session.recentAuthUntil);
+  // Re-evaluated every 30 s, so the card changes when the 15 minutes run out (display only).
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+  const recent = until.getTime() > now;
+  return (
+    <Card title="Recent sign-in">
+      {recent ? (
+        <p className="muted">
+          Protected actions, such as cancelling or deleting an event, need a sign-in within the last 15
+          minutes. Your sign-in counts as recent until {until.toLocaleTimeString()}.
+        </p>
+      ) : (
+        <ReauthPrompt
+          session={session}
+          intro="Your last sign-in was more than 15 minutes ago. Protected actions, such as cancelling or deleting an event, need you to confirm it’s you first."
+        />
+      )}
+    </Card>
   );
 }
 
