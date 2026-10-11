@@ -85,6 +85,41 @@ export async function requireOrganizer(
   return principal;
 }
 
+export type RecentAuthentication = 'recent' | 'unauthenticated' | 'reauthentication_required';
+
+/**
+ * FR-ORG-5, ADR-010 §8: whether the session was authenticated within the last 15 minutes.
+ * Must run INSIDE the locked transaction of the protected operation (event cancellation and
+ * deletion: after the event lock), with that transaction's decision time `now`, never with a
+ * browser timestamp or an earlier check. The session row is read FOR SHARE, so a concurrent
+ * re-authentication (which revokes this session in TX-A02) is serialized with the operation:
+ * whichever commits first wins. Recent means `now < authenticated_at + 15 min`; at exactly
+ * 15 minutes, re-authentication is required.
+ */
+export async function recentAuthentication(
+  trx: Tx,
+  sessionId: string,
+  now: Date,
+): Promise<RecentAuthentication> {
+  const row = await trx
+    .selectFrom('app.organizer_sessions')
+    .select(['revoked_at', 'absolute_expires_at', 'authenticated_at'])
+    .where('id', '=', sessionId)
+    .forShare()
+    .executeTakeFirst();
+  if (!row || row.revoked_at || now >= row.absolute_expires_at) return 'unauthenticated';
+  return now.getTime() < row.authenticated_at.getTime() + RECENT_AUTH_MS
+    ? 'recent'
+    : 'reauthentication_required';
+}
+
+/** Throws the matching 401 unless the session is recently authenticated (see recentAuthentication). */
+export async function requireRecentAuthentication(trx: Tx, sessionId: string, now: Date): Promise<void> {
+  const status = await recentAuthentication(trx, sessionId, now);
+  if (status === 'unauthenticated') throw new AppError(401, 'unauthenticated');
+  if (status === 'reauthentication_required') throw new AppError(401, 'reauthentication_required');
+}
+
 /** Re-check after the event lock (FR-ORG-4: revocation applies to every later authorization check). */
 export async function sessionStillValid(trx: Tx, sessionId: string, now: Date): Promise<boolean> {
   const row = await trx

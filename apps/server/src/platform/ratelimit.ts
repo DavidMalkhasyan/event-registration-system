@@ -17,6 +17,8 @@ export const RULES = {
   failedLinkLookupsPerIp: { scope: 'token_lookup_ip', limit: 20, windowSeconds: 600 },
   signInPerAddress: { scope: 'signin_email', limit: 5, windowSeconds: 900 },
   signInPerIp: { scope: 'signin_ip', limit: 30, windowSeconds: 900 },
+  // API_DESIGN §11: re-authentication requests per account (value provisional, OQ-9).
+  reauthPerAccount: { scope: 'reauth_account', limit: 5, windowSeconds: 900 },
   registrationPerIp: { scope: 'register_ip', limit: 30, windowSeconds: 900 },
   registrationPerAddress: { scope: 'register_email', limit: 5, windowSeconds: 900 },
   failedCheckInsPerSession: { scope: 'checkin_fail_session', limit: 30, windowSeconds: 300 },

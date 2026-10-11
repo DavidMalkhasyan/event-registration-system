@@ -116,7 +116,22 @@ const signIn: MessageHandler = {
     });
     return { signIn: t };
   },
-  async render(_db, _msg, tokens, origin) {
+  async render(db, msg, tokens, origin) {
+    const request = await db
+      .selectFrom('app.sign_in_requests')
+      .select('purpose')
+      .where('id', '=', msg.sign_in_request_id!)
+      .executeTakeFirst();
+    if (request?.purpose === 'reauth') {
+      // FR-ORG-5, AC-149: the link only confirms identity; it never performs the action.
+      return email('Confirm it is you: Event Registration', [
+        'You asked to confirm your sign-in before a protected action, such as cancelling or deleting an event.',
+        'Confirming this link only signs you in again. It does not cancel, delete or otherwise change any event. After confirming, return to the event and confirm the action yourself.',
+        { label: 'Confirm it is you', link: `${origin}/sign-in#t=${tokens.signIn}` },
+        'The link works once and expires 15 minutes after you requested it. Confirming it signs out the browser that asked for it and signs in the browser where you open it.',
+        'If you did not request this, you can ignore this email.',
+      ]);
+    }
     return email('Your sign-in link for Event Registration', [
       'Use this link to sign in. It works once and expires 15 minutes after you requested it.',
       { label: 'Sign in', link: `${origin}/sign-in#t=${tokens.signIn}` },
