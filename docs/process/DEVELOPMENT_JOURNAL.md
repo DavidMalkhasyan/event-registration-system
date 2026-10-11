@@ -544,3 +544,45 @@
 | `da1ee09` | 00:45:26 | feat(portal): ticket resend, share links and link rotation (K-405) |
 | `704c241` | 00:53:16 | feat(client): participant self-service on the management page (K-405) |
 | *(closing commit)* | after 00:55 | docs: record K-405. Pushed to PR #7; the CI result and the merge are recorded at the start of the next branch. |
+
+---
+
+## S-11: K-405 merged; K-406 Staff invitations and sessions
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-12 00:59:48 +04:00 (continuation of the S-10 prompt: "After K-405 is successfully merged into dev, proceed with … K-406") |
+| **End** | 2026-10-12, at the closing documentation commit on `feature/k-406-staff-invitations`. The activity table ends at 01:28. |
+| **Cards** | K-405 (Review → Done), K-406 (To Do → In Progress → Review); K-504 partly (minimal staff check-in screen) |
+| **Tools and model** | Claude Code 2.1.296, model `claude-opus-5-5`; GitHub CLI 2.101.0; the S-02 toolchain |
+
+**Activity:**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 00:56–00:59 | K-405 closing documentation `8567170` pushed to PR #7; diff reviewed (22 files, no secrets, only replaced lines removed); final CI run [38174318350](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38174318350) **passed** (5 migrations; 99/99, 6/6, 14/14) | — |
+| 00:59:52 | `gh pr merge 7 --merge` | `35d9213` on `dev`; tree equals the tested head; `main` unchanged |
+| 01:00–01:01 | `feature/k-406-staff-invitations` from `origin/dev`. Read: FR-STAFF-1 to FR-STAFF-7; API #14 to #16 and #41 to #50 and their schemas; TX-S01 to TX-S03 and TX-C01; `staff_invitations` and `staff_sessions`; U-16 to U-19, FK-10, FK-14, FK-15, CK-35; ADR-010 §3 and §5; AC-26, AC-82, AC-96, AC-101, AC-111, AC-151, AC-156, AC-186, EC-104; the existing staff hooks in `0001` | The outbox has no per-type reference constraint, so the invitation email can use `request_ref` (PD-54) |
+| 01:02:21 | Commit | `bf73afd` docs(process): K-405 Done; PD-53 to PD-58 |
+| 01:02–01:07 | Migration `0006`, schema types, `staff-sessions.ts`, the 403 for staff-only callers, check-in generalized to owner or staff, count and stream for staff, `staff/staff.ts` and `routes.ts`, the invitation email handler, the cancellation and deletion hooks | One combined shell edit was rejected by the shell for quoting before it ran; nothing was applied; redone with script files |
+| 01:07:58 | `pnpm migrate` on `ers_dev` ("applied 0006_staff.sql"); existing server suite | **99/99**: the check-in refactor broke nothing; web and worker restarted |
+| 01:11:06 | `staff.test.ts` (11 tests) | **10 passed, 1 failed.** The harness app has no live hub, so the count and stream routes don't exist there. This also showed that an assertion in the authorization test ("count of another event → 404") passed only because the route was missing, a false positive. Both count checks moved to the live-stream group, which runs a real server with the hub. |
+| 01:12:42 | Rerun three times | 11/11 each |
+| 01:13:34–01:14:54 | Mutation checks | No staff re-check after the lock → AC-156 test fails; accept not single-use → AC-82 fails; cancellation keeps invitations → fails; stream ignores staff revocation → AC-186 fails. "No 403 for staff" at first did not apply (Prettier had reformatted the line, so its "11 passed" proved nothing); rerun against the formatted text → fails. Sources restored. |
+| 01:17:22 | Server suite **110/110**; commit | `c6437d6` feat(staff): staff invitations, device sessions and staff check-in |
+| 01:17–01:19 | UI: `/invite` page, `/staff` screen (check-in component parameterized for staff), "Staff" card; Vite and static routing | Client 6/6; typecheck and lint pass |
+| 01:19:41–01:26:47 | Full suite | `format:check`, `lint`, `typecheck`, `test` (server 110/110, client 6/6) and `build` exit 0; **E2E 15/15 three times**. Commit `465acbf`. |
+| 01:27:04 | Pushed; [PR #8](https://github.com/DavidMalkhasyan/event-registration-system/pull/8), `dev` ← `feature/k-406-staff-invitations` | CI [run 38176421220](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38176421220) **passed** in 2 min 47 s: **6 migrations** on a fresh database; 110/110, 6/6, 15/15 |
+
+**Not covered by an automated test:** AC-186 (c), a staff stream with no check-ins being closed within 30 s plus one check, because the test would have to wait over 30 seconds. The 30-second re-check is the existing timer shared with organizer streams.
+
+**Commits in S-11:**
+
+| Hash | Time (+04:00) | Message |
+|---|---|---|
+| `8567170` | 00:56:46 | docs: record K-405 … S-10's closing commit |
+| `35d9213` | 00:59:51 (GitHub) | Merge K-405: participant self-service (#7) |
+| `bf73afd` | 01:02:21 | docs(process): K-405 Done; K-406 started with decisions PD-53 to PD-58 |
+| `c6437d6` | 01:17:22 | feat(staff): staff invitations, device sessions and staff check-in (K-406) |
+| `465acbf` | 01:26:47 | feat(client): staff invitation, staff check-in screen and owner staff card (K-406) |
+| *(closing commit)* | after 01:28 | docs: record K-406. Pushed to PR #8; the CI result and the merge are recorded at the start of the next branch. |

@@ -52,6 +52,7 @@
 
 | Card | Milestone | Awaiting |
 |---|---|---|
+| K-406 Staff invitations and sessions (FR-STAFF-1 to FR-STAFF-7; TX-S01 to TX-S03; API #14 to #16, #41, #42, #45 to #50), including the K-304c dependency | M4 | Done on `feature/k-406-staff-invitations` (`c6437d6` server, migration `0006` and tests, `465acbf` UI and E2E): 11 integration tests (AC-156 forced orders and lock-held races, AC-186 a on a real server), 1 E2E test, mutation checks. [PR #8](https://github.com/DavidMalkhasyan/event-registration-system/pull/8) into `dev`; CI [run 38176421220](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38176421220) passed (6 migrations; 110/110, 6/6, 15/15). **Awaiting:** merge into `dev`; Done is recorded after the merge. |
 | K-001 Apply R60; synchronize the documents | M0 | Stakeholder check (commit `3fe9cb7`) |
 | K-004 Process documentation | M0 | Stakeholder review |
 
@@ -59,7 +60,6 @@
 
 | Card | Milestone | State |
 |---|---|---|
-| K-406 Staff invitations and sessions (FR-STAFF-1 to FR-STAFF-7; TX-S01 to TX-S03; API #14 to #16, #41, #42, #45 to #50), including the K-304c dependency (PD-40) | M4 | **In progress** on `feature/k-406-staff-invitations` (PD-53 to PD-58) |
 | K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Updated in S-07 |
 
 ## To Do
@@ -78,7 +78,7 @@
 | K-403 Notifications | 9 of 17 message types | The rest, with their features |
 | K-404 Jobs | Reminder fan-out (P0 #13); cutoff job (K-404b, done in `dev`) | — |
 | K-408 Email providers | Fake provider | Resend adapter (P2) |
-| K-504 Scanner and live count | Owner check-in screen with live count | Staff scanner (P1) |
+| K-504 Scanner and live count | Owner check-in screen with live count; minimal staff check-in screen at `/staff` (K-406, PD-57) | A dedicated staff entry and scanner polish (UI work) |
 
 ## Backlog
 
