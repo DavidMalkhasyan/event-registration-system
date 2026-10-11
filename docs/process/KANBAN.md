@@ -4,7 +4,7 @@
 |---|---|
 | **Columns** | Backlog → To Do → In Progress → Review → Done, plus **Deferred** for extended scope that was intentionally not built |
 | **Work-in-progress limits** | In Progress ≤ 2, Review ≤ 3 |
-| **Last updated** | 2026-10-11, session S-07 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
+| **Last updated** | 2026-10-11, session S-08 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
 | **Scope** | Re-planned in S-02 by the final delivery strategy (PD-15): P0 is mandatory, then P1, with P2 deferred. Requirement-level status is in [ASSIGNMENT_SCOPE.md](../../ASSIGNMENT_SCOPE.md). |
 
 ## Rules
@@ -42,13 +42,14 @@
 | K-404b Registration cutoff job (F8, TX-J03, FR-WL-5, FR-NTF-4, D-3) | M4 | `d25d3dd`, `2d78ca5`; [PR #1](https://github.com/DavidMalkhasyan/event-registration-system/pull/1) into `dev`; CI [run 38144704826](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38144704826) passed (3 migrations on a fresh database; 27/27, 3/3, 4/4); merged 2026-10-11 17:51:34 as `5818fb4`. Not in `main` (PD-29). |
 | K-304a Capacity change (FR-EVT-7, FR-EVT-8, TX-E03, AC-13 to AC-15) | M3 | `f6024e3`, `c4f5733`, `3c73c23`; [PR #2](https://github.com/DavidMalkhasyan/event-registration-system/pull/2) into `dev`; CI runs [38145423055](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38145423055) and [38145629926](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38145629926) passed (35/35, 3/3, 5/5); merged 2026-10-11 18:27:23 as `0a811bb`. Not in `main`. |
 | K-304b Title and description edit (FR-EVT-5, TX-E02, AC-105) | M3 | `19ff849`, `b8ffae1`, `c2280d1`; [PR #3](https://github.com/DavidMalkhasyan/event-registration-system/pull/3) into `dev`; CI runs [38147918146](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38147918146) and [38148193367](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38148193367) passed (41/41, 3/3, 6/6); merged 2026-10-11 18:43:42 as `a99c44d`. Not in `main`. |
+| K-302b Re-authentication (FR-ORG-5, AC-149, ADR-010 §8) | M3 | `c866ae0`, `70eb8da`, `adde442`, `55943cc`; [PR #4](https://github.com/DavidMalkhasyan/event-registration-system/pull/4) into `dev`; CI runs [38153782544](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38153782544) and [38154065724](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38154065724) passed (53/53, 5/5, 7/7); merged 2026-10-11 20:08:54 as `88399fd`. Not in `main`. |
 | K-505 Playwright suites, **reduced scope** | M5 | `b7a164f`: 4 tests, including two simultaneous clients. 4/4 passed in 3 runs; a mutation check proved the live-count test fails when the feature breaks. |
 
 ## Review
 
 | Card | Milestone | Awaiting |
 |---|---|---|
-| K-302b Re-authentication (FR-ORG-5, AC-149, ADR-010 §8; the deferred part of K-302) | M3 | Done on `feature/k-302-reauthentication` (`70eb8da` server and tests, `adde442` UI and E2E): 12 integration tests including a deterministic race, 2 client unit tests, 1 E2E test with a test-database fixture; mutation checks. [PR #4](https://github.com/DavidMalkhasyan/event-registration-system/pull/4) CI [run 38153782544](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38153782544) passed (53/53, 5/5, 7/7). **Awaiting:** merge into `dev`; Done is recorded after the merge. |
+| K-304c Event cancellation (FR-EVT-9, BR-16, BR-23, TX-E05, AC-18, AC-19, AC-59; D1–D7) | M3 | Done on `feature/k-304c-event-cancellation` (`7575432` server and tests, `44b453e` UI and E2E): 20 integration tests (AC-18 and BR-23 in forced orders, 4-round races), 2 E2E tests, mutation checks. [PR #5](https://github.com/DavidMalkhasyan/event-registration-system/pull/5) CI [run 38162451724](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38162451724) passed (73/73, 5/5, 9/9). **Awaiting:** merge into `dev`; Done is recorded after the merge. |
 | K-001 Apply R60; synchronize the documents | M0 | Stakeholder check (commit `3fe9cb7`) |
 | K-004 Process documentation | M0 | Stakeholder review |
 
@@ -63,14 +64,13 @@
 | Card | Milestone | Notes |
 |---|---|---|
 | K-604 Release tag and submission | M6 | The secret scan was done in S-03. Tagging and submitting are the owner's actions. |
-| K-304c Event cancellation (FR-EVT-9, BR-16, TX-E05) | M3 | **Next.** Implementation plan reported in S-07 for review. Its re-authentication dependency is K-302b. Earlier note: FR-EVT-9 requires recent authentication (FR-ORG-5), which is not implemented. Needs a decision before starting: implement re-authentication, or record a deviation. |
-| K-304d Event deletion (FR-EVT-10, 11, 13, 14) | M3 | Largest part: eligibility checks in the deletion transaction, a deletion marker, audit survival |
+| K-304d Event deletion (FR-EVT-10, 11, 13, 14; TX-E06; API #37, #38) | M3 | **Next.** Needs migration `0004` (`deletion_markers`), the `K_preview` secret (ADR-010 §7) and the stateless preview token (API_DESIGN §7.4). Without webhooks (P2) no provider facts exist, so the marker's counts use send states only. |
 
 ## Partly done (remaining parts are in Backlog or Deferred)
 
 | Card | Done | Remaining |
 |---|---|---|
-| K-304 Event lifecycle | Idempotent create; reschedule with notification (P0 #1, #14); capacity change (K-304a) and title and description edit (K-304b), both done in `dev` | Cancel, delete: see To Do |
+| K-304 Event lifecycle | Idempotent create; reschedule (P0 #1, #14); capacity change (K-304a), title and description edit (K-304b), both done in `dev`; cancellation (K-304c, in Review) | Deletion: K-304d |
 | K-306 Check-in | Check-in with replay, window and outcomes (P0 #9, #10) | Undo |
 | K-401 Messaging | Outbox claim, fenced send, reaper, sweeps, pre-claim counter | Budget, pause, render-time re-check |
 | K-403 Notifications | 9 of 17 message types | The rest, with their features |
@@ -95,4 +95,4 @@
 | K-205 `migrate budget-sync` | P2 |
 | K-402 Webhooks, provider-event log, delivery facts | P2 |
 | K-405 Participant portal: resend, rotation | P1 |
-| K-406 Staff invitations and sessions | P1 |
+| K-406 Staff invitations and sessions. **Carries a dependency from K-304c (D5, PD-40):** event cancellation must revoke active invitations in the cancellation transaction and make existing staff sessions unusable (FR-STAFF-4, FR-STAFF-5). | P1 |

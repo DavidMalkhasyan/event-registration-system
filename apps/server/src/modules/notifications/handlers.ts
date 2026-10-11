@@ -358,6 +358,28 @@ const waitlistClosed: MessageHandler = {
   },
 };
 
+const eventCancellation: MessageHandler = {
+  // §4.9 "Event cancellation" (BR-16): no send-time check (the catalogue lists none), no links.
+  // Created only by TX-E05, once per registration (logical key), so it can't become stale.
+  async freshness() {
+    return { fresh: true };
+  },
+  async issueTokens() {
+    return {};
+  },
+  async render(db, msg) {
+    const event = (await eventOf(db, msg.event_id!))!;
+    const wasConfirmed = msg.payload.previousState === 'CONFIRMED';
+    return email(`Event cancelled: ${event.title}`, [
+      `The organizer has cancelled "${event.title}", which was planned for ${localTime(event.starts_at, event.time_zone)}.`,
+      wasConfirmed
+        ? 'Your registration is cancelled and your ticket is no longer valid. Please do not come to the event.'
+        : 'Your registration is cancelled, and you are no longer on the waiting list.',
+      'You do not need to do anything. Links in earlier emails about this event no longer work.',
+    ]);
+  },
+};
+
 const registrationCancelled: MessageHandler = {
   // A required notice: no freshness check, never dropped (BR-23, CK-69).
   async freshness() {
@@ -388,4 +410,5 @@ export const HANDLERS: Record<string, MessageHandler> = {
   event_change: eventChange,
   waitlist_closed: waitlistClosed,
   registration_cancelled: registrationCancelled,
+  event_cancellation: eventCancellation,
 };

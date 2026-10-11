@@ -214,3 +214,39 @@ export function tokenFromLink(link: string): string {
 export function moveClockTo(target: Date, offsetMs = 0): void {
   setTestClockOffset((target.getTime() + offsetMs - Date.now()) / 1000);
 }
+
+/**
+ * FR-ORG-5: requests a re-authentication link for `s`, confirms it in a browser without a
+ * session (as the email recipient would) and returns the new session. The old one is revoked.
+ */
+export async function reauthenticate(h: Harness, s: Session, email: string): Promise<Session> {
+  const request = await h.app.inject({
+    method: 'POST',
+    url: '/api/auth/reauthentication',
+    headers: organizerHeaders(s),
+  });
+  if (request.statusCode !== 202) throw new Error(`reauthentication failed: ${request.statusCode}`);
+  await drain(h);
+  const mail = mailFor(h, email).find((m) => m.subject.startsWith('Confirm it is you'))!;
+  const token = linkToken(mail, '/sign-in');
+  const view = await h.app.inject({
+    method: 'GET',
+    url: '/api/links/sign-in',
+    headers: { authorization: `Link ${token}` },
+  });
+  const nonce = cookieValue(view, '__Host-ers_presession')!;
+  const confirm = await h.app.inject({
+    method: 'POST',
+    url: '/api/links/sign-in/confirm',
+    headers: {
+      origin: ORIGIN,
+      authorization: `Link ${token}`,
+      'x-csrf-token': view.json().preSessionToken,
+      cookie: `__Host-ers_presession=${nonce}`,
+    },
+  });
+  if (confirm.statusCode !== 200) throw new Error(`reauthentication confirm failed: ${confirm.statusCode}`);
+  const cookie = `__Host-ers_org=${cookieValue(confirm, '__Host-ers_org')}`;
+  const session = await h.app.inject({ method: 'GET', url: '/api/auth/session', headers: { cookie } });
+  return { cookie, csrf: session.json().csrfToken, accountId: session.json().accountId };
+}

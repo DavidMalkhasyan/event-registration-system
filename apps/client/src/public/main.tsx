@@ -60,6 +60,11 @@ function EventPage({ publicId }: { publicId: string }) {
   return (
     <Page title={event.title}>
       <Card>
+        {event.phase === 'cancelled' && (
+          <Alert kind="error">
+            <strong>Cancelled.</strong> The organizer has cancelled this event.
+          </Alert>
+        )}
         <p>
           <strong>{formatLocal(event.startsAt, event.timeZone)}</strong>
         </p>
