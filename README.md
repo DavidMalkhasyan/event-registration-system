@@ -125,6 +125,7 @@ Open http://localhost:3000/organizer. The worker needs the same `PUBLIC_ORIGIN` 
 **Timing rules:**
 
 - **Registration and promotion close** 2 hours before the start.
+- **At the cutoff,** the worker expires registrations that were never confirmed, and each participant still on the waiting list gets one "Registration closed" email for that date. If a reschedule already moved the start inside the cutoff, its change email says so instead. Moving the event later reopens registration with waiting positions kept.
 - **Check-in** is open from 2 hours before the start until 12 hours after it.
 - **Reminders** go out 24 hours before the start, exactly once per confirmed participant, while the worker runs. A ticket, promotion or change email sent within those 24 hours counts as the reminder, so no second email follows. The automated tests prove the reminder with an injected test clock.
 
@@ -132,7 +133,7 @@ Open http://localhost:3000/organizer. The worker needs the same `PUBLIC_ORIGIN` 
 
 | Command                                                             | What it runs                                                                                                                                                                  | Result (2026-10-11)                       |
 | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| `pnpm test`                                                         | Server integration tests against the real `ers_test` database (its `app` schema is recreated per run), plus client unit tests                                                 | 23/23 and 3/3 passed                      |
+| `pnpm test`                                                         | Server integration tests against the real `ers_test` database (its `app` schema is recreated per run), plus client unit tests                                                 | 27/27 and 3/3 passed                      |
 | `pnpm e2e`                                                          | Playwright: builds the client, recreates the test database, starts real web and worker processes on :3100, and drives browsers (2 participant-flow tests, 2 two-client tests) | 4/4 passed (Edge locally; Chromium in CI) |
 | `pnpm lint` / `pnpm typecheck` / `pnpm format:check` / `pnpm build` | ESLint (including a layering rule), TypeScript strict, Prettier, production builds                                                                                            | All pass                                  |
 
@@ -184,7 +185,6 @@ Errors use RFC 9457 Problem Details (`application/problem+json`) with a stable `
 ## 8. Known limitations
 
 - **Organizer features:** only rescheduling is implemented. Event editing, capacity changes, event cancellation and deletion, check-in undo, and staff accounts are not; only the event owner checks in, from any number of signed-in devices.
-- **Background jobs:** none runs at the registration cutoff. Pending registrations are not expired, and waiting participants are not told that the waiting list closed. Registration and promotion still stop correctly at the cutoff.
 - **Email:** the fake provider is the only one. There is no Resend integration, no delivery webhooks and no bounce handling.
 - **Participant self-service:** limited to view, cancel and the ticket share link. There is no "resend my links" and no email change.
 - **Language:** English only.
@@ -196,12 +196,11 @@ Errors use RFC 9457 Problem Details (`application/problem+json`) with a stable `
 
 ## 9. Future improvements
 
-1. **Cutoff job:** expire pending registrations and send "waiting list closed" emails.
-2. **Event management:** cancellation and capacity changes for organizers, each with participant notification.
-3. **Staff:** invitations and dedicated check-in sessions.
-4. **Real email:** a Resend provider behind configuration, with delivery webhooks and a delivery-problem view.
-5. **Participant self-service:** link resend and rotation.
-6. **Test infrastructure:** Testcontainers once a container runtime is available, and a load test of the last-seat path.
+1. **Event management:** capacity changes, title and description editing, event cancellation and deletion (Kanban K-304).
+2. **Staff:** invitations and dedicated check-in sessions.
+3. **Real email:** a Resend provider behind configuration, with delivery webhooks and a delivery-problem view.
+4. **Participant self-service:** link resend and rotation.
+5. **Test infrastructure:** Testcontainers once a container runtime is available, and a load test of the last-seat path.
 
 ## 10. How this was built
 

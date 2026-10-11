@@ -220,8 +220,9 @@ describe('event creation (FR-EVT-1, AC-185)', () => {
     const [a, b] = await Promise.all([post(payload), post(payload)]);
     expect([a.statusCode, b.statusCode].sort()).toEqual([200, 201]);
     expect(a.json().event.id).toBe(b.json().event.id);
-    const tasks = await h.db.selectFrom('app.scheduled_tasks').select('id').execute();
-    expect(tasks).toHaveLength(1); // retries create no extra tasks
+    const tasks = await h.db.selectFrom('app.scheduled_tasks').select('kind').orderBy('kind').execute();
+    // One reminder and one cutoff task for version 1; the concurrent retry creates no extra tasks.
+    expect(tasks.map((t) => t.kind)).toEqual(['cutoff_processing', 'reminder_fanout']);
 
     const changed = await post({ ...payload, capacity: 11 });
     expect(changed.statusCode).toBe(409);

@@ -216,3 +216,60 @@
 | *(closing commit)* | after 17:14:42 | docs: record S-03 publishing, CI and clean-clone verification |
 
 **Next steps:** submit the repository URL. Optional before submission: update the GitHub Actions versions to clear the Node.js 20 deprecation warning. P1 work only if time remains.
+
+---
+
+## S-04: K-404b Registration cutoff job
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-11 17:35:20 +04:00 (first command after the stakeholder's prompt) |
+| **End** | 2026-10-11, at the closing documentation commit on the feature branch. The activity table ends at 17:44. |
+| **Card** | K-404b (P1), on branch `feature/k-404b-cutoff-job` (PD-25) |
+| **Tools and model** | Claude Code 2.1.296, model `claude-opus-5-5`; the S-02 toolchain |
+| **Significant prompt** | "Continue development according to our EXISTING project plan … NEXT TASK: K-404b — Registration cutoff job." Read the task and its requirements first; inspect the transactions, jobs, waiting-list and notification code; work on a feature branch; integration and concurrency tests; run all checks and E2E; then name the next task, prioritizing K-304. No Redis or Kafka; no UI redesign. |
+| **Before this session** | At about 17:26, on request, the development servers were started for manual inspection: web :3000, worker, Vite :5173, PostgreSQL :54318. No code changed, so there is no separate entry. |
+
+**Sources read:**
+- REQUIREMENTS.md: FR-WL-4 and FR-WL-5, FR-NTF-4, F8, AC-32, AC-106, AC-107, EC-18, EC-19, the state diagram (`EXPIRED` at the cutoff), the §4.9 row "Waiting list closed" (no links; key = registration + version), and NFR-REL-5.
+- Design: TX-J03, TX-E04 (`params.waitlist_closed_by_change`), D-3 (`EXPIRED` only by the cutoff task or event cancellation), U-26.
+
+**Activity:**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 17:35–17:37 | Read the requirements and design rows above; inspected `tasks.ts`, `lifecycle.ts`, `registrations.ts`, `handlers.ts`, the `0002` schema and the harness | The schema already allows `cutoff_processing` tasks with `params` and `EXPIRED (cutoff)`. No revoke reason exists for this case (PD-26). |
+| 17:37:10 | `git switch -c feature/k-404b-cutoff-job` | `main` untouched |
+| 17:37–17:38 | `scheduleCutoffTask` (create and reschedule); `runCutoff` (TX-J03, exclusive lock, attempt fence); `waitlist_closed` handler; migration `0003` backfill (PD-28) | — |
+| 17:39:23 | Typecheck; new `cutoff.test.ts` | Typecheck passed. **3 passed, 1 failed:** the test expected the old version's task to be `SKIPPED` immediately, but it is correctly still `PENDING` until its own due time. The test was corrected to check that it skips itself when due. |
+| 17:39:47 | `cutoff.test.ts` three times | 4/4, 4/4, 4/4 |
+| 17:40:20 | Mutation checks, sources restored afterwards (byte-identical) | Ignoring the FR-NTF-4 flag → the AC-106 test fails. No `EXPIRED` update → all 4 fail. Freshness without the `WAITLISTED` check → the concurrency test fails (3 of 3 runs). |
+| 17:40:56 | Side effect found: the running dev worker (`tsx watch`) reloaded the new code and refused to start, "schema version 2 does not match the expected version 3" (the intended fail-fast) | `pnpm migrate` on `ers_dev`: "applied 0003_cutoff_tasks.sql"; web and worker restarted; `/healthz` schema version 3 |
+| 17:41:31–17:42:47 | Full suite: `format:check`, `lint`, `typecheck`, `test`, `build`, then `PW_CHANNEL=msedge pnpm e2e` | All exit 0. **Server 27/27** (23 existing + 4 new), client 3/3, **E2E 4/4** |
+| 17:43:00 | Commit | `d25d3dd` feat(jobs): registration cutoff job (K-404b) |
+| 17:43–17:44 | Kanban (K-404b → Review; K-304 split into K-304a–d in To Do), decisions PD-25 to PD-28, ASSIGNMENT_SCOPE, README | — |
+
+**Test coverage added** (`apps/server/test/cutoff.test.ts`, real PostgreSQL):
+1. **AC-32 and D-3.** Nothing happens before the cutoff. After it, two workers run the task in parallel. Each waiting participant gets exactly one email, and the confirmed participant none. The pending registration becomes `EXPIRED (cutoff)`, and its verification link gives the generic response. Re-running changes nothing.
+2. **Concurrency at the cutoff.** These all start at once: three workers, a confirmed participant's cancellation, a waiting participant's cancellation, and a late verification. Results:
+   - the late verification is rejected;
+   - nobody is promoted;
+   - the participant who left the list is never told it closed, whichever transaction commits first;
+   - the remaining waiting participant gets exactly one email.
+3. **FR-NTF-4 and AC-106.** A reschedule to inside the cutoff produces the change email stating "closed", and no separate email. The old version's task skips itself when due.
+4. **EC-18, AC-107 and FR-REG-9.** After the cutoff, a reschedule to later reopens registration:
+   - positions are kept, FIFO promotion resumes, and there is no "reopened" email;
+   - the expired registrant can register again;
+   - the new version's cutoff sends one more email (one per version).
+
+**Not done:** CI has not run on this branch. The workflow runs on pushes to `main` and on pull requests, and the branch has not been pushed (PD-25).
+
+**Commits in S-04:**
+
+| Hash | Time (+04:00) | Message |
+|---|---|---|
+| `8c1247d` | 17:16:02 | docs: record S-03 publishing, CI and clean-clone verification. S-03's closing commit, recorded here. |
+| `d25d3dd` | 17:43:00 | feat(jobs): registration cutoff job (K-404b) |
+| *(closing commit)* | after 17:44 | docs: record K-404b in the journal, Kanban, decisions and scope |
+
+**Next task:** K-304a, capacity change (FR-EVT-7, FR-EVT-8, TX-E03). K-304c, event cancellation, needs a decision first, because it requires recent authentication (FR-ORG-5), which is not implemented.

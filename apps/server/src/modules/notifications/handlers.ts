@@ -316,6 +316,33 @@ const eventChange: MessageHandler = {
   },
 };
 
+const waitlistClosed: MessageHandler = {
+  // §4.9 "Waiting list closed" (FR-WL-5): event SCHEDULED, version current, still WAITLISTED. No links.
+  async freshness(trx, msg) {
+    const registration = await registrationOf(trx, msg.registration_id!);
+    const event = await trx
+      .selectFrom('app.events')
+      .select(['status', 'schedule_version'])
+      .where('id', '=', msg.event_id!)
+      .executeTakeFirst();
+    const fresh =
+      registration?.state === 'WAITLISTED' &&
+      event?.status === 'SCHEDULED' &&
+      event.schedule_version === msg.schedule_version;
+    return fresh ? { fresh: true } : { fresh: false, reason: 'obsolete' };
+  },
+  async issueTokens() {
+    return {};
+  },
+  async render(db, msg) {
+    const event = (await eventOf(db, msg.event_id!))!;
+    return email(`Registration closed: ${event.title}`, [
+      `Registration for "${event.title}" on ${localTime(event.starts_at, event.time_zone)} is now closed, and no place became available for you.`,
+      'You will not receive a ticket for this date. If the organizer moves the event to a later date, you will be told by email.',
+    ]);
+  },
+};
+
 const registrationCancelled: MessageHandler = {
   // A required notice: no freshness check, never dropped (BR-23, CK-69).
   async freshness() {
@@ -344,5 +371,6 @@ export const HANDLERS: Record<string, MessageHandler> = {
   promotion,
   reminder,
   event_change: eventChange,
+  waitlist_closed: waitlistClosed,
   registration_cancelled: registrationCancelled,
 };

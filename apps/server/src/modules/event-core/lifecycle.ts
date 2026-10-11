@@ -39,6 +39,33 @@ export async function scheduleReminderTask(
 }
 
 /**
+ * One cutoff task per schedule version, due at the cutoff (F8, TX-J03; U-26 makes it idempotent).
+ * `waitlistClosedByChange`: the version's change email already told waiting participants that
+ * registration is closed (FR-NTF-4), so the task sends no separate "waiting list closed" email.
+ */
+export async function scheduleCutoffTask(
+  trx: Tx,
+  eventId: string,
+  version: number,
+  startsAt: Date,
+  now: Date,
+  waitlistClosedByChange = false,
+): Promise<void> {
+  await trx
+    .insertInto('app.scheduled_tasks')
+    .values({
+      kind: 'cutoff_processing',
+      event_id: eventId,
+      schedule_version: version,
+      due_at: cutoffOf(startsAt),
+      params: JSON.stringify(waitlistClosedByChange ? { waitlist_closed_by_change: true } : {}),
+      created_at: now,
+    })
+    .onConflict((oc) => oc.columns(['kind', 'event_id', 'schedule_version']).doNothing())
+    .execute();
+}
+
+/**
  * Enqueues a message for one registration. If it must occupy the reminder slot (decision time
  * ≥ Start − 24 h, FR-NTF-2 a), the slot is claimed by uniqueness in the same transaction (FR-NTF-2a).
  */
@@ -395,6 +422,7 @@ export async function rescheduleEvent(
       });
     }
     await scheduleReminderTask(trx, eventId, version, resolved.instant, now);
+    await scheduleCutoffTask(trx, eventId, version, resolved.instant, now, closedNow);
     await promoteFifo(trx, eventId, now, correlationId); // BR-15: moving later can reopen promotion
     await recordAudit(trx, {
       now,

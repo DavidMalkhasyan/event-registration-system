@@ -12,7 +12,7 @@ import {
   resolveLocalStart,
 } from '../../platform/time.js';
 import type { OrganizerPrincipal } from '../identity/sessions.js';
-import { scheduleReminderTask } from './lifecycle.js';
+import { scheduleCutoffTask, scheduleReminderTask } from './lifecycle.js';
 
 export const eventCreateSchema = z
   .object({
@@ -128,6 +128,7 @@ export async function createEvent(ctx: AppContext, principal: OrganizerPrincipal
     if (inserted) {
       // Only the first, inserting request creates tasks, so identical retries create none (AC-185).
       await scheduleReminderTask(trx, inserted.id, 1, inserted.starts_at, now);
+      await scheduleCutoffTask(trx, inserted.id, 1, inserted.starts_at, now);
       return { created: true, event: eventView(ctx, inserted, now), now };
     }
 
