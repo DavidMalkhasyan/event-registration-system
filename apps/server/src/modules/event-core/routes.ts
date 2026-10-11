@@ -16,12 +16,14 @@ import {
 } from './events.js';
 import {
   cancelByManagementLink,
-  managementView,
   capacitySchema,
+  eventDetailsSchema,
+  managementView,
   rescheduleEvent,
   rescheduleSchema,
   setCapacity,
   shareView,
+  updateEventDetails,
 } from './lifecycle.js';
 import { confirmVerification, resolveVerification, submitRegistration } from './registrations.js';
 
@@ -97,6 +99,14 @@ export function registerEventCoreRoutes(app: FastifyInstance, ctx: AppContext): 
     const principal = await requireOrganizer(ctx, request, { csrf: true });
     const eventId = params.parse(request.params).eventId;
     await rescheduleEvent(ctx, principal, eventId, rescheduleSchema.parse(request.body), request.id);
+    return getOwnedEvent(ctx, principal, eventId);
+  });
+
+  // updateEventDetails (API catalogue #33): title and/or description; no emails.
+  app.patch('/api/events/:eventId', async (request) => {
+    const principal = await requireOrganizer(ctx, request, { csrf: true });
+    const eventId = params.parse(request.params).eventId;
+    await updateEventDetails(ctx, principal, eventId, eventDetailsSchema.parse(request.body));
     return getOwnedEvent(ctx, principal, eventId);
   });
 
