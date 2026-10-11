@@ -262,6 +262,18 @@ export interface ReminderSlotsTable {
   created_at: Timestamp;
 }
 
+export interface RotationRequestsTable {
+  id: Generated<string>;
+  registration_id: string;
+  event_id: string;
+  request_id: string;
+  link_type: 'management' | 'share';
+  authorizing_token_id: string;
+  new_token_id: string;
+  decided_at: Timestamp;
+  outbox_message_id: string | null;
+}
+
 export interface DeletionMarkersTable {
   event_id: string;
   owner_account_id: string;
@@ -309,4 +321,5 @@ export interface DB {
   'app.reminder_slots': ReminderSlotsTable;
   'app.scheduled_tasks': ScheduledTasksTable;
   'app.deletion_markers': DeletionMarkersTable;
+  'app.rotation_requests': RotationRequestsTable;
 }

@@ -17,6 +17,12 @@ export type ProblemCode =
   | 'deletion_blocked'
   | 'notifications_pending'
   | 'preview_invalid'
+  | 'not_confirmed'
+  | 'request_already_processed'
+  | 'rotation_not_available'
+  | 'rotation_not_applied'
+  | 'resend_limit'
+  | 'rotation_limit'
   | 'schedule_version_mismatch'
   | 'nonexistent_local_time'
   | 'ambiguous_local_time'
@@ -46,6 +52,12 @@ const TITLES: Record<ProblemCode, string> = {
   deletion_blocked: 'The event cannot be deleted yet',
   notifications_pending: 'Notifications are still being sent; try again later',
   preview_invalid: 'The deletion preview is no longer valid; review it again',
+  not_confirmed: 'This registration has no ticket',
+  request_already_processed: 'This request was already processed. Please start again.',
+  rotation_not_available: 'This link cannot be replaced for this registration',
+  rotation_not_applied: 'Your link was not changed. Your current link still works. Please try again.',
+  resend_limit: 'Too many ticket emails were requested. Please try again later.',
+  rotation_limit: 'Too many link replacements. Please try again later.',
   schedule_version_mismatch: 'The event was changed by another request; reload and try again',
   nonexistent_local_time: 'This local time does not exist in the time zone',
   ambiguous_local_time: 'This local time is ambiguous in the time zone',

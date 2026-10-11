@@ -19,8 +19,13 @@ export interface IssueInput {
 
 /** Issues a new token and returns the raw value; only its hash is stored (FR-LNK-1). */
 export async function issueToken(trx: Tx, input: IssueInput): Promise<string> {
+  return (await issueTokenWithId(trx, input)).raw;
+}
+
+/** As issueToken, also returning the new row's ID (rotation requests reference it, FK-17). */
+export async function issueTokenWithId(trx: Tx, input: IssueInput): Promise<{ raw: string; id: string }> {
   const raw = randomToken();
-  await trx
+  const row = await trx
     .insertInto('app.access_tokens')
     .values({
       token_type: input.type,
@@ -34,8 +39,9 @@ export async function issueToken(trx: Tx, input: IssueInput): Promise<string> {
       attempt_no: input.attemptNo ?? null,
       expires_at: input.expiresAt ?? null,
     })
-    .execute();
-  return raw;
+    .returning('id')
+    .executeTakeFirstOrThrow();
+  return { raw, id: row.id };
 }
 
 export interface TokenRow {
