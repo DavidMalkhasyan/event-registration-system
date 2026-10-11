@@ -16,7 +16,9 @@ import {
 } from './events.js';
 import {
   cancelByManagementLink,
+  cancelEvent,
   capacitySchema,
+  confirmedActionSchema,
   eventDetailsSchema,
   managementView,
   rescheduleEvent,
@@ -99,6 +101,15 @@ export function registerEventCoreRoutes(app: FastifyInstance, ctx: AppContext): 
     const principal = await requireOrganizer(ctx, request, { csrf: true });
     const eventId = params.parse(request.params).eventId;
     await rescheduleEvent(ctx, principal, eventId, rescheduleSchema.parse(request.body), request.id);
+    return getOwnedEvent(ctx, principal, eventId);
+  });
+
+  // cancelEvent (API catalogue #36): confirmed, recent authentication; a repeat returns 200 (TX-E05).
+  app.post('/api/events/:eventId/cancellation', async (request) => {
+    const principal = await requireOrganizer(ctx, request, { csrf: true });
+    const eventId = params.parse(request.params).eventId;
+    confirmedActionSchema.parse(request.body ?? {});
+    await cancelEvent(ctx, principal, eventId, request.id);
     return getOwnedEvent(ctx, principal, eventId);
   });
 

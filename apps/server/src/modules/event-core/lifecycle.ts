@@ -4,11 +4,16 @@ import { z } from 'zod';
 import type { AppContext } from '../../composition/context.js';
 import { ticketCode } from '../../platform/crypto.js';
 import { AppError, InvalidLinkError } from '../../platform/errors.js';
+import { RULES } from '../../platform/ratelimit.js';
 import { checkInWindow, cutoffOf, resolveLocalStart } from '../../platform/time.js';
 import { decisionTime, withEventLock, type LockedEvent, type Tx } from '../../platform/tx.js';
 import { findToken, type TokenRow } from '../access-tokens/tokens.js';
 import { recordAudit } from '../audit/audit.js';
-import { sessionStillValid, type OrganizerPrincipal } from '../identity/sessions.js';
+import {
+  requireRecentAuthentication,
+  sessionStillValid,
+  type OrganizerPrincipal,
+} from '../identity/sessions.js';
 import { enqueue, type MessageType } from '../messaging/outbox.js';
 
 const DAY_MS = 24 * 3_600_000;
@@ -347,6 +352,93 @@ export async function cancelByManagementLink(
   if (outcome === 'closed') throw new AppError(409, 'cancellation_closed');
   if (outcome === 'checked_in') throw new AppError(409, 'ticket_checked_in');
   return outcome;
+}
+
+// ---------------------------------------------------------------- event cancellation (FR-EVT-9, BR-16)
+
+/** ConfirmedAction: the explicit confirmation every destructive operation requires. */
+export const confirmedActionSchema = z.object({ confirmed: z.literal(true) }).strict();
+
+/**
+ * TX-E05 (FR-EVT-9, FR-ORG-5, BR-16, BR-18, BR-23, AC-18, AC-59): under the exclusive event lock,
+ * in this order (PD-39): owner, session and recent authentication (database decision time),
+ * then the idempotent answer for an already-cancelled event, then the start. One transaction:
+ * the event becomes CANCELLED (cancelled_at, schedule version + 1, so reminder and cutoff tasks
+ * become stale, PD-37); CONFIRMED and WAITLISTED → CANCELLED and PENDING_VERIFICATION → EXPIRED,
+ * both with end_reason 'event_cancelled', in one statement; exactly one event-cancellation email
+ * per previously confirmed or waiting participant (recipients read under the lock before the
+ * update); an audit record. Queued messages are not touched: their claim, under the shared event
+ * lock, re-checks freshness and drops them (AC-18). No registration-cancellation confirmation is
+ * created (AC-59). Tickets and check-ins stay as history; check-in answers EVENT_CANCELLED.
+ */
+export async function cancelEvent(
+  ctx: AppContext,
+  principal: OrganizerPrincipal,
+  eventId: string,
+  correlationId: string,
+): Promise<void> {
+  if (!z.uuid().safeParse(eventId).success) throw new AppError(404, 'not_found');
+  // PD-38: per account, before any event lookup, so a 429 says nothing about the event.
+  const limit = await ctx.limiter.hit(RULES.eventCancellationPerAccount, principal.accountId);
+  if (!limit.allowed) throw new AppError(429, 'rate_limited', { retryAfterSeconds: limit.retryAfterSeconds });
+
+  const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
+    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    await requireRecentAuthentication(trx, principal.sessionId, now); // 401 unauthenticated / reauthentication_required
+    if (event.status === 'CANCELLED') return 'already_cancelled' as const;
+    if (now >= event.starts_at) return 'started' as const;
+
+    const recipients = await trx
+      .selectFrom('app.registrations')
+      .select(['id', 'email', 'state'])
+      .where('event_id', '=', eventId)
+      .where('state', 'in', ['CONFIRMED', 'WAITLISTED'])
+      .orderBy('id')
+      .execute();
+    await trx
+      .updateTable('app.events')
+      .set({
+        status: 'CANCELLED',
+        cancelled_at: now,
+        schedule_version: event.schedule_version + 1,
+        updated_at: now,
+      })
+      .where('id', '=', eventId)
+      .execute();
+    const ended = await sql<{ state: string; n: number }>`
+      WITH ended AS (
+        UPDATE app.registrations
+           SET state = CASE WHEN state = 'PENDING_VERIFICATION' THEN 'EXPIRED' ELSE 'CANCELLED' END,
+               ended_at = ${now}, end_reason = 'event_cancelled', updated_at = ${now}
+         WHERE event_id = ${eventId} AND state IN ('PENDING_VERIFICATION', 'CONFIRMED', 'WAITLISTED')
+        RETURNING state)
+      SELECT state, count(*)::int AS n FROM ended GROUP BY state`.execute(trx);
+    for (const reg of recipients) {
+      await enqueue(trx, {
+        type: 'event_cancellation',
+        logicalKey: `event_cancellation:${reg.id}`, // one logical message per registration (BR-16)
+        recipientEmail: reg.email,
+        now,
+        eventId,
+        registrationId: reg.id,
+        payload: { previousState: reg.state },
+        correlationId,
+      });
+    }
+    const count = (state: string) => ended.rows.find((r) => r.state === state)?.n ?? 0;
+    await recordAudit(trx, {
+      now,
+      action: 'event_cancelled',
+      actorKind: 'owner',
+      actorAccountId: principal.accountId,
+      eventId,
+      outcome: 'success',
+      details: { cancelled: count('CANCELLED'), expired: count('EXPIRED'), notified: recipients.length },
+    });
+    return 'cancelled' as const;
+  });
+  if (result === null || result === 'not_found') throw new AppError(404, 'not_found');
+  if (result === 'started') throw new AppError(409, 'event_started');
 }
 
 // ---------------------------------------------------------------- title and description (FR-EVT-5)
