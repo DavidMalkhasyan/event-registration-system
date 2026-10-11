@@ -1,4 +1,4 @@
-import { linkToken } from './bootstrap-token'; // must stay the first import (FR-LNK-10 b)
+import { linkToken, replaceLinkToken } from './bootstrap-token'; // must stay the first import (FR-LNK-10 b)
 import { useEffect, useState, type FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ApiError, api, errorMessage } from '../shared/api';
@@ -238,8 +238,198 @@ type ManageView =
     }
   | { state: 'WAITLISTED'; event: EventSummary; position: number; actions: { cancel: boolean } };
 
+const tokenOf = (link: string) => link.split('#t=')[1] ?? '';
+
+/** Ticket resend (FR-SELF-4) and share-link issuance (FR-SHR-1) for a confirmed registration. */
+function TicketActions({ token }: { token: string }) {
+  const [resend, setResend] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const [shareLink, setShareLink] = useState<string>();
+  const [error, setError] = useState<string>();
+  const requestResend = async () => {
+    setResend('sending');
+    setError(undefined);
+    const requestId = crypto.randomUUID(); // a retry reuses it, so it can't create a second email
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        await api('/api/links/manage/resend', { method: 'POST', linkToken: token, body: { requestId } });
+        setResend('sent');
+        return;
+      } catch (e) {
+        if (!(e instanceof ApiError && e.code === 'network_error') || attempt === 1) {
+          setError(errorMessage(e));
+          setResend('idle');
+          return;
+        }
+      }
+    }
+  };
+  const issueShareLink = async () => {
+    setError(undefined);
+    try {
+      setShareLink(
+        (
+          await api<{ shareLink: string }>('/api/links/manage/share-links', {
+            method: 'POST',
+            linkToken: token,
+          })
+        ).shareLink,
+      );
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  };
+  return (
+    <Card title="Your ticket">
+      <div className="row">
+        <button className="secondary" onClick={requestResend} disabled={resend !== 'idle'}>
+          {resend === 'sending'
+            ? 'Sending…'
+            : resend === 'sent'
+              ? 'Ticket email sent'
+              : 'Email me my ticket again'}
+        </button>
+        <button className="secondary" onClick={issueShareLink}>
+          Share ticket
+        </button>
+      </div>
+      {resend === 'sent' && (
+        <Alert kind="success">We sent your ticket to your email address again. It contains new links.</Alert>
+      )}
+      {shareLink && (
+        <>
+          <CopyLink label="Share link (pass on only the ticket)" url={shareLink} />
+          <p className="muted">
+            Whoever has this link can see and use the ticket once. It cannot manage or cancel your
+            registration.
+          </p>
+        </>
+      )}
+      {error && <Alert>{error}</Alert>}
+    </Card>
+  );
+}
+
+const ROTATION_TEXT = {
+  management:
+    'All earlier management links, including the ones in earlier emails, stop working immediately. Your share links are not affected. We will email you the new management link.',
+  share:
+    'All earlier share links, including the ones in earlier emails, stop working immediately. Your management link is not affected. The ticket code itself does not change, so anyone who already saw the code or QR code can still use it once.',
+} as const;
+
+/** Link rotation (FR-ROT-1 to FR-ROT-11): explicit confirmation, fresh request ID per confirmation page. */
+function LinkRotation({
+  token,
+  confirmed,
+  onManagementRotated,
+}: {
+  token: string;
+  confirmed: boolean;
+  onManagementRotated: (next: string) => void;
+}) {
+  const [linkType, setLinkType] = useState<'management' | 'share' | null>(null);
+  const [requestId, setRequestId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [issued, setIssued] = useState<{ linkType: 'management' | 'share'; newLink: string }>();
+  const [message, setMessage] = useState<{ kind: 'info' | 'error'; text: string }>();
+  const open = (type: 'management' | 'share') => {
+    setLinkType(type);
+    setRequestId(crypto.randomUUID()); // FR-ROT-11: every confirmation page has a fresh request ID
+    setIssued(undefined);
+    setMessage(undefined);
+  };
+  const rotate = async () => {
+    if (!linkType) return;
+    setBusy(true);
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const result = await api<
+          | { result: 'rotated'; linkType: 'management' | 'share'; newLink: string }
+          | { result: 'already_replaced' }
+        >('/api/links/manage/rotations', {
+          method: 'POST',
+          linkToken: token,
+          body: { linkType, requestId, confirmed: true },
+        });
+        if (result.result === 'already_replaced') {
+          setMessage({
+            kind: 'info',
+            text: 'Your link was already replaced. The new link has been sent to your email address.',
+          });
+        } else {
+          setIssued({ linkType: result.linkType, newLink: result.newLink });
+          if (result.linkType === 'management') onManagementRotated(tokenOf(result.newLink));
+        }
+        setLinkType(null);
+        break;
+      } catch (e) {
+        if (e instanceof ApiError && e.code === 'network_error' && attempt === 0) continue; // same request ID
+        if (e instanceof ApiError && e.code === 'request_already_processed')
+          setRequestId(crypto.randomUUID());
+        setMessage({
+          kind: 'error',
+          text:
+            e instanceof ApiError && e.code === 'rotation_not_applied'
+              ? 'Your link was not changed. Your current link still works. Please try again.'
+              : errorMessage(e),
+        });
+        break;
+      }
+    }
+    setBusy(false);
+  };
+  return (
+    <Card title="Replace your links">
+      <p className="muted">
+        If you shared or forwarded a link by mistake, replace it. Each link type is replaced separately.
+      </p>
+      {linkType ? (
+        <div className="stack">
+          <Alert kind="info">{ROTATION_TEXT[linkType]}</Alert>
+          <div className="row">
+            <button className="danger" onClick={rotate} disabled={busy}>
+              {busy
+                ? 'Replacing…'
+                : linkType === 'management'
+                  ? 'Yes, replace my management link'
+                  : 'Yes, replace my share link'}
+            </button>
+            <button className="secondary" onClick={() => setLinkType(null)} disabled={busy}>
+              Keep my links
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="row">
+          <button className="secondary" onClick={() => open('management')}>
+            Replace management link…
+          </button>
+          {confirmed && (
+            <button className="secondary" onClick={() => open('share')}>
+              Replace share link…
+            </button>
+          )}
+        </div>
+      )}
+      {issued && (
+        <>
+          <Alert kind="success">
+            {issued.linkType === 'management'
+              ? 'Your management link was replaced. This page now uses the new link; copy it now, it is shown only once. We also emailed it to you.'
+              : 'Your share link was replaced. Copy the new one now; it is shown only once.'}
+          </Alert>
+          <CopyLink
+            label={issued.linkType === 'management' ? 'Your new management link' : 'Your new share link'}
+            url={issued.newLink}
+          />
+        </>
+      )}
+      {message && <Alert kind={message.kind}>{message.text}</Alert>}
+    </Card>
+  );
+}
+
 function ManagePage() {
-  const token = linkToken();
+  const [token, setToken] = useState(linkToken());
   const [view, setView] = useState<ManageView>();
   const [invalid, setInvalid] = useState(!token);
   const [confirming, setConfirming] = useState(false);
@@ -307,6 +497,17 @@ function ManagePage() {
           </p>
         )}
       </Card>
+      {view.state === 'CONFIRMED' && token && <TicketActions token={token} />}
+      {token && (
+        <LinkRotation
+          token={token}
+          confirmed={view.state === 'CONFIRMED'}
+          onManagementRotated={(next) => {
+            replaceLinkToken(next);
+            setToken(next);
+          }}
+        />
+      )}
       {view.actions.cancel && (
         <Card title="Cancel registration">
           {!confirming ? (

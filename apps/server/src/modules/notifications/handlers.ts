@@ -358,6 +358,39 @@ const waitlistClosed: MessageHandler = {
   },
 };
 
+const ticketResend: MessageHandler = {
+  // §4.9 "Ticket resend": still CONFIRMED, event not cancelled; management and share links issued at send time.
+  ...registrationMessage('CONFIRMED', true),
+  async render(db, msg, tokens, origin) {
+    const event = (await eventOf(db, msg.event_id!))!;
+    const code = await ticketCodeOf(db, msg.registration_id!);
+    return email(`Your ticket (resent): ${event.title}`, [
+      `As requested, here is your ticket for "${event.title}" on ${localTime(event.starts_at, event.time_zone)}.`,
+      `Ticket code: ${code ?? '(unavailable)'}`,
+      TRANSFER,
+      { label: 'Manage or cancel your registration', link: `${origin}/manage#t=${tokens.manage}` },
+      FORWARD_WARNING,
+      { label: 'Share ticket', link: `${origin}/ticket#t=${tokens.share}` },
+      SHARE_HINT,
+    ]);
+  },
+};
+
+const managementLinkReplaced: MessageHandler = {
+  // §4.9 "Management link replaced" (FR-ROT-5, FR-NTF-13): registration still active, event not cancelled.
+  // Its management link is issued at send time, after the rotation, so it is valid (FR-ROT-3).
+  ...registrationMessage('ACTIVE', false),
+  async render(db, msg, tokens, origin) {
+    const event = (await eventOf(db, msg.event_id!))!;
+    return email(`Your management link was replaced: ${event.title}`, [
+      `The management link for your registration for "${event.title}" on ${localTime(event.starts_at, event.time_zone)} was replaced. Earlier management links no longer work.`,
+      { label: 'Your new management link', link: `${origin}/manage#t=${tokens.manage}` },
+      FORWARD_WARNING,
+      'If you did not do this, someone else may have had your link. Open the new link and replace it again. If you receive several of these emails, use the most recent one.',
+    ]);
+  },
+};
+
 const eventCancellation: MessageHandler = {
   // §4.9 "Event cancellation" (BR-16): no send-time check (the catalogue lists none), no links.
   // Created only by TX-E05, once per registration (logical key), so it can't become stale.
@@ -411,4 +444,6 @@ export const HANDLERS: Record<string, MessageHandler> = {
   waitlist_closed: waitlistClosed,
   registration_cancelled: registrationCancelled,
   event_cancellation: eventCancellation,
+  ticket_resend: ticketResend,
+  management_link_replaced: managementLinkReplaced,
 };

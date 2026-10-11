@@ -217,6 +217,8 @@ export async function deleteEvent(
     });
 
     // §8.4: explicit, set-based deletes in dependency order; the CASCADE foreign keys stay as a safety net.
+    // PD-47: rotation_requests first, because FK-17 and FK-18 to access_tokens are NO ACTION, not deferrable.
+    await trx.deleteFrom('app.rotation_requests').where('event_id', '=', eventId).execute();
     await trx.deleteFrom('app.access_tokens').where('event_id', '=', eventId).execute();
     await trx.deleteFrom('app.reminder_slots').where('event_id', '=', eventId).execute();
     await trx.deleteFrom('app.check_in_requests').where('event_id', '=', eventId).execute();
