@@ -4,7 +4,7 @@
 |---|---|
 | **Columns** | Backlog → To Do → In Progress → Review → Done, plus **Deferred** for extended scope that was intentionally not built |
 | **Work-in-progress limits** | In Progress ≤ 2, Review ≤ 3 |
-| **Last updated** | 2026-10-11, session S-06 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
+| **Last updated** | 2026-10-11, session S-07 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
 | **Scope** | Re-planned in S-02 by the final delivery strategy (PD-15): P0 is mandatory, then P1, with P2 deferred. Requirement-level status is in [ASSIGNMENT_SCOPE.md](../../ASSIGNMENT_SCOPE.md). |
 
 ## Rules
@@ -41,13 +41,13 @@
 | K-601 README | M6 | S-03: followed from a clean clone with a new PostgreSQL cluster; two gaps found and fixed (`67346ac`) |
 | K-404b Registration cutoff job (F8, TX-J03, FR-WL-5, FR-NTF-4, D-3) | M4 | `d25d3dd`, `2d78ca5`; [PR #1](https://github.com/DavidMalkhasyan/event-registration-system/pull/1) into `dev`; CI [run 38144704826](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38144704826) passed (3 migrations on a fresh database; 27/27, 3/3, 4/4); merged 2026-10-11 17:51:34 as `5818fb4`. Not in `main` (PD-29). |
 | K-304a Capacity change (FR-EVT-7, FR-EVT-8, TX-E03, AC-13 to AC-15) | M3 | `f6024e3`, `c4f5733`, `3c73c23`; [PR #2](https://github.com/DavidMalkhasyan/event-registration-system/pull/2) into `dev`; CI runs [38145423055](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38145423055) and [38145629926](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38145629926) passed (35/35, 3/3, 5/5); merged 2026-10-11 18:27:23 as `0a811bb`. Not in `main`. |
+| K-304b Title and description edit (FR-EVT-5, TX-E02, AC-105) | M3 | `19ff849`, `b8ffae1`, `c2280d1`; [PR #3](https://github.com/DavidMalkhasyan/event-registration-system/pull/3) into `dev`; CI runs [38147918146](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38147918146) and [38148193367](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38148193367) passed (41/41, 3/3, 6/6); merged 2026-10-11 18:43:42 as `a99c44d`. Not in `main`. |
 | K-505 Playwright suites, **reduced scope** | M5 | `b7a164f`: 4 tests, including two simultaneous clients. 4/4 passed in 3 runs; a mutation check proved the live-count test fails when the feature breaks. |
 
 ## Review
 
 | Card | Milestone | Awaiting |
 |---|---|---|
-| K-304b Title and description edit (FR-EVT-5, TX-E02, AC-105) | M3 | Done on `feature/k-304b-event-edit` (`19ff849` backend and tests, `b8ffae1` UI and E2E): 6 integration tests, 1 E2E test, mutation checks. [PR #3](https://github.com/DavidMalkhasyan/event-registration-system/pull/3) CI [run 38147918146](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38147918146) passed (41/41, 3/3, 6/6). **Awaiting:** merge into `dev`; Done is recorded after the merge. |
 | K-001 Apply R60; synchronize the documents | M0 | Stakeholder check (commit `3fe9cb7`) |
 | K-004 Process documentation | M0 | Stakeholder review |
 
@@ -55,6 +55,7 @@
 
 | Card | Milestone | State |
 |---|---|---|
+| K-302b Re-authentication (FR-ORG-5, AC-149, ADR-010 §8; the deferred part of K-302) | M3 | **In progress** on `feature/k-302-reauthentication`; approved by the stakeholder before K-304c |
 | K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Updated in S-06 |
 
 ## To Do
@@ -69,7 +70,7 @@
 
 | Card | Done | Remaining |
 |---|---|---|
-| K-304 Event lifecycle | Idempotent create; reschedule with notification (P0 #1, #14); capacity change (K-304a, done in `dev`); title and description edit (K-304b, in Review) | Cancel, delete: see To Do |
+| K-304 Event lifecycle | Idempotent create; reschedule with notification (P0 #1, #14); capacity change (K-304a) and title and description edit (K-304b), both done in `dev` | Cancel, delete: see To Do |
 | K-306 Check-in | Check-in with replay, window and outcomes (P0 #9, #10) | Undo |
 | K-401 Messaging | Outbox claim, fenced send, reaper, sweeps, pre-claim counter | Budget, pause, render-time re-check |
 | K-403 Notifications | 9 of 17 message types | The rest, with their features |
