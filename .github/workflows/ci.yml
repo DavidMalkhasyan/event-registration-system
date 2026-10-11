@@ -45,6 +45,7 @@ jobs:
             echo "CSRF_SECRET=$(openssl rand -hex 32)"
             echo "PRESESSION_SECRET=$(openssl rand -hex 32)"
             echo "RATE_LIMIT_SECRET=$(openssl rand -hex 32)"
+            echo "PREVIEW_SECRET=$(openssl rand -hex 32)"
           } >> "$GITHUB_ENV"
       - name: Provision roles and databases
         env:

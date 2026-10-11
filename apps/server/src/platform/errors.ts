@@ -13,6 +13,10 @@ export type ProblemCode =
   | 'event_not_scheduled'
   | 'event_started'
   | 'capacity_below_confirmed'
+  | 'cancelled_event_not_deletable'
+  | 'deletion_blocked'
+  | 'notifications_pending'
+  | 'preview_invalid'
   | 'schedule_version_mismatch'
   | 'nonexistent_local_time'
   | 'ambiguous_local_time'
@@ -38,6 +42,10 @@ const TITLES: Record<ProblemCode, string> = {
   event_not_scheduled: 'The event is not scheduled',
   event_started: 'The event has started',
   capacity_below_confirmed: 'Capacity is below the number of confirmed participants',
+  cancelled_event_not_deletable: "Cancelled events can't be deleted",
+  deletion_blocked: 'The event cannot be deleted yet',
+  notifications_pending: 'Notifications are still being sent; try again later',
+  preview_invalid: 'The deletion preview is no longer valid; review it again',
   schedule_version_mismatch: 'The event was changed by another request; reload and try again',
   nonexistent_local_time: 'This local time does not exist in the time zone',
   ambiguous_local_time: 'This local time is ambiguous in the time zone',
