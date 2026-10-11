@@ -1,0 +1,60 @@
+import { createHash, randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import type { RenderedEmail } from '../notifications/handlers.js';
+
+// Fake email provider (ENG-TST-9) for development, tests and demos. It writes each accepted
+// email as a JSON file into a local mailbox directory, outside the database: the raw link
+// tokens in an email belong to the recipient's side, never to our tables (BR-19, AC-61).
+// Idempotency follows Resend's documented rule: same key + same body = replay; different body = 409.
+
+export interface ProviderResult {
+  category: 'accepted' | 'replayed' | 'idempotent_key_conflict';
+  providerMessageId?: string;
+}
+
+export interface EmailProvider {
+  send(input: { idempotencyKey: string; to: string; email: RenderedEmail; tags: Record<string, string> }): Promise<ProviderResult>;
+}
+
+export interface MailboxEntry {
+  id: string;
+  createdAt: string;
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  tags: Record<string, string>;
+}
+
+export class FakeEmailProvider implements EmailProvider {
+  constructor(private readonly dir: string) {
+    mkdirSync(join(dir, 'keys'), { recursive: true });
+  }
+
+  async send(input: { idempotencyKey: string; to: string; email: RenderedEmail; tags: Record<string, string> }): Promise<ProviderResult> {
+    const keyFile = join(this.dir, 'keys', `${createHash('sha256').update(input.idempotencyKey).digest('hex')}.json`);
+    const bodyHash = createHash('sha256').update(JSON.stringify([input.to, input.email])).digest('hex');
+    if (existsSync(keyFile)) {
+      const previous = JSON.parse(readFileSync(keyFile, 'utf8')) as { bodyHash: string; id: string };
+      return previous.bodyHash === bodyHash
+        ? { category: 'replayed', providerMessageId: previous.id }
+        : { category: 'idempotent_key_conflict' };
+    }
+    const id = `fake_${randomUUID()}`;
+    const entry: MailboxEntry = { id, createdAt: new Date().toISOString(), to: input.to, ...input.email, tags: input.tags };
+    writeFileSync(join(this.dir, `${Date.now()}-${id}.json`), JSON.stringify(entry, null, 2));
+    writeFileSync(keyFile, JSON.stringify({ bodyHash, id }));
+    return { category: 'accepted', providerMessageId: id };
+  }
+}
+
+/** Development mailbox reader (used by the dev mailbox page and by tests). Newest first. */
+export function readMailbox(dir: string): MailboxEntry[] {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((f) => f.endsWith('.json'))
+    .sort()
+    .reverse()
+    .map((f) => JSON.parse(readFileSync(join(dir, f), 'utf8')) as MailboxEntry);
+}
