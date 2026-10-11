@@ -28,7 +28,7 @@
 | K-202 Migrations, **reduced scope** | M2 | `f458591`, `2a4f722`: `0001_core` and `0002_reminders`, 16 tables. The other tables are deferred (ASSIGNMENT_SCOPE §4). |
 | K-203 Database test harness, **with deviation** | M2 | `34c98ec`: real PostgreSQL 18.6 test database instead of Testcontainers (PD-12) |
 | K-301 Platform layer | M3 | `2a4f722`. Configuration, transactions and event locks with retries, decision time, Problem Details errors, HTTP plumbing, rate limiting. |
-| K-302 Identity, **reduced scope** | M3 | `2a4f722`: passwordless sign-in, sessions, CSRF, pre-session. Re-authentication and email change are deferred. |
+| K-302 Identity, **reduced scope** | M3 | `2a4f722`: passwordless sign-in, sessions, CSRF, pre-session. Re-authentication: K-302b. Email change (FR-ORG-6) stays deferred. |
 | K-303 Access tokens and link resolution | M3 | `2a4f722`; test "byte-identical generic response" |
 | K-305 Registration, verification, waiting list, promotion, participant cancellation | M3 | `2a4f722`, `34c98ec`: `registration` and `lifecycle` tests (P0 #2 to #6) |
 | K-307 Concurrency suites | M3 | `34c98ec`: 12-way last-seat race, double confirm, two simultaneous cancellations, 10 parallel scans, parallel reminder runs |
@@ -48,6 +48,7 @@
 
 | Card | Milestone | Awaiting |
 |---|---|---|
+| K-302b Re-authentication (FR-ORG-5, AC-149, ADR-010 §8; the deferred part of K-302) | M3 | Done on `feature/k-302-reauthentication` (`70eb8da` server and tests, `adde442` UI and E2E): 12 integration tests including a deterministic race, 2 client unit tests, 1 E2E test with a test-database fixture; mutation checks. [PR #4](https://github.com/DavidMalkhasyan/event-registration-system/pull/4) CI [run 38153782544](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38153782544) passed (53/53, 5/5, 7/7). **Awaiting:** merge into `dev`; Done is recorded after the merge. |
 | K-001 Apply R60; synchronize the documents | M0 | Stakeholder check (commit `3fe9cb7`) |
 | K-004 Process documentation | M0 | Stakeholder review |
 
@@ -55,15 +56,14 @@
 
 | Card | Milestone | State |
 |---|---|---|
-| K-302b Re-authentication (FR-ORG-5, AC-149, ADR-010 §8; the deferred part of K-302) | M3 | **In progress** on `feature/k-302-reauthentication`; approved by the stakeholder before K-304c |
-| K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Updated in S-06 |
+| K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Updated in S-07 |
 
 ## To Do
 
 | Card | Milestone | Notes |
 |---|---|---|
 | K-604 Release tag and submission | M6 | The secret scan was done in S-03. Tagging and submitting are the owner's actions. |
-| K-304c Event cancellation (FR-EVT-9, BR-16, TX-E05) | M3 | **Next, after a review of the re-authentication assessment (S-06).** **Dependency:** FR-EVT-9 requires recent authentication (FR-ORG-5), which is not implemented. Needs a decision before starting: implement re-authentication, or record a deviation. |
+| K-304c Event cancellation (FR-EVT-9, BR-16, TX-E05) | M3 | **Next.** Implementation plan reported in S-07 for review. Its re-authentication dependency is K-302b. Earlier note: FR-EVT-9 requires recent authentication (FR-ORG-5), which is not implemented. Needs a decision before starting: implement re-authentication, or record a deviation. |
 | K-304d Event deletion (FR-EVT-10, 11, 13, 14) | M3 | Largest part: eligibility checks in the deletion transaction, a deletion marker, audit survival |
 
 ## Partly done (remaining parts are in Backlog or Deferred)
