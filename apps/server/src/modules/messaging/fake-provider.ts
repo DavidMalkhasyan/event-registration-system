@@ -33,6 +33,7 @@ export class FakeEmailProvider implements EmailProvider {
   }
 
   async send(input: { idempotencyKey: string; to: string; email: RenderedEmail; tags: Record<string, string> }): Promise<ProviderResult> {
+    mkdirSync(join(this.dir, 'keys'), { recursive: true });
     const keyFile = join(this.dir, 'keys', `${createHash('sha256').update(input.idempotencyKey).digest('hex')}.json`);
     const bodyHash = createHash('sha256').update(JSON.stringify([input.to, input.email])).digest('hex');
     if (existsSync(keyFile)) {
@@ -43,8 +44,9 @@ export class FakeEmailProvider implements EmailProvider {
     }
     const id = `fake_${randomUUID()}`;
     const entry: MailboxEntry = { id, createdAt: new Date().toISOString(), to: input.to, ...input.email, tags: input.tags };
-    writeFileSync(join(this.dir, `${Date.now()}-${id}.json`), JSON.stringify(entry, null, 2));
+    // Record the key first: a crash after this point is replayed, never delivered twice.
     writeFileSync(keyFile, JSON.stringify({ bodyHash, id }));
+    writeFileSync(join(this.dir, `${Date.now()}-${id}.json`), JSON.stringify(entry, null, 2));
     return { category: 'accepted', providerMessageId: id };
   }
 }
