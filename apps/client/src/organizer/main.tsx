@@ -364,6 +364,7 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
           </span>
         </div>
       </div>
+      <CapacityEditor session={session} event={event} onDone={load} />
       <Reschedule session={session} event={event} onDone={load} />
       <Card title={`Participants (${participants.length})`}>
         <table>
@@ -392,6 +393,75 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
         </table>
       </Card>
     </Page>
+  );
+}
+
+function CapacityEditor({
+  session,
+  event,
+  onDone,
+}: {
+  session: Session;
+  event: EventItem;
+  onDone: () => void;
+}) {
+  const [capacity, setCapacity] = useState(String(event.capacity));
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ kind: 'success' | 'error'; text: string }>();
+  if (event.status !== 'SCHEDULED') return null;
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setMessage(undefined);
+    try {
+      // Absolute value (FR-EVT-7, FR-EVT-8): repeating the same request changes nothing.
+      const updated = await api<EventItem>(`/api/events/${event.id}/capacity`, {
+        method: 'PUT',
+        csrf: session.csrfToken,
+        body: { capacity: Number(capacity) },
+      });
+      const promotes = updated.capacity > event.capacity && event.phase === 'registration_open';
+      setMessage({
+        kind: 'success',
+        text: `Capacity is now ${updated.capacity}.${promotes ? ' Free seats were offered to the waiting list in order, and promoted participants are emailed their tickets.' : ''}`,
+      });
+      onDone();
+    } catch (err) {
+      const minimum =
+        err instanceof ApiError && err.code === 'capacity_below_confirmed'
+          ? err.body.minimumCapacity
+          : undefined;
+      setMessage({
+        kind: 'error',
+        text:
+          typeof minimum === 'number'
+            ? `Capacity can't be lower than the ${minimum} confirmed participants. The minimum allowed capacity is ${minimum}.`
+            : errorMessage(err),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Card title="Capacity">
+      <form className="row" onSubmit={submit}>
+        <label>
+          Number of seats
+          <input
+            type="number"
+            min={1}
+            max={100000}
+            required
+            value={capacity}
+            onChange={(e) => setCapacity(e.target.value)}
+          />
+        </label>
+        <button style={{ flex: '0 0 auto' }} disabled={busy}>
+          {busy ? 'Saving…' : 'Update capacity'}
+        </button>
+      </form>
+      {message && <Alert kind={message.kind}>{message.text}</Alert>}
+    </Card>
   );
 }
 
