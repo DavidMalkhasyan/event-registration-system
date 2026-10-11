@@ -16,3 +16,11 @@ token = captureFragmentToken(window.location, window.history);
 export function linkToken(): string | null {
   return token;
 }
+
+/**
+ * After a management rotation the page switches to the new token, in memory only (FR-ROT-5,
+ * FR-LNK-10): never the address bar, cookies or browser storage.
+ */
+export function replaceLinkToken(next: string): void {
+  token = next;
+}

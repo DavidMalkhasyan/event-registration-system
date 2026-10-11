@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { captureFragmentToken } from './bootstrap-token';
+import { captureFragmentToken, linkToken, replaceLinkToken } from './bootstrap-token';
 
 const TOKEN = 'A'.repeat(43);
 
@@ -23,5 +23,15 @@ describe('fragment token bootstrap (FR-LNK-10 b, AC-173)', () => {
   it('returns null after a reload without the fragment (lost by design, FR-LNK-10 e)', () => {
     window.history.replaceState(null, '', '/verify');
     expect(captureFragmentToken(window.location, window.history)).toBeNull();
+  });
+
+  it('switches to a rotated token in memory only, never the address bar or browser storage (FR-ROT-5)', () => {
+    window.history.replaceState(null, '', '/manage');
+    const next = 'B'.repeat(43);
+    replaceLinkToken(next);
+    expect(linkToken()).toBe(next);
+    expect(window.location.href).not.toContain(next);
+    expect(window.localStorage.length).toBe(0);
+    expect(window.sessionStorage.length).toBe(0);
   });
 });
