@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: ci-superuser-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      PUBLIC_ORIGIN: http://localhost:5173
+      EMAIL_PROVIDER: fake
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Throwaway credentials for the ephemeral CI database; nothing here is a real secret.
+      - name: Generate CI-only credentials
+        run: |
+          {
+            echo "OWNER_PW=$(openssl rand -hex 16)"
+            echo "RUNTIME_PW=$(openssl rand -hex 16)"
+            echo "CSRF_SECRET=$(openssl rand -hex 32)"
+            echo "PRESESSION_SECRET=$(openssl rand -hex 32)"
+            echo "RATE_LIMIT_SECRET=$(openssl rand -hex 32)"
+          } >> "$GITHUB_ENV"
+      - name: Provision roles and databases
+        env:
+          PGPASSWORD: ci-superuser-only
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 \
+            -v owner_password="$OWNER_PW" -v runtime_password="$RUNTIME_PW" \
+            -f scripts/provision-local-db.sql
+          {
+            echo "TEST_DATABASE_URL=postgres://app_runtime:$RUNTIME_PW@localhost:5432/ers_test"
+            echo "TEST_MIGRATION_DATABASE_URL=postgres://app_owner:$OWNER_PW@localhost:5432/ers_test"
+            echo "MIGRATION_DATABASE_URL=postgres://app_owner:$OWNER_PW@localhost:5432/ers_dev"
+          } >> "$GITHUB_ENV"
+
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - name: Migrations apply to an empty database
+        run: pnpm migrate
+      - name: Tests (integration tests use the real PostgreSQL service)
+        run: pnpm test
+      - run: pnpm build
