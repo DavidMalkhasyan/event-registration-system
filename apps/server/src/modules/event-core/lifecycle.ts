@@ -349,6 +349,74 @@ export async function cancelByManagementLink(
   return outcome;
 }
 
+// ---------------------------------------------------------------- title and description (FR-EVT-5)
+
+/** EventDetailsPatch: title and/or description, same limits as creation (FR-EVT-1). */
+export const eventDetailsSchema = z
+  .object({
+    title: z.string().trim().min(1).max(200).optional(),
+    description: z.string().max(5000).nullable().optional(),
+  })
+  .strict()
+  .refine((v) => v.title !== undefined || v.description !== undefined, {
+    message: 'Provide a title, a description, or both',
+  });
+
+/**
+ * TX-E02: edits title and/or description while the event is SCHEDULED, under the exclusive event
+ * lock with an owner re-check. Changes nothing else and creates no email (FR-EVT-5, AC-105).
+ * Absolute values: an identical repeat is a no-op (no write, no audit record).
+ */
+export async function updateEventDetails(
+  ctx: AppContext,
+  principal: OrganizerPrincipal,
+  eventId: string,
+  input: z.infer<typeof eventDetailsSchema>,
+) {
+  if (!z.uuid().safeParse(eventId).success) throw new AppError(404, 'not_found');
+  const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
+    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
+    if (event.status !== 'SCHEDULED') return 'not_scheduled' as const;
+    const current = await trx
+      .selectFrom('app.events')
+      .select(['title', 'description'])
+      .where('id', '=', eventId)
+      .executeTakeFirstOrThrow();
+    // An empty description means "no description", as on the creation form.
+    const description =
+      input.description === undefined
+        ? current.description
+        : input.description === ''
+          ? null
+          : input.description;
+    const title = input.title ?? current.title;
+    const changed = [
+      ...(title !== current.title ? ['title'] : []),
+      ...(description !== current.description ? ['description'] : []),
+    ];
+    if (changed.length === 0) return 'unchanged' as const;
+    await trx
+      .updateTable('app.events')
+      .set({ title, description, updated_at: now })
+      .where('id', '=', eventId)
+      .execute();
+    await recordAudit(trx, {
+      now,
+      action: 'event_details_edit',
+      actorKind: 'owner',
+      actorAccountId: principal.accountId,
+      eventId,
+      outcome: 'success',
+      details: { changed: changed.join(',') },
+    });
+    return 'changed' as const;
+  });
+  if (result === null || result === 'not_found') throw new AppError(404, 'not_found');
+  if (result === 'unauthenticated') throw new AppError(401, 'unauthenticated');
+  if (result === 'not_scheduled') throw new AppError(409, 'event_not_scheduled');
+}
+
 // ---------------------------------------------------------------- capacity (FR-EVT-7, FR-EVT-8, BR-1, BR-5, BR-11)
 
 export const capacitySchema = z.object({ capacity: z.number().int().min(1).max(100_000) }).strict();

@@ -25,7 +25,8 @@ test('organizer creates an event; participants register, join the waiting list, 
 
   await signIn(page, organizer);
   const { publicUrl } = await createEvent(page, { title, capacity: 1, startsInMs: 72 * HOUR });
-  await expect(page.getByText('Created by the end-to-end test.')).toBeVisible(); // description shown
+  // Description shown on the dashboard (the details editor below holds it too, in its text area).
+  await expect(page.locator('p', { hasText: 'Created by the end-to-end test.' })).toBeVisible();
 
   // Anna takes the only seat and sees her ticket.
   const annaResult = await registerParticipant(browser, publicUrl, anna);

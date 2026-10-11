@@ -364,6 +364,7 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
           </span>
         </div>
       </div>
+      <DetailsEditor session={session} event={event} onDone={load} />
       <CapacityEditor session={session} event={event} onDone={load} />
       <Reschedule session={session} event={event} onDone={load} />
       <Card title={`Participants (${participants.length})`}>
@@ -393,6 +394,62 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
         </table>
       </Card>
     </Page>
+  );
+}
+
+function DetailsEditor({
+  session,
+  event,
+  onDone,
+}: {
+  session: Session;
+  event: EventItem;
+  onDone: () => void;
+}) {
+  const [title, setTitle] = useState(event.title);
+  const [description, setDescription] = useState(event.description ?? '');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ kind: 'success' | 'error'; text: string }>();
+  if (event.status !== 'SCHEDULED') return null;
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setMessage(undefined);
+    try {
+      // FR-EVT-5: title and description only; participants are not emailed (AC-105).
+      await api<EventItem>(`/api/events/${event.id}`, {
+        method: 'PATCH',
+        csrf: session.csrfToken,
+        body: { title, description: description || null },
+      });
+      setMessage({ kind: 'success', text: 'Details saved. Participants are not emailed about this change.' });
+      onDone();
+    } catch (err) {
+      setMessage({ kind: 'error', text: errorMessage(err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Card title="Event details">
+      <form className="stack" onSubmit={submit}>
+        <label>
+          Event title
+          <input required maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} />
+        </label>
+        <label>
+          Event description
+          <textarea
+            maxLength={5000}
+            rows={3}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </label>
+        <button disabled={busy}>{busy ? 'Saving…' : 'Save details'}</button>
+      </form>
+      {message && <Alert kind={message.kind}>{message.text}</Alert>}
+    </Card>
   );
 }
 

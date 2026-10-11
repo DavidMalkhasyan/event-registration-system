@@ -323,3 +323,47 @@
 | *(closing commit)* | after 18:00 | docs: record K-304a. Pushed to PR #2, which triggers another CI run. |
 
 **Next task:** K-304b, title and description edit (FR-EVT-5). Before K-304c, event cancellation, report the smallest compliant re-authentication mechanism (FR-EVT-9, FR-ORG-5); see the stakeholder's instruction.
+
+---
+
+## S-06: K-304a merged; K-304b title and description editing; K-304c assessment
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-11 18:27:07 +04:00 |
+| **End** | 2026-10-11, at the closing documentation commit on `feature/k-304b-event-edit`. The activity table ends at 18:41. |
+| **Cards** | K-304a (Review → Done), K-304b (To Do → Review), K-304c (assessment only) |
+| **Tools and model** | Claude Code 2.1.296, model `claude-opus-5-5`; GitHub CLI 2.101.0; the S-02 toolchain |
+| **Significant prompt** | "APPROVED — merge PR #2 into dev." Then K-304b following FR-EVT-5 and AC-105 on `feature/k-304b-event-edit`, with integration and browser tests and a pull request into `dev`, merged once green and reviewed. Then assess what FR-ORG-5 re-authentication needs for K-304c, and stop before implementing it. |
+
+**Activity:**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 18:27:07 | Checked PR #2 | Head `3c73c23`, check `verify: SUCCESS`, mergeable, base `dev`; `origin/dev` `5818fb4`, `origin/main` `8c1247d` |
+| 18:27:23 | `gh pr merge 2 --merge` | Merge commit `0a811bb` on `dev`; `dev` contains `d25d3dd` (K-404b) and `f6024e3` (K-304a); its tree equals the CI-tested PR head; `main` unchanged |
+| 18:27:32 | `feature/k-304b-event-edit` from `origin/dev`, upstream unset | Working tree unchanged, so the dev servers kept running on schema 3 |
+| 18:27–18:28 | Read FR-EVT-1, FR-EVT-5, AC-105, TX-E02 and `updateEventDetails` (`PATCH /api/events/{eventId}`, `EventDetailsPatch` with `additionalProperties: false` and `minProperties: 1`) | — |
+| 18:28–18:29 | `updateEventDetails` and the route | First typecheck failed: audit `details` values must be scalars (an array was passed); fixed with a comma-joined string |
+| 18:29:31 | `event-edit.test.ts` (6 tests) | **6/6** |
+| 18:29:52 | Mutation checks, source restored | Without the status check, the owner check or the no-op, one test fails each time; 6/6 twice afterwards |
+| 18:30:27 | Commit | `19ff849` feat(events): edit event title and description |
+| 18:30–18:31 | "Event details" card in the UI; `event-edit.spec.ts` | Client typecheck and lint pass |
+| 18:31:26–18:33:36 | Full suite | `format:check`, `lint`, `typecheck`, `test` (**server 41/41**, client 3/3) and `build` exit 0. **E2E failed twice with the same 2 failures, both in the tests:** (1) `event-edit`: the "before" email count was read before the asynchronous ticket email arrived (the extra email was the ticket, not an edit email); (2) `participant-flow`: `getByText('Created by the end-to-end test.')` now matched 2 elements, because the new editor's text area also holds the description. |
+| 18:33:47–18:35:54 | Fixes: wait for the ticket email first; look for the description in the displayed paragraph | **E2E 6/6 three times** |
+| 18:36:46 | Static checks again; commit | All exit 0. `b8ffae1` feat(client): edit event title and description on the dashboard |
+| 18:36:59 | Pushed; [PR #3](https://github.com/DavidMalkhasyan/event-registration-system/pull/3), `dev` ← `feature/k-304b-event-edit` | CI [run 38147918146](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38147918146) **passed** in 2 min 4 s: 3 migrations; server 41/41, client 3/3, E2E 6/6 |
+| 18:37–18:40 | K-304c assessment. Read: FR-ORG-4, FR-ORG-5, FR-EVT-9, AC-149, ADR-010 §8, API #27 `requestReauthentication`, TX-A01, TX-A02, CK-03, CK-05, CK-11, FK-20. Inspected `sign-in.ts`, `sessions.ts` and the identity routes. | The schema and the confirmation side already support re-authentication. The missing parts are listed in the report to the stakeholder; no implementation. |
+| 18:40:28 | Kanban, scope, README, PD-31, AI usage, this entry | — |
+
+**Commits in S-06:**
+
+| Hash | Time (+04:00) | Message |
+|---|---|---|
+| `3c73c23` | 18:03:12 | docs: record K-304a … S-05's closing commit |
+| `0a811bb` | 18:27:22 (GitHub) | Merge K-304a: event capacity changes (#2) |
+| `19ff849` | 18:30:27 | feat(events): edit event title and description (K-304b) |
+| `b8ffae1` | 18:36:46 | feat(client): edit event title and description on the dashboard (K-304b) |
+| *(closing commit)* | after 18:41 | docs: record K-304b. Pushed to PR #3. |
+
+**Next:** merge PR #3 into `dev` once the final CI run is green; record K-304b as Done at the start of the next branch. K-304c waits for the stakeholder's review of the re-authentication assessment.
