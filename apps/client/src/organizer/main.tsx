@@ -26,6 +26,7 @@ interface EventItem {
   scheduleVersion: number;
   checkInOpensAt: string;
   checkInClosesAt: string;
+  cancelledAt: string | null;
 }
 
 function navigate(path: string) {
@@ -339,6 +340,13 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
   if (!event) return <Page title="Event">{error ? <Alert>{error}</Alert> : <p>Loading…</p>}</Page>;
   return (
     <Page title={event.title} actions={<Link to="/organizer">← All events</Link>}>
+      {event.status === 'CANCELLED' && (
+        <Alert kind="error">
+          <strong>Status: CANCELLED.</strong> This event was cancelled
+          {event.cancelledAt ? ` on ${formatLocal(event.cancelledAt, event.timeZone)}` : ''}. Registration,
+          check-in and changes are closed, and every confirmed and waiting participant was emailed.
+        </Alert>
+      )}
       <Card>
         <p>
           <strong>{formatLocal(event.startsAt, event.timeZone)}</strong> · {PHASE_LABEL[event.phase]} ·
@@ -370,7 +378,8 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
       <DetailsEditor session={session} event={event} onDone={load} />
       <CapacityEditor session={session} event={event} onDone={load} />
       <Reschedule session={session} event={event} onDone={load} />
-      <RecentSignIn session={session} />
+      {event.status === 'SCHEDULED' && <RecentSignIn session={session} />}
+      <CancelEvent session={session} event={event} onDone={load} />
       <Card title={`Participants (${participants.length})`}>
         <table>
           <thead>
@@ -436,6 +445,67 @@ export function ReauthPrompt({ session, intro }: { session: Session; intro: stri
       </button>
       {error && <Alert>{error}</Alert>}
     </div>
+  );
+}
+
+/**
+ * Event cancellation (FR-EVT-9, BR-16): a destructive action with an explicit confirmation step.
+ * If the sign-in is not recent, the server answers reauthentication_required (FR-ORG-5): the
+ * organizer confirms it's them by email and then has to confirm the cancellation again.
+ */
+function CancelEvent({ session, event, onDone }: { session: Session; event: EventItem; onDone: () => void }) {
+  const [step, setStep] = useState<'idle' | 'confirming' | 'sending' | 'reauth'>('idle');
+  const [error, setError] = useState<string>();
+  if (event.status !== 'SCHEDULED' || event.phase === 'started') return null;
+  const cancel = async () => {
+    setStep('sending');
+    setError(undefined);
+    try {
+      await api(`/api/events/${event.id}/cancellation`, {
+        method: 'POST',
+        csrf: session.csrfToken,
+        body: { confirmed: true },
+      });
+      onDone();
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'reauthentication_required') {
+        setStep('reauth'); // the confirmation must be given again after re-authentication
+        return;
+      }
+      setError(errorMessage(err));
+      setStep('idle');
+    }
+  };
+  return (
+    <Card title="Cancel event">
+      <p className="muted">
+        Cancelling is permanent. Every ticket stops working, the waiting list is closed, and each confirmed
+        and waiting participant is emailed. Checked-in records are kept.
+      </p>
+      {step === 'reauth' ? (
+        <ReauthPrompt
+          session={session}
+          intro="For your security, cancelling needs a sign-in from the last 15 minutes. Confirm it’s you by email; the event is not cancelled until you confirm the cancellation again."
+        />
+      ) : step === 'idle' ? (
+        <button className="danger" onClick={() => setStep('confirming')}>
+          Cancel this event…
+        </button>
+      ) : (
+        <div className="stack">
+          <Alert kind="error">Cancel “{event.title}” permanently? This cannot be undone.</Alert>
+          <div className="row">
+            <button className="danger" onClick={cancel} disabled={step === 'sending'}>
+              {step === 'sending' ? 'Cancelling…' : 'Yes, cancel the event permanently'}
+            </button>
+            <button className="secondary" onClick={() => setStep('idle')} disabled={step === 'sending'}>
+              Keep the event
+            </button>
+          </div>
+        </div>
+      )}
+      {error && <Alert>{error}</Alert>}
+    </Card>
   );
 }
 
