@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Phase 1 Architecture Blueprint — approved 2026-10-11 |
-| **Requirements baseline** | [REQUIREMENTS.md](../../REQUIREMENTS.md) v1.6 |
+| **Requirements baseline** | [REQUIREMENTS.md](../../REQUIREMENTS.md) v1.7 |
 | **Related** | [ARCHITECTURE.md](ARCHITECTURE.md) · [ADR index](../adr/README.md) |
 
 Labels are the same as in [ARCHITECTURE.md](ARCHITECTURE.md#how-to-read-this-document): **[Req]**, **[ADR-nnn]**, **[Blueprint]**, **[Proposed: ADR-nnn]** and **[Open]**.

@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Database design — see [DATABASE_DESIGN.md](DATABASE_DESIGN.md) for the decision register |
 | **Design target** | PostgreSQL 18, `READ COMMITTED` (NFR-CON-4 a, NFR-CON-7 a) |
-| **Requirements baseline** | [REQUIREMENTS.md](../../REQUIREMENTS.md) v1.6 |
+| **Requirements baseline** | [REQUIREMENTS.md](../../REQUIREMENTS.md) v1.7 |
 
 **Labels:**
 - **[REQ]** binding requirement;
@@ -178,7 +178,7 @@ Columns:
 
 | TX | Operation | Module | Cls | Steps after the lock and decision time (writes in order) | Trace | AC-133 |
 |---|---|---|---|---|---|---|
-| TX-E01 | Create event | event-core | NEW | Validate (start > `T`, zone, DST). INSERT `events`. INSERT two `scheduled_tasks` (fan-out due `starts_at − 24 h`, cutoff due `starts_at − 2 h`). | FR-EVT-1 to FR-EVT-4, EC-33 | — |
+| TX-E01 | Create event | event-core | NEW | Validate (start > `T`, zone, DST). Compute the fingerprint of the normalized request (DB-A1). `INSERT events … ON CONFLICT (owner_account_id, creation_request_id) DO NOTHING RETURNING id`. **Inserted:** INSERT two `scheduled_tasks` (fan-out due `starts_at − 24 h`, cutoff due `starts_at − 2 h`) → `201`. **Conflict:** read the owner's existing event (a concurrent duplicate waits on U-27 until the first transaction commits); same fingerprint → `200` with that event and no new tasks; different fingerprint → `409 request_id_reused`, nothing written. | FR-EVT-1 to FR-EVT-4, EC-33, AC-185 | — |
 | TX-E02 | Edit title or description | event-core | EX | Owner re-check (`authorize`). UPDATE `events`. No email. | FR-EVT-5, AC-105 | yes |
 | TX-E03 | Change capacity | event-core | EX | Decrease: reject if `new < confirmed_count` (conflict with the minimum). Increase: UPDATE `capacity` **first**; if `T < cutoff`, promote FIFO (UPDATE registrations → `CONFIRMED`, INSERT tickets, slot if `T >= starts_at − 24 h`, INSERT promotion outbox). INSERT audit. | FR-EVT-7, FR-EVT-8, BR-5, NFR-CON-4 f | yes |
 | TX-E04 | Reschedule | event-core | EX | Validate (`T < starts_at`, new start > `T`). UPDATE `starts_at`, `schedule_version + 1`. INSERT `event_change` outbox for every `CONFIRMED` and `WAITLISTED` registration (payload marks "registration closed" if `T >=` new cutoff, FR-NTF-4). If `T >= new start − 24 h`, INSERT slots (new version) for confirmed, filled by `event_change` (FR-NTF-3). INSERT new-version tasks (`params.waitlist_closed_by_change` when FR-NTF-4 applies). If `T <` new cutoff, promote into free seats (BR-15, AC-107). INSERT audit. | FR-EVT-6, BR-12 to BR-15, FR-NTF-2d | yes |
@@ -458,6 +458,7 @@ Any row returned raises an alert. Nothing is corrected automatically.
 | CT-17 | Pre-claim counter, claim and reaper racing on the same message (forced orders) | No lost increments; no deadlock; TX-M14 and TX-M15 never take an event lock | NFR-CON-6, D-16 |
 | CT-18 | Deleting an event whose required notices cover all five outcomes, with a webhook arriving during and after the deletion | Counts as in FR-EVT-14 and AC-184; later events don't change the marker | D-14, AC-184 |
 | CT-19 | Verification decided 1 ms before the cutoff with a forced late commit; confirmation vs. fan-out at Start − 24 h, both orders | Accepted; exactly one slot claim in every order | D-1, AC-182 |
+| CT-20 | Two identical event-creation requests with the same request ID (both orders forced); a retry after commit; the same ID with a different payload; the same ID from two organizers | One event and one task set, returned to both; `409 request_id_reused` for the different payload; two events for two organizers | D-17, AC-185 |
 
 **Performance tests** before production. Pass thresholds are **[OPEN]** (NFR-PERF-1 says the latency threshold is still to be set); each test reports the metrics listed:
 

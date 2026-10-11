@@ -1,6 +1,6 @@
 # Architecture Decision Index
 
-Requirements baseline: [REQUIREMENTS.md](../../REQUIREMENTS.md) v1.6 (authoritative). Architecture: [ARCHITECTURE.md](../architecture/ARCHITECTURE.md), [MODULES.md](../architecture/MODULES.md).
+Requirements baseline: [REQUIREMENTS.md](../../REQUIREMENTS.md) v1.7 (authoritative). Architecture: [ARCHITECTURE.md](../architecture/ARCHITECTURE.md), [MODULES.md](../architecture/MODULES.md).
 
 **Status values:**
 - **Approved** — decided by the stakeholder.
@@ -41,7 +41,7 @@ Where a Proposed ADR would only *record* an already-approved requirement, the re
 |---|---|---|
 | Phase 1 Architecture Blueprint: components, modules, dependency graph, process layout | **Approved** 2026-10-11 | [ARCHITECTURE.md](../architecture/ARCHITECTURE.md), [MODULES.md](../architecture/MODULES.md) |
 | **Database design baseline** (`docs/database/`), including decisions D-1 to D-16 | **Approved** 2026-10-11 | [DATABASE_DESIGN.md §1](../database/DATABASE_DESIGN.md#1-decision-register) |
-| **API design** (`docs/api/`), decisions API-D1 to API-D10 | **Approved** 2026-10-11. API-D3 depends on the proposed DB-A1 and AL-API-2. | [API_DESIGN.md](../api/API_DESIGN.md) |
+| **API design** (`docs/api/`), decisions API-D1 to API-D10 | **Approved** 2026-10-11. AL-API-1 to AL-API-4 and DB-A1 applied as R60. | [API_DESIGN.md](../api/API_DESIGN.md) |
 | **PostgreSQL 18** is the target major version for development, testing and database design. Production on 18 is conditional on hosting support; **OQ-2 stays partially open**. | **Approved** 2026-10-11 (stakeholder directive); recorded in REQUIREMENTS.md as R59 | [ARCHITECTURE.md §6.1](../architecture/ARCHITECTURE.md#61-version) |
 
 ## 3. Open questions that affect decisions

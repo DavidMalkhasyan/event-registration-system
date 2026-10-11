@@ -86,11 +86,11 @@ Every error response except the generic link error is **RFC 9457 Problem Details
 
 **Negative:**
 - A `503` on a link route tells the user something failed, but never whether their link is valid. This is deliberate.
-- AC-137 must be aligned (see below).
+- AC-137 was aligned by R60.
 
-## 4. Requirement alignment needed (proposed, not applied)
+## 4. Requirement alignment
 
-AC-137 currently says link endpoints return the generic response "whatever the internal category". API-D1 changes that for genuine infrastructure and unexpected failures. Proposed wording is in API_DESIGN.md §13 (AL-API-1).
+Applied as **R60** (REQUIREMENTS.md v1.7): FR-LNK-7 and AC-137 now distinguish unusable tokens (the generic response) from infrastructure and unexpected failures (a safe `503` or `500`).
 
 ## Traceability
 

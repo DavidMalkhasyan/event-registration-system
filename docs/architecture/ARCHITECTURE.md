@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Phase 1 Architecture Blueprint — approved 2026-10-11 |
-| **Requirements baseline** | [REQUIREMENTS.md](../../REQUIREMENTS.md) v1.6 (authoritative; this document doesn't restate it) |
+| **Requirements baseline** | [REQUIREMENTS.md](../../REQUIREMENTS.md) v1.7 (authoritative; this document doesn't restate it) |
 | **Decision index** | [docs/adr/README.md](../adr/README.md) |
 | **Module rules** | [MODULES.md](MODULES.md) |
 | **Database design** | [docs/database/](../database/DATABASE_DESIGN.md) (approved baseline, 2026-10-11) |

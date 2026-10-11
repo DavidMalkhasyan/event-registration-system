@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Database design — see [DATABASE_DESIGN.md](DATABASE_DESIGN.md) for the decision register |
 | **Design target** | PostgreSQL 18 |
-| **Requirements baseline** | [REQUIREMENTS.md](../../REQUIREMENTS.md) v1.6 |
+| **Requirements baseline** | [REQUIREMENTS.md](../../REQUIREMENTS.md) v1.7 |
 
 **How this document is produced:** every diagram is generated from the column tables in [DATABASE_DESIGN.md §5](DATABASE_DESIGN.md#5-table-definitions) and the foreign-key table in [CONSTRAINTS_AND_INDEXES.md §3](CONSTRAINTS_AND_INDEXES.md#3-foreign-keys). Those two documents are authoritative. If a diagram disagrees with them, the diagram is wrong.
 
@@ -155,6 +155,8 @@ erDiagram
   events {
     uuid id PK
     uuid owner_account_id FK
+    uuid creation_request_id
+    bytea creation_fingerprint
     text public_id UK
     text title
     text description "nullable"

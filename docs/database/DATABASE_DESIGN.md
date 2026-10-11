@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Status** | **Approved baseline** (2026-10-11), updated for the final decisions of review round 16 (R59) |
+| **Status** | **Approved baseline** (2026-10-11), updated for review rounds 16 (R59) and 17 (R60) |
 | **Design target** | PostgreSQL 18 (development, testing, design). Production version conditional on hosting (OQ-2, partially open) |
-| **Requirements baseline** | [REQUIREMENTS.md](../../REQUIREMENTS.md) v1.6 (R59 applied; authoritative) |
+| **Requirements baseline** | [REQUIREMENTS.md](../../REQUIREMENTS.md) v1.7 (R60 applied; authoritative) |
 | **Companion documents** | [ERD.md](ERD.md) · [CONSTRAINTS_AND_INDEXES.md](CONSTRAINTS_AND_INDEXES.md) · [TRANSACTIONS_AND_LOCKING.md](TRANSACTIONS_AND_LOCKING.md) · [MIGRATIONS_STRATEGY.md](MIGRATIONS_STRATEGY.md) |
 | **Architecture** | [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) · [MODULES.md](../architecture/MODULES.md) · [ADR index](../adr/README.md) |
 
@@ -43,6 +43,7 @@ This is a design specification. No SQL migration, table or application code exis
 | D-14 | Deletion-marker counts `failed_required_notices` and `unconfirmed_required_notices`, taken as a snapshot at deletion, each notice counted at most once (was OPEN-4) | **[REQ]** R59: FR-EVT-14, AC-184 | §5.8, TX-E06 |
 | D-15 | Budget synchronization is a protected administrative subcommand of `migrate` and the only writer of the configured budget (was OPEN-5) | **[ARCH]** approved | §5.6 `send_budget`, [MIGRATIONS_STRATEGY.md §4.1](MIGRATIONS_STRATEGY.md#41-protected-budget-sync-subcommand-d-15) |
 | D-16 | A durable, bounded pre-claim failure counter, written in its own short transaction that holds no event lock (was OPEN-6) | **[ARCH]** approved; **[REQ]** R59: NFR-REL-13 h, AC-183 | §5.6, TX-M14, TX-M15 |
+| D-17 | Idempotent event creation (DB-A1): `events.creation_request_id` and `creation_fingerprint`, unique per organizer; the original fingerprint is immutable; the uniqueness record ends when the event is deleted | **[ARCH]** approved; **[REQ]** R60: FR-EVT-1, AC-185, EC-103 | §5.2 `events`, TX-E01 |
 
 ---
 
@@ -181,6 +182,8 @@ Valid when `revoked_at IS NULL`, `decision_time < absolute_expires_at` and `deci
 |---|---|---|---|---|
 | `id` | uuid | no | `uuidv7()` | PK-05 |
 | `owner_account_id` | uuid | no | | FK-01 (checked only when the event is created) |
+| `creation_request_id` | uuid | no | | Client-generated request ID of the creating request (D-17). Unique with `owner_account_id` (U-27). Immutable (TR-17). |
+| `creation_fingerprint` | bytea | no | | SHA-256 of the normalized creation request, excluding the request ID (D-17, CK-70). Immutable (TR-17). |
 | `public_id` | text | no | | At least 128-bit random, base64url; U-06 (FR-EVT-12) |
 | `title` | text | no | | 1–200 characters (FR-EVT-1) |
 | `description` | text | yes | | At most 5,000 characters (FR-EVT-1) |
@@ -194,6 +197,8 @@ Valid when `revoked_at IS NULL`, `decision_time < absolute_expires_at` and `deci
 | `created_at` | timestamptz | no | | |
 | `updated_at` | timestamptz | no | | |
 | `cancelled_at` | timestamptz | yes | | Set exactly when `status = 'CANCELLED'` (CK-18) |
+
+**Idempotent creation (D-17)** **[REQ: FR-EVT-1, AC-185]**: the uniqueness record is stored on the event row itself, so it lasts exactly as long as the event. After an eligible event is deleted, the same request ID could create a new event (EC-103). There is no separate durable idempotency record, so idempotency is **not** guaranteed across deletion.
 
 Computed, never stored: cutoff `starts_at - interval '2 hours'`; check-in window `[starts_at - interval '2 hours', starts_at + interval '12 hours']`; reminder time `starts_at - interval '24 hours'` **[REQ: Glossary]**.
 
@@ -744,6 +749,7 @@ No PostgreSQL extension is required in production. `pgrowlocks` is installed in 
 | RISK-2 | Outbox, attempt and provider-event tables grow fast. Autovacuum tuning and retention (OQ-5) are needed. | [RISK] |
 | RISK-3 | Decision time comes from the database server clock. A backward clock step can reorder deadlines. The database host needs slewing time synchronization (OQ-2). | [RISK] |
 | RISK-4 | Backups and point-in-time recovery are undecided (OQ-2). Without them, forward-only migrations can't be rolled back. | [RISK] |
+| RISK-7 | Event-creation idempotency ends when the event is deleted (D-17, EC-103): an accepted limitation, not a guarantee across deletion | [RISK] |
 | RISK-5 | Raw tokens issued at claim time live in worker memory until the provider call returns; JavaScript can't wipe strings reliably ([TRANSACTIONS_AND_LOCKING.md §6.4](TRANSACTIONS_AND_LOCKING.md#64-tokens-issued-at-claim-time-arch-d-2-req-fr-lnk-1-fr-lnk-3-br-19)). | [RISK] |
 
 ## 12. Alignment with other documents

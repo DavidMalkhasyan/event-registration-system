@@ -1,12 +1,12 @@
 openapi: 3.1.0
 info:
   title: Event Registration System API
-  version: 0.1.0-design
+  version: 0.1.1-design
   summary: Reviewed API contract for the MVP (design baseline; no implementation yet).
   description: >-
     Contract for the same-origin JSON API of the Event Registration System.
     Narrative, decisions and traceability are in docs/api/API_DESIGN.md.
-    Requirements baseline: REQUIREMENTS.md v1.6. Every operation carries
+    Requirements baseline: REQUIREMENTS.md v1.7. Every operation carries
     x-transaction (TRANSACTIONS_AND_LOCKING.md), x-requirements, x-principals,
     x-idempotency and x-confirmation-required. The generic invalid-link
     response (FR-LNK-7) is byte-identical for every unusable link token.
@@ -779,11 +779,12 @@ paths:
       description: >-
         A retry with the same requestId and an identical payload returns the
         previously created event (200). Reusing the requestId with a different
-        payload returns 409 request_id_reused and creates nothing. Requires the
-        database amendment DB-A1 (API_DESIGN.md §13).
+        payload returns 409 request_id_reused and creates nothing. Uniqueness is
+        per organizer in PostgreSQL (D-17); the original normalized fingerprint is
+        kept. Limitation (EC-103): idempotency ends when the event is deleted.
       security: [{ orgSession: [], csrfToken: [] }]
       x-transaction: TX-E01
-      x-requirements: [FR-EVT-1, FR-EVT-2, FR-EVT-3, FR-EVT-4, FR-EVT-12, EC-33, AC-104, AC-118]
+      x-requirements: [FR-EVT-1, FR-EVT-2, FR-EVT-3, FR-EVT-4, FR-EVT-12, EC-33, EC-103, AC-104, AC-118, AC-185]
       x-principals: [organizer]
       x-idempotency: request-id
       x-confirmation-required: false
@@ -1126,11 +1127,13 @@ paths:
         each committed check-in or undo, coalesced up to 250 ms); "access_ended"
         before the server closes the stream. Comment keep-alive every 15 s;
         retry 3000. Authorization is re-validated before every push and at least
-        every 30 s (API-D6). No Last-Event-ID replay; every connection starts with
+        every 30 s; the stream closes at the first failed check. No update is sent
+        whose check began after a revocation committed; one update whose check
+        completed just before may still be delivered (FR-STAFF-3, AC-186). No Last-Event-ID replay; every connection starts with
         the authoritative count.
       security: [{ orgSession: [] }, { staffSession: [] }]
       x-transaction: TX-X03
-      x-requirements: [FR-DSH-2, FR-DSH-3, FR-STAFF-3, NFR-PERF-2, AC-25, AC-111, AC-112]
+      x-requirements: [FR-DSH-2, FR-DSH-3, FR-STAFF-3, NFR-PERF-2, EC-104, AC-25, AC-111, AC-112, AC-186]
       x-principals: [organizer, staff]
       x-staff-accessible: true
       x-idempotency: read-only

@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Database design — see [DATABASE_DESIGN.md](DATABASE_DESIGN.md) for the decision register |
 | **Design target** | PostgreSQL 18 (development and test); production version conditional on hosting (OQ-2) |
-| **Requirements baseline** | [REQUIREMENTS.md](../../REQUIREMENTS.md) v1.6 |
+| **Requirements baseline** | [REQUIREMENTS.md](../../REQUIREMENTS.md) v1.7 |
 
 **Labels:**
 - **[REQ]** binding requirement;
@@ -97,7 +97,7 @@ The table and constraint IDs refer to [DATABASE_DESIGN.md](DATABASE_DESIGN.md) a
 |---|---|---|
 | `0001_schema_and_clock` | Schema `app`; FN-01 `app.decision_time()` | Database creation and collation happen in provisioning (§7), not here |
 | `0002_identity` | `accounts`, `sign_in_requests`, `email_change_requests`, `organizer_sessions`; PK-01 to PK-04, U-01 to U-05, CK-01 to CK-12, IX-02 to IX-05; then FK-19 to FK-23 | Circular FK-20 and FK-23 are added after both tables exist |
-| `0003_event_core` | `events`, `registrations`, `tickets`, `check_ins`, `check_in_requests`, `reminder_slots`; PK-05 to PK-10, U-06 to U-14, CK-13 to CK-32, IX-01, IX-06 to IX-10; FK-01 to FK-07; FN-06; TR-01 to TR-07, TR-16 | FK-08 is added in 0006, once `outbox_messages` exists |
+| `0003_event_core` | `events`, `registrations`, `tickets`, `check_ins`, `check_in_requests`, `reminder_slots`; PK-05 to PK-10, U-06 to U-14, CK-13 to CK-32, IX-01, IX-06 to IX-10; FK-01 to FK-07; FN-06; TR-01 to TR-07, TR-16, TR-17; U-27, CK-70 | FK-08 is added in 0006, once `outbox_messages` exists |
 | `0004_staff` | `staff_invitations`, `staff_sessions`; PK-12, PK-13, U-16 to U-19, CK-40 to CK-45, IX-16, IX-17; FK-14, FK-15 | |
 | `0005_access_tokens_and_rotation` | `access_tokens`, `rotation_requests`; PK-11, PK-14, U-15, U-20, CK-33 to CK-39, CK-46, IX-11 to IX-15, IX-18, IX-19; FK-09 to FK-13, FK-16 to FK-18; TR-15 | Circular FK-13 with FK-17/FK-18: tables first, foreign keys after |
 | `0006_messaging` | `outbox_messages`, `outbox_generations`, `outbox_attempts`, `provider_events`, `provider_event_matches`, `send_budget`, `sending_pause`; PK-15 to PK-21, U-21 to U-25, CK-47 to CK-63, CK-69, IX-20 to IX-29, IX-35; FK-24 to FK-27; **FK-08**; FN-02 to FN-05; TR-08 to TR-12; singleton rows | `fillfactor` and autovacuum settings for hot tables |

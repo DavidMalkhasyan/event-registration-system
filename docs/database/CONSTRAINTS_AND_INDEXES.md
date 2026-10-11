@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Database design — see [DATABASE_DESIGN.md](DATABASE_DESIGN.md) for the decision register |
 | **Design target** | PostgreSQL 18 |
-| **Requirements baseline** | [REQUIREMENTS.md](../../REQUIREMENTS.md) v1.6 |
+| **Requirements baseline** | [REQUIREMENTS.md](../../REQUIREMENTS.md) v1.7 |
 
 **Labels:**
 - **REQ:** the constraint itself is required. A requirement demands database enforcement, for example BR-2's partial unique index or NFR-CON-5's `CHECK`.
@@ -79,6 +79,7 @@ Column names refer to [DATABASE_DESIGN.md §5](DATABASE_DESIGN.md#5-table-defini
 | U-24 | `outbox_attempts` | `outbox_id`, `attempt_no` | — | One attempt row per claim | NFR-REL-9 | REC |
 | U-25 | `provider_events` | `svix_id` | — | The **only** deduplication rule | NFR-REL-15 c, AC-160, AC-166 | REQ |
 | U-26 | `scheduled_tasks` | `kind`, `event_id`, `schedule_version` | — | One task of each kind per version | AC-28, AC-32, FR-WL-5 | REC |
+| U-27 | `events` | `owner_account_id`, `creation_request_id` | — | Idempotent event creation per organizer | FR-EVT-1, AC-185, D-17 | REQ |
 
 **No other uniqueness exists on `provider_events`** **[REQ: NFR-REL-15 c]**: two legitimate events sharing provider ID, type and timestamp are both stored (AC-166).
 
@@ -197,6 +198,7 @@ Every foreign key's child columns have a supporting index, so cascades and check
 | CK-67 | `rate_limit_counters` | `count`, `expires_at`, `window_start` | `count >= 1 AND expires_at > window_start` | NFR-SEC-3 | REC |
 | CK-68 | `worker_heartbeats` | `slots_priority`, `slots_bulk` | `slots_priority >= 1 AND slots_bulk >= 0` | NFR-REL-12 a, NFR-REL-14 g | REQ |
 | CK-69 | `outbox_messages` | `is_required_notice`, `status` | `NOT (is_required_notice AND status = 'DROPPED')` | BR-23, BR-29, FR-EVT-10 | REQ |
+| CK-70 | `events` | `creation_fingerprint` | `octet_length(creation_fingerprint) = 32` | FR-EVT-1, D-17 | REC |
 
 ## 5. Non-unique indexes
 
@@ -260,6 +262,7 @@ Every foreign key's child columns have a supporting index, so cascades and check
 | TR-14 | `deletion_markers` | BEFORE UPDATE OR DELETE, per row | all | Reject | FR-EVT-14 | REC |
 | TR-15 | `access_tokens` | BEFORE UPDATE, per row | `revoked_at`, `revoke_reason`, `revoked_by_rotation_id`, `token_hash` | Only revocation columns may change, NULL → value once; the hash and owner columns are immutable | FR-LNK-1, BR-20 | REC |
 | TR-16 | `events` | BEFORE UPDATE OF `confirmed_count`, per row | `confirmed_count` | Reject when `pg_trigger_depth() = 0`: only TR-02 to TR-04 may change the counter | NFR-CON-5 | REC |
+| TR-17 | `events` | BEFORE UPDATE OF `creation_request_id`, `creation_fingerprint`, per row | `creation_request_id`, `creation_fingerprint` | Reject any change: the original request ID and fingerprint are preserved | FR-EVT-1, D-17 | REC |
 
 **Purge and retention under OQ-5:** TR-11 to TR-14 will need a privileged, audited purge path, for example a `SECURITY DEFINER` function owned by `app_owner`. It is designed together with the retention policy. **[OPEN]**
 
@@ -324,6 +327,7 @@ Every foreign key's child columns have a supporting index, so cascades and check
 | FR-EVT-10, FR-EVT-14, NFR-CON-6 | Cascades limited to event-owned rows; audit, markers, outbox and tasks have no foreign key | Consistent |
 | NFR-REL-3, NFR-REL-15 c | U-21; U-25 is the only uniqueness on the event log | Consistent |
 | NFR-REL-13 e, g, h (R59) | CK-50 to CK-53, CK-55, CK-57 and TR-08 make "possibly accepted ⇒ never `FAILED` or `DROPPED`" a database invariant; `claim_failed` settlement; state kept on contradicting evidence | Consistent |
+| FR-EVT-1 (R60) | U-27, CK-70, TR-17; the uniqueness record ends with the event (EC-103) | Consistent |
 | FR-EVT-14 (R59), BR-23, BR-29 | CK-66 (two counts), CK-69 (required notices never `DROPPED`) | Consistent |
 | NFR-REL-16 | CK-48, CK-56, CK-59 | Consistent |
 | FR-LNK-1, BR-19, AC-61 | Hash-only columns (CK-10, CK-34, CK-43); `payload` never contains tokens (enforced in code; CK-58 only checks the shape) | Consistent; the token-free payload is a **code-level** rule |
