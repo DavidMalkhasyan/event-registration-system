@@ -26,7 +26,11 @@ This is Task 9 of the AI-assisted software engineering assignment.
 
 ## 2. Install and set up
 
+The commands are for a POSIX shell. On Windows, use Git Bash: `cp` and the inline `NAME=value command` form don't work in PowerShell.
+
 ```sh
+git clone https://github.com/DavidMalkhasyan/event-registration-system.git
+cd event-registration-system
 corepack enable
 pnpm install
 ```
@@ -39,7 +43,7 @@ Run the provisioning script as a PostgreSQL superuser. It creates two roles and 
 - **`app_runtime`:** used by the web and worker processes.
 - **`ers_dev`** and **`ers_test`:** the development and test databases.
 
-Choose your own passwords:
+Choose your own passwords. `psql` asks for the superuser password, or reads it from `PGPASSWORD`.
 
 ```sh
 psql -h localhost -p 5432 -U postgres -v ON_ERROR_STOP=1 \
@@ -99,8 +103,10 @@ Use `localhost`, not `127.0.0.1`: state-changing requests must come from exactly
 ```sh
 pnpm build
 CLIENT_DIST_DIR=apps/client/dist PUBLIC_ORIGIN=http://localhost:3000 pnpm start:web   # serves the client and the API
-pnpm start:worker
+PUBLIC_ORIGIN=http://localhost:3000 pnpm start:worker                                  # links in emails use this origin
 ```
+
+Open http://localhost:3000/organizer. The worker needs the same `PUBLIC_ORIGIN` as the web process; otherwise emailed links point to the development port.
 
 ## 4. Demo walkthrough (about 10 minutes)
 
@@ -124,18 +130,20 @@ pnpm start:worker
 
 ## 5. Tests and quality checks
 
-| Command                                                             | What it runs                                                                                                                                                                  | Last local result (2026-10-11)              |
-| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `pnpm test`                                                         | Server integration tests against the real `ers_test` database (its `app` schema is recreated per run), plus client unit tests                                                 | 23/23 and 3/3 passed                        |
-| `pnpm e2e`                                                          | Playwright: builds the client, recreates the test database, starts real web and worker processes on :3100, and drives browsers (2 participant-flow tests, 2 two-client tests) | 4/4 passed, in 3 consecutive runs with Edge |
-| `pnpm lint` / `pnpm typecheck` / `pnpm format:check` / `pnpm build` | ESLint (including a layering rule), TypeScript strict, Prettier, production builds                                                                                            | All pass                                    |
+| Command                                                             | What it runs                                                                                                                                                                  | Result (2026-10-11)                       |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `pnpm test`                                                         | Server integration tests against the real `ers_test` database (its `app` schema is recreated per run), plus client unit tests                                                 | 23/23 and 3/3 passed                      |
+| `pnpm e2e`                                                          | Playwright: builds the client, recreates the test database, starts real web and worker processes on :3100, and drives browsers (2 participant-flow tests, 2 two-client tests) | 4/4 passed (Edge locally; Chromium in CI) |
+| `pnpm lint` / `pnpm typecheck` / `pnpm format:check` / `pnpm build` | ESLint (including a layering rule), TypeScript strict, Prettier, production builds                                                                                            | All pass                                  |
 
 **Running the end-to-end tests:**
 
 - **Browser:** first run `pnpm --filter @ers/e2e exec playwright install chromium`, or set `PW_CHANNEL=msedge` (or `chrome`) to use an installed browser.
 - **Database conflict:** don't run `pnpm test` and `pnpm e2e` at the same time, because both recreate the test database.
 
-CI: [.github/workflows/ci.yml](.github/workflows/ci.yml) runs every command above against a `postgres:18` service. **It has not run on GitHub yet**, because the repository has no remote.
+**CI:** [.github/workflows/ci.yml](.github/workflows/ci.yml) runs every command above on GitHub Actions against a `postgres:18` service. [Results on GitHub Actions](https://github.com/DavidMalkhasyan/event-registration-system/actions).
+
+**Clean-clone verification (2026-10-11):** the published repository was cloned into a new directory and these instructions were followed against a newly initialized PostgreSQL 18.6 cluster. Install, migrations, the three development processes, the full §4 walkthrough in a browser, all commands in the table above, and the production-like run all succeeded. Details are in [DEVELOPMENT_JOURNAL.md](docs/process/DEVELOPMENT_JOURNAL.md) S-03.
 
 ## 6. Architecture in brief
 
@@ -182,7 +190,8 @@ Errors use RFC 9457 Problem Details (`application/problem+json`) with a stable `
 - **Language:** English only.
 - **Camera scanning:** QR scanning uses the browser's `BarcodeDetector` where it exists. It is not covered by automated tests; manual code entry is.
 - **Test environment:** tests use a local PostgreSQL database instead of Testcontainers (no container runtime on the development machine).
-- **Unverified setup and CI:** the setup has been followed only on the development machine, and CI has not run on GitHub yet.
+- **Verified on one platform only:** the setup was verified from a clean clone on Windows (Git Bash) and in CI on Ubuntu; macOS has not been tried.
+- **CI warnings:** GitHub reports that the v4 actions target the deprecated Node.js 20 runtime (they run on Node.js 24). Updating the action versions is pending.
 - **Not production-ready:** no deployment configuration, TLS termination, backups or load testing.
 
 ## 9. Future improvements
