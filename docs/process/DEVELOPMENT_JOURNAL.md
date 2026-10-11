@@ -27,7 +27,7 @@
 | Field | Record |
 |---|---|
 | **Start** | 2026-10-11 13:35:00 +04:00 (first timestamped command of the session) |
-| **End** | Recorded in the follow-up journal commit, below |
+| **End** | 2026-10-11 13:42:45 +04:00 (time of the closing journal update) |
 | **Milestone and cards** | M0: K-001, K-002, K-003, K-004 (K-005 blocked) |
 | **Tools and model** | Claude Code 2.1.296 (VS Code extension), model `claude-opus-5-5`; Git 2.55.0.windows.3; Python 3.12.10 with `openapi-spec-validator` 0.7.1 and PyYAML 6.0.2 (outside the repository) |
 | **Significant prompt** | "Finalize R60 and synchronize documentation" and "Establish a transparent development process with Git, Kanban, milestones and real progress records", plus clarifications on link errors, the idempotency limitation, the §4.8 → §4.9 fix and the honest SSE guarantee. "Do not fabricate historical timestamps, Git commits, test results or AI tool usage." |
@@ -62,7 +62,8 @@
 **Files changed:**
 - **`da80a85`:** the 18 baseline files, added unchanged.
 - **`3fe9cb7`:** REQUIREMENTS.md, ADR-017, the ADR index, API_DESIGN.md, openapi.yaml, ARCHITECTURE.md, MODULES.md, and all five database documents.
-- **Process-documentation commit:** the six files in `docs/process/`.
+- **`896c263`** (2026-10-11 13:42:33 +04:00): the six files in `docs/process/`.
+- **Closing commit** (follows `896c263`): this journal's end time and commit list. Its own hash is recorded in session S-02, because a commit can't contain its own hash.
 
 **Problems:**
 1. **No container runtime.** Docker isn't installed, which affects the Testcontainers tests in M2 (decision PD-Q6).
@@ -75,3 +76,14 @@
 2. Decide PD-Q1 to PD-Q6, ADR-018 and OQ-8 ([DECISION_LOG.md](DECISION_LOG.md) §4).
 3. The owner creates the GitHub repository; then push (K-005).
 4. Start K-102, project initialization.
+
+**Commits in S-01:**
+
+| Hash | Time (+04:00) | Message |
+|---|---|---|
+| `da80a85` | 2026-10-11 13:35:25 | docs: add requirements and design baseline |
+| `3fe9cb7` | 2026-10-11 13:38:31 | docs: apply R60 API alignment (REQUIREMENTS v1.7) |
+| `896c263` | 2026-10-11 13:42:33 | docs(process): add Kanban, milestones and progress records |
+| *(closing commit)* | 13:42:45 or later | docs(process): record S-01 end time and commit hashes. The hash is recorded in S-02. |
+
+**Session time:** 13:35:00 to 13:42:45 (+04:00).
