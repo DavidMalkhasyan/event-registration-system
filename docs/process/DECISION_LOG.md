@@ -42,17 +42,31 @@ The design documents first entered version control in commit `da80a85`, on 2026-
 | PD-7 | 2026-10-11 (S-01) | The raw agent-session transcript is **not** published. The development journal, this decision log and the prompt summaries in AI_USAGE.md replace it. | Agent, per stakeholder rules | The transcript contains the whole private conversation and local environment details |
 | PD-8 | Restated 2026-10-11 | PostgreSQL is the only stateful dependency. Redis is deferred until performance tests show a need. No speculative infrastructure. | Stakeholder (R51) | Simplicity for one developer |
 | PD-9 | 2026-10-11 (S-01) | No GitHub repository is created by the agent. The owner creates it and the steps are documented (SUBMISSION_CHECKLIST §3). | Agent, per stakeholder rules | Account, name and visibility are the owner's decisions |
+| PD-10 | 2026-10-11 14:02 (S-02) | Node.js 24.21.0 (Active LTS) and pnpm 12.11.2 workspaces, pinned in `package.json`. Resolves PD-Q2 and PD-Q3. | Stakeholder (approved stack); versions chosen by the agent | Matches the approved stack; pnpm suits the monorepo |
+| PD-11 | 2026-10-11 14:05:57 | Pin TypeScript 6.0.3 instead of 7.0, and `@types/node` ^24 | Agent | `typescript-eslint` supports TypeScript below 6.1 only. The types match the runtime's major version. |
+| PD-12 | 2026-10-11 14:03:57 | **Resolves PD-Q6.** No container runtime is available, so: portable PostgreSQL 18.6 binaries in the user profile; integration tests use a dedicated local `ers_test` database (schema recreated per run); CI uses a `postgres:18` service container. This deviates from ENG-TST-2 (Testcontainers). | Agent, within the stakeholder's "real PostgreSQL" requirement | Real PostgreSQL without admin rights or Docker; recorded in ASSIGNMENT_SCOPE §4 |
+| PD-13 | 2026-10-11 14:11 | In-repository migration runner: ordered SQL files, checksums, advisory lock, schema-version check at start-up, owner and runtime roles. This implements ADR-018's recommendation; the ADR document's status is unchanged. | Agent | Smallest tool that meets MIGRATIONS_STRATEGY |
+| PD-14 | 2026-10-11 16:31 | **Resolves PD-Q4.** CI on GitHub Actions: format, lint, typecheck, migrate, test, build and E2E against a `postgres:18` service. Dependency and secret scanning in CI are not configured yet (K-105). | Stakeholder (approved stack) | The repository will live on GitHub |
+| PD-15 | 2026-10-11 (S-02) | **Final delivery strategy:** P0 is mandatory; P1 only after P0 passes; P2 is deferred. A focused schema (16 tables) and API (24 routes) instead of the full design. [ASSIGNMENT_SCOPE.md](../../ASSIGNMENT_SCOPE.md) is the delivery scope and traceability matrix; REQUIREMENTS.md stays unchanged and authoritative. | Stakeholder | Deadline of 5 calendar days with limited supervision |
+| PD-16 | 2026-10-11 14:10:46 | Decision time comes from an application helper that reads `clock_timestamp()` after the lock, plus a test-only offset (refused unless `NODE_ENV=test`). It replaces the database function FN-01. Due-work queries use the same helper. | Agent | Same semantics as D-1, with fewer moving parts; the tests can move the clock deterministically |
+| PD-17 | 2026-10-11 14:16:50 | English user interface and emails | Agent (assumption) | OQ-8 is still open; English is the language of the requirements. Recorded as an assumption, not a resolution. |
+| PD-18 | 2026-10-11 (S-02) | Registration keeps email verification (confirm link) inside P0, although the delivery plan lists "email verification" under P1 | Agent, per REQUIREMENTS Q1 | REQUIREMENTS makes verification the registration mechanism; removing it would silently weaken an approved requirement |
+| PD-19 | 2026-10-11 16:22:06 | The public link pages render without React StrictMode | Agent | StrictMode's doubled effects resolved a sign-in link twice and set two different pre-session cookies |
+| PD-20 | 2026-10-11 16:33 | E2E tests run against real processes (built client served by the web process, separate worker) on the test database. Locally they use the installed Edge (`PW_CHANNEL=msedge`); CI installs Chromium. | Agent | Tests what is shipped; avoids a browser download on the development machine |
+| PD-21 | 2026-10-11 16:15:58 | Work written from 14:04 to 16:15 was committed as three logical commits in one command, so they share the timestamp 16:15:59. They were not split further or backdated. | Agent | PD-3 forbids artificial splitting and backdating; the journal records when the work was actually done |
 
-## 4. Decisions needed before implementation (open)
+## 4. Open decisions
 
-| ID | Question | Needed by | Recommendation |
-|---|---|---|---|
-| PD-Q1 | What is the submission deadline? | Scheduling milestones and contingency | Provide the date. Milestones then get calendar targets. |
-| PD-Q2 | Which Node.js version? | K-102 | The Active LTS line at project start (Node.js 24 on 2026-10-11), pinned in the repository |
-| PD-Q3 | Which package manager? | K-102 | pnpm (workspaces) or npm (no extra install); pnpm recommended for the monorepo |
-| PD-Q4 | CI platform (OQ-14), scanning tools and the failure threshold | K-103 | GitHub Actions, since the repository will be on GitHub; built-in dependency and secret scanning where available |
-| PD-Q5 | GitHub repository name, account, visibility and licence | K-005 | The owner decides; a private repository until submission if the course allows |
-| PD-Q6 | Container runtime for Testcontainers (Docker is not installed) | M2 | Install Docker Desktop (or Podman), or accept database tests in CI only |
-| ADR-018 | Migration tool | M2 | A minimal in-repository runner (MIGRATIONS_STRATEGY §2) |
-| ADR-003, 016, 019, 020 | Typed transactions, time library, test architecture, configuration | M1 to M3 | Approve before the dependent cards start |
-| OQ-8 | Localization: language of the UI and emails | M3 to M5 (user-facing text) | Decide the MVP language before the first user-facing text |
+Updated in S-02. Resolved items keep their row, with the resolving decision.
+
+| ID | Question | Status |
+|---|---|---|
+| PD-Q1 | Submission deadline | **Resolved:** the stakeholder stated 5 calendar days remaining at the start of S-02 (2026-10-11). The exact date was not stated. |
+| PD-Q2 | Node.js version | **Resolved:** PD-10 |
+| PD-Q3 | Package manager | **Resolved:** PD-10 |
+| PD-Q4 | CI platform | **Resolved:** PD-14. Scanning tools are still open (K-105). |
+| PD-Q5 | GitHub repository name, account, visibility and licence | **Open.** The owner decides; this blocks K-005. |
+| PD-Q6 | Container runtime for Testcontainers | **Resolved:** PD-12 (no container runtime; local PostgreSQL) |
+| ADR-018 | Migration tool | Implemented as recommended (PD-13); the ADR text was not edited |
+| ADR-003, 016, 019, 020 | Typed transactions, time handling, test architecture, configuration | Still **Proposed**; the ADR documents were not edited. What was built: ADR-003, lock helpers with retries but no test-mode lock recorder. ADR-016, Luxon with an injected test clock offset. ADR-019, Vitest, Playwright and the fake provider, with local PostgreSQL instead of Testcontainers (PD-12). ADR-020, zod fail-fast configuration. |
+| OQ-8 | Language of the UI and emails | **Open.** English is assumed (PD-17). |

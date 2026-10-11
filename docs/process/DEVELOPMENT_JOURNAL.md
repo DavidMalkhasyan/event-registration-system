@@ -87,3 +87,83 @@
 | *(closing commit)* | 13:42:45 or later | docs(process): record S-01 end time and commit hashes. The hash is recorded in S-02. |
 
 **Session time:** 13:35:00 to 13:42:45 (+04:00).
+
+---
+
+## S-02: Implementation of the P0 scope
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-11 14:02:06 +04:00 (first command of the session, from the session transcript) |
+| **End** | 2026-10-11, at the closing documentation commit listed below. Its own time comes from Git; the activity table ends at 16:44:37. |
+| **Milestone and cards** | M1 to M6, re-planned as P0 / P1 / P2 by the stakeholder's final delivery strategy ([ASSIGNMENT_SCOPE.md](../../ASSIGNMENT_SCOPE.md)). Card moves are in [KANBAN.md](KANBAN.md). |
+| **Tools and model** | Claude Code 2.1.296 (VS Code extension), model `claude-opus-5-5`. Node.js 24.21.0, pnpm 12.11.2, PostgreSQL 18.6 (portable binaries), Git 2.55.0, Microsoft Edge 155 (driven by Playwright 1.64.0), Python 3.12.10 (secret generation and transcript reading only). |
+| **Significant prompts** | "We are starting implementation NOW" (5 calendar days remain; approved stack; vertical slices; real PostgreSQL; autonomy for routine decisions). Then "FINAL DELIVERY STRATEGY": P0 / P1 / P2, ASSIGNMENT_SCOPE.md, quality gates, no fabricated progress. |
+| **Context management** | The conversation was summarized automatically once, at 16:30:37. Work continued from the summary and the files on disk. |
+
+**Decisions:** PD-10 to PD-21 in [DECISION_LOG.md](DECISION_LOG.md) §3.
+
+**Activity.** Times are read from the session transcript and from Git:
+
+| Local time | Activity | Result |
+|---|---|---|
+| 14:02:06 | Environment check | No PostgreSQL, Docker or Node.js installed; network available |
+| 14:02:25–14:03:39 | Downloaded and extracted portable Node.js 24.21.0 and PostgreSQL 18 into the user profile, outside the repository | Node.js zip checked against `SHASUMS256.txt`: **OK**. EDB publishes no checksum for the PostgreSQL zip; its SHA-256 was recorded (see AI_USAGE.md). |
+| 14:03:57 | `initdb` (UTF-8, built-in C.UTF-8 locale, scram-sha-256) and `pg_ctl start` on port 54318 | "server started". The superuser password is stored in a file outside the repository. |
+| 14:04–14:06 | pnpm via corepack; root workspace and hygiene files; server package | TypeScript 7.0 resolved by default; pinned 6.0.3 (PD-11). Approved the esbuild build script for pnpm 12. |
+| 14:08:17 | Migration `0001_core.sql` written | — |
+| 14:08:44 | Provisioned roles and databases with `scripts/provision-local-db.sql`; generated the git-ignored `.env` with random secrets | `.env` confirmed ignored by Git |
+| 14:10–14:12 | Platform layer (configuration, transactions and locks, crypto, errors, time, migration runner) | `pnpm migrate`: "applied 0001_core.sql (206 ms)"; second run "schema is up to date". Missing `MIGRATION_DATABASE_URL` → the variable is named and the process exits 1 (AC-143). |
+| 14:13–14:17:34 | Modules: rate limiting, HTTP plumbing, outbox, tokens, audit, identity, events, registrations, check-in, notifications, fake provider, dispatcher | — |
+| 14:17:34–16:10:16 | **The transcript records no tool calls in this interval.** | — |
+| 16:10–16:14 | Web app, dev mailbox, live hub (SSE), entry points, migration `0002_reminders.sql`, lifecycle (cancel, promote, reschedule), jobs | First server typecheck passed. Fixed: a claim sentinel ambiguity, and due-work queries that ignored the test clock. |
+| 16:15:36 | First integration test file | **7/7 passed** |
+| 16:15:59 | Three commits created together (PD-21) | `e9545fa`, `f458591`, `2a4f722` |
+| 16:17:35 | All integration tests | **2 failed, 21 passed**: the live test raced (the check-in fired before the second stream opened), and the mailbox wasn't cleared between tests |
+| 16:18:15 | Rerun after fixing test isolation and adding the SSE barrier | **1 failed, 22 passed**: a duplicate ticket email |
+| 16:18:47–16:19:13 | Cause: resetting the test data deleted the fake provider's key directory. The provider now recreates it and writes the key before the mail. | **23/23 passed**; typecheck passed |
+| 16:19:20 | Commit | `34c98ec` |
+| 16:19–16:23 | React client: public and organizer entries, fragment token bootstrap, pages | Client typecheck, 3/3 unit tests and the build passed after one Vite configuration typing fix |
+| 16:23:49–16:25:21 | Started web, worker and Vite dev servers; HTTP smoke test of the whole P0 flow through :5173 | First attempt found the worker writing to `apps/server/var/mailbox` (relative path); paths are now resolved from the repository root. Second attempt: **"SMOKE TEST PASSED"** |
+| 16:26:06 | Commits | `885dfa9`, `cc5bcbc` |
+| 16:26–16:30 | ESLint (typescript-eslint, react-hooks, platform layering rule) and Prettier | Layering rule proven with a temporary violating file (error reported, file deleted). eslint 0 problems; Prettier reformatted 39 files; tests 23/23 and 3/3 passed again; build passed. Commit `9b40caf`. |
+| 16:30–16:32 | CI workflow (`postgres:18` service) and `.env.example` | The same root scripts run locally in CI order: all exit 0. Commit `d6fec3a`. |
+| 16:33–16:39 | Playwright E2E package, launcher, 4 browser tests | **4/4 passed** with Edge on the first run, and in 2 further consecutive runs. Mutation check: replacing the client's live-count handler made the two-device test fail (expected "1", received "0"); the change was reverted. Commit `b7a164f`. |
+| 16:40–16:44 | Compiled build check; README, ASSIGNMENT_SCOPE.md, process documents | `node apps/server/dist/entrypoints/web.js` served `/healthz` (schema version 2), the organizer page (200) and its assets (200); the compiled worker started. Both were stopped afterwards. |
+
+**Tests at the end of the session:**
+
+| Suite | Result |
+|---|---|
+| Server integration tests (real PostgreSQL 18.6) | 23/23 passed |
+| Client unit tests | 3/3 passed |
+| Browser E2E (Playwright, Edge) | 4/4 passed |
+| Lint, typecheck, format check, build | All pass |
+| CI on GitHub | **Not run**: no remote exists (K-005) |
+
+**Problems and open items:**
+1. **No GitHub remote:** K-005 remains blocked on the owner.
+2. **Setup unverified elsewhere:** the README setup hasn't been followed from a clean clone on another machine.
+3. **Deferred P1/P2 scope:** see [ASSIGNMENT_SCOPE.md](../../ASSIGNMENT_SCOPE.md) §3.
+4. **Shared commit time:** three commits share one timestamp (PD-21).
+
+**Commits in S-02:**
+
+| Hash | Time (+04:00) | Message |
+|---|---|---|
+| `8465c5d` | 2026-10-11 13:42:45 | docs(process): record S-01 end time and commit hashes. This is S-01's closing commit, recorded here as promised. |
+| `e9545fa` | 16:15:59 | chore: initialize pnpm workspace and server toolchain |
+| `f458591` | 16:15:59 | feat(db): add PostgreSQL migrations and migration runner |
+| `2a4f722` | 16:15:59 | feat(server): organizer sign-in, events, registration, check-in, email worker |
+| `34c98ec` | 16:19:21 | test(server): integration tests for the P0 flows; fix fake-provider ordering |
+| `885dfa9` | 16:26:07 | feat(server): share view API; resolve local paths from the repository root |
+| `cc5bcbc` | 16:26:07 | feat(client): React frontend for organizers and participants |
+| `9b40caf` | 16:30:44 | chore: add ESLint and Prettier quality gates |
+| `d6fec3a` | 16:32:12 | ci: GitHub Actions workflow with a PostgreSQL 18 service; add .env.example |
+| `b7a164f` | 16:40:02 | test(e2e): Playwright browser tests, including two simultaneous clients |
+| *(closing commit)* | after 16:44:37 | docs: README, assignment scope and S-02 process records. The hash is recorded in the next session. |
+
+**Next steps:**
+1. The owner creates the GitHub repository; then run the secret scan, push, and confirm the first CI run (K-005, K-103).
+2. Follow the README from a clean clone.
+3. Highest-priority remaining work: the P1 cutoff job, then event cancellation and capacity changes.

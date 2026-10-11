@@ -17,6 +17,8 @@
     "dev:web": "pnpm --filter @ers/server dev:web",
     "dev:worker": "pnpm --filter @ers/server dev:worker",
     "dev:client": "pnpm --filter @ers/client dev",
+    "start:web": "node --env-file-if-exists=.env apps/server/dist/entrypoints/web.js",
+    "start:worker": "node --env-file-if-exists=.env apps/server/dist/entrypoints/worker.js",
     "e2e": "pnpm --filter @ers/e2e e2e"
   },
   "devDependencies": {

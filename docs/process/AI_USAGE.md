@@ -5,8 +5,8 @@
 | Item | Value | Evidence |
 |---|---|---|
 | AI agent | **Claude Code**, in the VS Code extension | Session environment |
-| Claude Code version | 2.1.295, then 2.1.296 | Version metadata in the local session transcript |
-| Model | **Claude Opus 5.5** (`claude-opus-5-5`) | Model ID on every one of the 581 assistant messages in the transcript |
+| Claude Code version | 2.1.295, then 2.1.296 (all of S-02) | Version metadata in the local session transcript |
+| Model | **Claude Opus 5.5** (`claude-opus-5-5`) | Model ID on every assistant message in the transcript: 581 by the end of S-01, and every S-02 message as well |
 | Operating system | Windows 10 Enterprise 10.0.19045 | Session environment |
 | Shells | Git Bash, Windows PowerShell 5.1 | Session environment |
 | Git | 2.55.0.windows.3 | `git --version` (S-01) |
@@ -14,6 +14,11 @@
 | Python | 3.12.10, used only for documentation checks | `python --version` (S-01) |
 | Validation libraries | `openapi-spec-validator` 0.7.1, PyYAML 6.0.2, and their dependencies, installed from PyPI into a temporary folder **outside the repository** | Session S-01 and the API-design phase |
 | Container runtime | **None installed** (`docker` not found) | S-01 |
+| Node.js | 24.21.0, portable zip in the user profile | `node --version`; zip checked against the official `SHASUMS256.txt` (S-02) |
+| pnpm | 12.11.2 via corepack | `packageManager` in `package.json` |
+| PostgreSQL | 18.6, portable EDB zip binaries in the user profile | `postgres --version`. EDB publishes no checksum, so the zip's SHA-256 was recorded: `fbe23da234ee31547bf8a36d29dfd81e82b849df2d2b78d2eecb43d360252f8c` |
+| Browser for E2E | Microsoft Edge 155 (already installed), driven by Playwright 1.64.0 | Installed application folder; `pnpm add` output (S-02) |
+| Python | Also used in S-02 to generate local secrets and to read timestamps from the session transcript for the journal; neither output is in the repository | S-02 |
 
 ## 2. Why this model and tooling
 
@@ -31,7 +36,7 @@
 | Document edits | Scripted, exact-match replacements that abort if an anchor is missing | Diffs reviewed; checks rerun after every edit |
 | Consistency checks | Writes and runs Python check scripts | Results recorded in the journal; scripts will be versioned in M1 (PD-6) |
 | Version control | Runs `git` commands and writes commit messages | No backdating; `Co-Authored-By` trailer; owner identity |
-| Implementation (from M1) | Writes code and tests | Tests first for invariants; CI; human review |
+| Implementation (S-02) | Writes the code, migrations and tests; runs them | Every claim of success is backed by a recorded run (journal S-02); a mutation check for the E2E live-count test; integration tests against real PostgreSQL; the stakeholder's quality gates (test, typecheck, runnable, record, commit) |
 
 ## 4. Prompts and session record
 
@@ -47,6 +52,8 @@ Significant prompts, summarized in order. The stakeholder's own instructions are
 | 4 | Database design proposal, then corrections on time semantics, crash safety, hashing, budget configuration and stale messages | docs/database; R59 |
 | 5 | API design and OpenAPI 3.1, then API-D1 to API-D10 with changes | docs/api; ADR-010, ADR-017 |
 | 6 | Finalize R60, initialize Git, set up Kanban and milestones, AI transparency. "Do not fabricate historical timestamps, Git commits, test results or AI tool usage." | Session S-01: commits `da80a85`, `3fe9cb7` and the process documents |
+| 7 | "We are starting implementation NOW": 5 days; approved stack (Node 24, pnpm, TypeScript, Fastify, React and Vite, PostgreSQL 18, Kysely, Vitest, GitHub Actions); vertical slices with real PostgreSQL and tests; autonomy for routine decisions. "Do not attempt to generate the entire application in one unverified batch." | S-02: toolchain, migrations, server, integration tests |
+| 8 | "FINAL DELIVERY STRATEGY": the P0 list of 15 mandatory features plus general requirements; P1 and P2 only afterwards; ASSIGNMENT_SCOPE.md traceability; quality gates after each feature; "Do not fabricate progress or test outcomes", "Do not present deferred features as implemented", "Do not claim integration tests passed if PostgreSQL was unavailable". | S-02: client, quality gates, CI, E2E, README, ASSIGNMENT_SCOPE.md |
 
 **Context management:** Claude Code summarized earlier parts of the long session automatically to stay within the context window. Decisions taken before a summary were re-read from the documents and the transcript whenever exact wording mattered.
 
@@ -59,6 +66,17 @@ Each was caught by a check or by the stakeholder, then corrected and recorded:
 - The proposal mapped every link-route failure to the generic `404`. The stakeholder required honest `500`/`503` responses for infrastructure failures (API-D1).
 - The first SSE wording claimed "zero updates after a revocation", which no implementation mechanism enforces. It was corrected in R60.
 - One check script misreads transaction IDs such as `TX-R01` as requirement IDs. This known false positive is noted in the journal.
+
+Caught during implementation (S-02), all by tests, typecheck or runtime checks before commit:
+- **Ambiguous claim result:** the job-claim function returned the same value for "already claimed" and "event missing".
+- **Test clock ignored:** due-work queries used the database clock directly, ignoring the test clock. The reminder tests exposed it.
+- **Missing confirmation check:** the cancellation endpoint didn't require the explicit `{confirmed: true}` body that API-D4 demands.
+- **Test isolation:** the mailbox was not cleared between tests, and the SSE test raced, firing the check-in before the second stream opened.
+- **Duplicate ticket email:** resetting the test data deleted the fake provider's idempotency directory.
+- **Wrong mailbox path:** the worker wrote email under `apps/server/var/` because relative paths were resolved from the package directory.
+- **Double sign-in effect:** React StrictMode's doubled effects resolved a sign-in link twice (PD-19).
+- **Over-strict lint rule:** the first ESLint layering rule wrongly forbade the composition layer from importing modules.
+- **Overstated decision-log entry:** a first draft claimed ADR-003, 016, 019 and 020 were "implemented in their recommended form". Checking the ADR index showed ADR-016 names no library and ADR-019 specifies Testcontainers, so the entry was corrected before commit.
 
 ## 6. Data handling
 
@@ -77,5 +95,8 @@ Each was caught by a check or by the stakeholder, then corrected and recorded:
 | Conventional Commits | Commit-message convention | Specification |
 | `openapi-spec-validator` and its dependencies (`jsonschema`, `referencing`, and others), PyYAML | Local validation only; not distributed with the project | Third-party open-source packages from PyPI |
 | Resend documentation | Provider behavior cited in REQUIREMENTS §12.1a | Vendor documentation |
+| npm packages (runtime) | Fastify, @fastify/cookie, @fastify/static, Kysely, pg, zod, Luxon, React, React DOM, qrcode | Open-source dependencies, declared in each `package.json` and locked in `pnpm-lock.yaml` |
+| npm packages (development) | TypeScript, tsx, Vite, @vitejs/plugin-react, Vitest, jsdom, Testing Library, Playwright, ESLint, typescript-eslint, eslint-plugin-react-hooks, Prettier | As above |
+| PostgreSQL 18 (EDB binaries), Node.js 24 | Runtime platform | Not distributed with the project |
 
-No code templates, starter kits or generators have been used so far. Any used from M1 onward will be added here.
+No code templates, starter kits or project generators were used. The workspace, configuration files and application code were written in the session (S-02), not generated by `create-vite` or a similar tool.

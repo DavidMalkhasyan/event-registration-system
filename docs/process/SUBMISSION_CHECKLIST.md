@@ -11,19 +11,19 @@ Nothing is marked Done without evidence.
 
 | # | Requirement | Status | Evidence or next step |
 |---|---|---|---|
-| 1 | GitHub repository containing the **working** project | **Not started** | A local repository exists (`main`). No remote yet (K-005). No application code yet (M1 to M5). |
-| 2 | Exact AI model and development tools, with a short rationale | **In progress** | [AI_USAGE.md](AI_USAGE.md) §1–2; to be completed when the tools are fixed in M1 |
-| 3 | Important prompts, decision logs, or a safely handled session export | **In progress** | [AI_USAGE.md](AI_USAGE.md) §4; [DECISION_LOG.md](DECISION_LOG.md). The transcript is not exported (PD-7). |
-| 4 | Real incremental progress shown by Git commits and timestamped records | **In progress** | Commits from `da80a85` onward; [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md) |
-| 5 | Clear setup and deployment instructions | **Not started** | README (K-102 skeleton, K-601 final) |
-| 6 | Accurate description of the current state | **In progress** | Journal and Kanban; the final README section in M6 |
-| 7 | Incomplete work and recommended next improvements | **In progress** | [MILESTONES.md](MILESTONES.md) §9; final list in M6 |
-| 8 | Attribution for reused templates, generators or third-party solutions | **In progress** | [AI_USAGE.md](AI_USAGE.md) §7 |
+| 1 | GitHub repository containing the **working** project | **In progress** | The project works locally: 23 integration, 3 unit and 4 E2E tests pass, and a smoke test passed (journal S-02). No remote yet (K-005, blocked on PD-Q5). |
+| 2 | Exact AI model and development tools, with a short rationale | **In progress** | [AI_USAGE.md](AI_USAGE.md) §1–2, updated for S-02; finalize at submission |
+| 3 | Important prompts, decision logs, or a safely handled session export | **In progress** | [AI_USAGE.md](AI_USAGE.md) §4 (prompts 1–8); [DECISION_LOG.md](DECISION_LOG.md) (PD-1 to PD-21). The transcript is not exported (PD-7). |
+| 4 | Real incremental progress shown by Git commits and timestamped records | **In progress** | Commits `da80a85` to `b7a164f` and onward; journal S-01 and S-02 |
+| 5 | Clear setup and deployment instructions | **In progress** | [README.md](../../README.md) §1–4. Not yet followed from a clean clone; no deployment target (P2). |
+| 6 | Accurate description of the current state | **In progress** | [ASSIGNMENT_SCOPE.md](../../ASSIGNMENT_SCOPE.md); README §8 |
+| 7 | Incomplete work and recommended next improvements | **In progress** | README §8–9; ASSIGNMENT_SCOPE §3–4 |
+| 8 | Attribution for reused templates, generators or third-party solutions | **In progress** | [AI_USAGE.md](AI_USAGE.md) §7 (packages added in S-02; no templates or generators used) |
 
 ## 2. Before every push
 
 1. **Secret scan:** search for private keys, cloud and API keys, `re_…` (Resend), `whsec_…`, GitHub tokens, and `password=` / `secret=` assignments. The result must be none.
-2. **No real `.env` file** is tracked; only `.env.example` with placeholders (from M1).
+2. **No real `.env` file** is tracked; only `.env.example` with placeholders (added in `d6fec3a`).
 3. **No session export, transcript or local path** (`C:\Users\…`) appears in tracked files.
 4. **Personal data:** only example addresses in documents and fixtures.
 5. **`git status`** is clean, and the journal entry for the session is committed.
