@@ -131,11 +131,11 @@ Open http://localhost:3000/organizer. The worker needs the same `PUBLIC_ORIGIN` 
 
 ## 5. Tests and quality checks
 
-| Command                                                             | What it runs                                                                                                                                                                  | Result (2026-10-11)                       |
-| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| `pnpm test`                                                         | Server integration tests against the real `ers_test` database (its `app` schema is recreated per run), plus client unit tests                                                 | 27/27 and 3/3 passed                      |
-| `pnpm e2e`                                                          | Playwright: builds the client, recreates the test database, starts real web and worker processes on :3100, and drives browsers (2 participant-flow tests, 2 two-client tests) | 4/4 passed (Edge locally; Chromium in CI) |
-| `pnpm lint` / `pnpm typecheck` / `pnpm format:check` / `pnpm build` | ESLint (including a layering rule), TypeScript strict, Prettier, production builds                                                                                            | All pass                                  |
+| Command                                                             | What it runs                                                                                                                                                                                           | Result (2026-10-11)                       |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
+| `pnpm test`                                                         | Server integration tests against the real `ers_test` database (its `app` schema is recreated per run), plus client unit tests                                                                          | 35/35 and 3/3 passed                      |
+| `pnpm e2e`                                                          | Playwright: builds the client, recreates the test database, starts real web and worker processes on :3100, and drives browsers (participant flow, two simultaneous clients, capacity changes: 5 tests) | 5/5 passed (Edge locally; Chromium in CI) |
+| `pnpm lint` / `pnpm typecheck` / `pnpm format:check` / `pnpm build` | ESLint (including a layering rule), TypeScript strict, Prettier, production builds                                                                                                                     | All pass                                  |
 
 **Running the end-to-end tests:**
 
@@ -172,19 +172,19 @@ docs/         requirements-phase design, process records (Kanban, journal, decis
 
 ## 7. HTTP API (implemented subset)
 
-| Area                                                  | Routes                                                                                                                                                                                                                                                                     |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Public**                                            | `GET /api/public/events/:publicId` · `POST /api/public/events/:publicId/registrations`                                                                                                                                                                                     |
-| **Participant links** (`Authorization: Link <token>`) | `GET /api/links/verify` · `POST /api/links/verify/confirm` · `GET /api/links/manage` · `POST /api/links/manage/cancel` · `GET /api/links/ticket`                                                                                                                           |
-| **Organizer sign-in**                                 | `POST /api/auth/sign-in-requests` · `GET /api/links/sign-in` · `POST /api/links/sign-in/confirm` · `GET /api/auth/session` · `POST /api/auth/sign-out`                                                                                                                     |
-| **Organizer events**                                  | `GET` / `POST /api/events` · `GET /api/events/:id` · `GET /api/events/:id/dashboard` · `GET /api/events/:id/participants` · `POST /api/events/:id/reschedule` · `POST /api/events/:id/check-ins` · `GET /api/events/:id/check-in-count` · `GET /api/events/:id/live` (SSE) |
-| **Operations**                                        | `GET /healthz` · `GET /dev/mailbox` (development with the fake provider only)                                                                                                                                                                                              |
+| Area                                                  | Routes                                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Public**                                            | `GET /api/public/events/:publicId` · `POST /api/public/events/:publicId/registrations`                                                                                                                                                                                                                      |
+| **Participant links** (`Authorization: Link <token>`) | `GET /api/links/verify` · `POST /api/links/verify/confirm` · `GET /api/links/manage` · `POST /api/links/manage/cancel` · `GET /api/links/ticket`                                                                                                                                                            |
+| **Organizer sign-in**                                 | `POST /api/auth/sign-in-requests` · `GET /api/links/sign-in` · `POST /api/links/sign-in/confirm` · `GET /api/auth/session` · `POST /api/auth/sign-out`                                                                                                                                                      |
+| **Organizer events**                                  | `GET` / `POST /api/events` · `GET /api/events/:id` · `GET /api/events/:id/dashboard` · `GET /api/events/:id/participants` · `PUT /api/events/:id/capacity` · `POST /api/events/:id/reschedule` · `POST /api/events/:id/check-ins` · `GET /api/events/:id/check-in-count` · `GET /api/events/:id/live` (SSE) |
+| **Operations**                                        | `GET /healthz` · `GET /dev/mailbox` (development with the fake provider only)                                                                                                                                                                                                                               |
 
 Errors use RFC 9457 Problem Details (`application/problem+json`) with a stable `code`.
 
 ## 8. Known limitations
 
-- **Organizer features:** only rescheduling is implemented. Event editing, capacity changes, event cancellation and deletion, check-in undo, and staff accounts are not; only the event owner checks in, from any number of signed-in devices.
+- **Organizer features:** rescheduling and capacity changes are implemented. Title and description editing, event cancellation and deletion, check-in undo, and staff accounts are not; only the event owner checks in, from any number of signed-in devices.
 - **Email:** the fake provider is the only one. There is no Resend integration, no delivery webhooks and no bounce handling.
 - **Participant self-service:** limited to view, cancel and the ticket share link. There is no "resend my links" and no email change.
 - **Language:** English only.
@@ -196,7 +196,7 @@ Errors use RFC 9457 Problem Details (`application/problem+json`) with a stable `
 
 ## 9. Future improvements
 
-1. **Event management:** capacity changes, title and description editing, event cancellation and deletion (Kanban K-304).
+1. **Event management:** title and description editing, event cancellation (which needs recent re-authentication, FR-ORG-5) and deletion (Kanban K-304b to K-304d).
 2. **Staff:** invitations and dedicated check-in sessions.
 3. **Real email:** a Resend provider behind configuration, with delivery webhooks and a delivery-problem view.
 4. **Participant self-service:** link resend and rotation.

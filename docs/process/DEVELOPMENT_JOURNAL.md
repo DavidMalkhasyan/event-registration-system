@@ -273,3 +273,53 @@
 | *(closing commit)* | after 17:44 | docs: record K-404b in the journal, Kanban, decisions and scope |
 
 **Next task:** K-304a, capacity change (FR-EVT-7, FR-EVT-8, TX-E03). K-304c, event cancellation, needs a decision first, because it requires recent authentication (FR-ORG-5), which is not implemented.
+
+---
+
+## S-05: Branching strategy, K-404b integration, K-304a capacity changes
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-11 17:48:49 +04:00 |
+| **End** | 2026-10-11, at the closing documentation commit on `feature/k-304a-capacity`. The activity table ends at 18:00. |
+| **Cards** | K-404b (Review → Done), K-304a (To Do → In Progress → Review) |
+| **Tools and model** | Claude Code 2.1.296, model `claude-opus-5-5`; GitHub CLI 2.101.0; the S-02 toolchain |
+| **Significant prompt** | The branching strategy (`main` stable, `dev` integration, `feature/*`, `fix/*`); publish K-404b as a pull request into `dev`, verify the real CI, review the diff, merge into `dev` (not `main`); no database downgrade or old code against schema 3; then K-304a with integration, concurrency and browser tests and a pull request into `dev`; report the re-authentication need before K-304c. |
+
+**Activity:**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 17:48:49 | Inspected branches, remotes, history | `origin/main` = `8c1247d`, the verified submission (CI run 38142498731 passed); no `dev` branch; the feature branch sits directly on `main` |
+| 17:48:59 | `git branch dev origin/main` (no checkout, so the working tree and the schema-3 dev servers never ran `main`'s code, PD-30); pushed `dev` and `feature/k-404b-cutoff-job` | `dev` → `origin/dev`; feature commits `d25d3dd` and `2d78ca5` unchanged |
+| 17:49:17 | [PR #1](https://github.com/DavidMalkhasyan/event-registration-system/pull/1), `dev` ← `feature/k-404b-cutoff-job` | CI run 38144704826 started (`pull_request` event) |
+| 17:49:43 | PR diff review | 12 files, +494 / −32; only server source, tests, migrations, process docs, README, ASSIGNMENT_SCOPE. No secrets: the pattern scan, plus a search for every local `.env` value and the superuser password. |
+| 17:50–17:51 | CI [run 38144704826](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38144704826) | **Passed** in 1 min 40 s: migrations 0001–0003 on a fresh PostgreSQL; server 27/27, client 3/3, E2E 4/4 |
+| 17:51:34 | `gh pr merge 1 --merge` | Merge commit `5818fb4` on `dev`; tree identical to the feature branch; `main` unchanged at `8c1247d` |
+| 17:51:47 | `feature/k-304a-capacity` from `origin/dev` (upstream unset) | Dev servers unaffected (identical tree); `/healthz` schema 3 |
+| 17:52:53 | Commit | `1474aa5` docs(process): branching strategy (PD-29, PD-30); K-404b Done |
+| 17:51–17:53 | Read FR-EVT-7, FR-EVT-8, BR-1, BR-5, BR-11, AC-13 to AC-15, TX-E03, the API design (`setCapacity`, `PUT /api/events/{eventId}/capacity`, absolute value, `capacity_below_confirmed` with `minimumCapacity`) and FR-DSH-1 to FR-DSH-3 | Only the checked-in count is pushed live (FR-DSH-2); the other counts come from committed state on load and after the change (FR-DSH-3). No new live channel was added. |
+| 17:53–17:54 | `setCapacity` (exclusive event lock, reuses `promoteFifo` and audit) and the route | Typecheck passed |
+| 17:54:41 | `capacity.test.ts` (8 tests) | **8/8** on the first run |
+| 17:55:12 | Mutation checks, source restored afterwards | No promotion → 4 tests fail; no minimum check → 3 fail; no no-op on repeats → 1 fails |
+| 17:55:44 | Stability | 8/8 three times |
+| 17:56:26 | Commit | `f6024e3` feat(events): capacity changes with FIFO promotion |
+| 17:56–17:57 | "Capacity" card in the organizer UI; `capacity.spec.ts` E2E | Client typecheck and lint pass |
+| 17:57:15–17:58:47 | Full suite | `format:check`, `lint`, `typecheck`, `test` (**server 35/35**, client 3/3), `build` all exit 0; **E2E 5/5**, twice |
+| 17:59:19 | Commit | `c4f5733` feat(client): capacity control |
+| 17:59 | Pushed the branch; [PR #2](https://github.com/DavidMalkhasyan/event-registration-system/pull/2), `dev` ← `feature/k-304a-capacity` | CI [run 38145423055](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38145423055) **passed** in 1 min 49 s: migrations 0001–0003; server 35/35, client 3/3, E2E 5/5 |
+
+**Not done:** PR #2 is not merged; it awaits the stakeholder's review (PD-29). K-304a stays in Review until then.
+
+**Commits in S-05:**
+
+| Hash | Time (+04:00) | Message |
+|---|---|---|
+| `2d78ca5` | 17:44:46 | docs: record K-404b in the journal, Kanban, decisions and scope. S-04's closing commit. |
+| `5818fb4` | 17:51:33 (GitHub) | Merge K-404b: registration cutoff job (#1) |
+| `1474aa5` | 17:52:56 | docs(process): branching strategy; K-404b integrated into dev |
+| `f6024e3` | 17:56:26 | feat(events): capacity changes with FIFO promotion (K-304a) |
+| `c4f5733` | 17:59:19 | feat(client): capacity control on the event dashboard (K-304a) |
+| *(closing commit)* | after 18:00 | docs: record K-304a. Pushed to PR #2, which triggers another CI run. |
+
+**Next task:** K-304b, title and description edit (FR-EVT-5). Before K-304c, event cancellation, report the smallest compliant re-authentication mechanism (FR-EVT-9, FR-ORG-5); see the stakeholder's instruction.
