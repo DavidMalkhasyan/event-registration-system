@@ -1,0 +1,2370 @@
+openapi: 3.1.0
+info:
+  title: Event Registration System API
+  version: 0.1.0-design
+  summary: Reviewed API contract for the MVP (design baseline; no implementation yet).
+  description: >-
+    Contract for the same-origin JSON API of the Event Registration System.
+    Narrative, decisions and traceability are in docs/api/API_DESIGN.md.
+    Requirements baseline: REQUIREMENTS.md v1.6. Every operation carries
+    x-transaction (TRANSACTIONS_AND_LOCKING.md), x-requirements, x-principals,
+    x-idempotency and x-confirmation-required. The generic invalid-link
+    response (FR-LNK-7) is byte-identical for every unusable link token.
+servers:
+  - url: /
+    description: The single public origin (ADR-013). No version prefix (API-D8).
+security: []
+tags:
+  - name: public
+    description: Public event page and registration.
+  - name: links
+    description: Link-resolution API and link actions. Token only in "Authorization Link"; cookies ignored (FR-LNK-10).
+  - name: auth
+    description: Organizer sign-in requests and session management.
+  - name: account
+    description: Organizer account and email change.
+  - name: events
+    description: Event management by the owner.
+  - name: participants
+    description: Read-only dashboard and participant list (ADR-021).
+  - name: waitlist
+    description: Waiting-list removal by the owner.
+  - name: check-in
+    description: Check-in, undo and staff session.
+  - name: staff
+    description: Staff invitations and staff sessions, managed by the owner.
+  - name: live
+    description: Server-sent events for the live checked-in count.
+  - name: system
+    description: Provider webhooks and health.
+
+paths:
+  # ---------------------------------------------------------------- public
+  /api/public/events/{publicId}:
+    parameters:
+      - $ref: '#/components/parameters/publicId'
+    get:
+      operationId: getPublicEvent
+      tags: [public]
+      summary: Public event page data.
+      security: []
+      x-transaction: read
+      x-requirements: [FR-EVT-12, FR-DSH-5, AC-123]
+      x-principals: [anonymous]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      responses:
+        '200':
+          description: Public event information.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicEvent' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/public/events/{publicId}/registrations:
+    parameters:
+      - $ref: '#/components/parameters/publicId'
+    post:
+      operationId: submitRegistration
+      tags: [public]
+      summary: Submit or resubmit a registration (always the same response).
+      description: >-
+        Creates a PENDING_VERIFICATION registration, resubmits a pending one, or
+        sends an existing-registration access email. The 202 body and status are
+        identical in all three cases (NFR-SEC-2). Origin is checked.
+      security: []
+      x-transaction: TX-R01
+      x-requirements: [FR-REG-1, FR-REG-2, FR-REG-7, FR-REG-8, FR-REG-10, NFR-SEC-2, NFR-SEC-3, AC-5, AC-37]
+      x-principals: [anonymous]
+      x-idempotency: none
+      x-confirmation-required: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegistrationSubmission' }
+      responses:
+        '202':
+          description: Always "check your email".
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckYourEmail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  # ---------------------------------------------------------------- links: verification
+  /api/links/verify:
+    get:
+      operationId: resolveVerificationLink
+      tags: [links]
+      summary: Resolve a verification link (read-only).
+      security: [{ linkToken: [] }]
+      x-transaction: TX-X02
+      x-requirements: [FR-REG-4, FR-REG-11, FR-REG-12, FR-LNK-7, FR-LNK-9, FR-LNK-10, AC-60, AC-93, AC-94]
+      x-principals: [link:verification]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      responses:
+        '200':
+          description: Confirmation page data, or "already confirmed".
+          headers: { Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }, Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VerificationView' }
+        '404': { $ref: '#/components/responses/GenericInvalidLink' }
+        '429': { $ref: '#/components/responses/GenericInvalidLinkRateLimited' }
+        '500': { $ref: '#/components/responses/LinkInternalError' }
+        '503': { $ref: '#/components/responses/LinkServiceUnavailable' }
+    head:
+      operationId: headVerificationLink
+      tags: [links]
+      summary: HEAD of the verification link resolution (same status and headers as GET, no body, no state change).
+      security: [{ linkToken: [] }]
+      x-transaction: TX-X02
+      x-requirements: [FR-LNK-9, AC-60, AC-94]
+      x-principals: [link:verification]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      responses:
+        '200': { $ref: '#/components/responses/LinkHeadOk' }
+        '404': { $ref: '#/components/responses/LinkHeadInvalid' }
+        '429': { $ref: '#/components/responses/LinkHeadRateLimited' }
+        '500': { $ref: '#/components/responses/LinkHeadError' }
+        '503': { $ref: '#/components/responses/LinkHeadUnavailable' }
+
+  /api/links/verify/confirm:
+    post:
+      operationId: confirmVerification
+      tags: [links]
+      summary: Confirm a registration (explicit action).
+      security: [{ linkToken: [] }]
+      x-transaction: TX-R02
+      x-requirements: [FR-REG-4, FR-REG-5, FR-REG-11, FR-REG-12, FR-LNK-2, FR-NTF-2, BR-9, AC-2, AC-3, AC-4, AC-81, AC-88, AC-182]
+      x-principals: [link:verification]
+      x-idempotency: state
+      x-confirmation-required: false
+      responses:
+        '200':
+          description: Confirmed, waitlisted, or already confirmed. Raw tokens appear only inside the issued link URLs.
+          headers: { Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }, Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VerificationResult' }
+        '403': { $ref: '#/components/responses/LinkForbidden' }
+        '404': { $ref: '#/components/responses/GenericInvalidLink' }
+        '429': { $ref: '#/components/responses/GenericInvalidLinkRateLimited' }
+        '500': { $ref: '#/components/responses/LinkInternalError' }
+        '503': { $ref: '#/components/responses/LinkServiceUnavailable' }
+
+  # ---------------------------------------------------------------- links: management
+  /api/links/manage:
+    get:
+      operationId: resolveManagementLink
+      tags: [links]
+      summary: Resolve a management link (read-only).
+      security: [{ linkToken: [] }]
+      x-transaction: TX-X02
+      x-requirements: [FR-SELF-1, FR-WL-7, FR-LNK-5, FR-LNK-6, FR-LNK-7, FR-LNK-9, FR-LNK-10, AC-60, AC-83, AC-126]
+      x-principals: [link:management]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      responses:
+        '200':
+          description: Management view.
+          headers: { Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }, Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ManagementView' }
+        '404': { $ref: '#/components/responses/GenericInvalidLink' }
+        '429': { $ref: '#/components/responses/GenericInvalidLinkRateLimited' }
+        '500': { $ref: '#/components/responses/LinkInternalError' }
+        '503': { $ref: '#/components/responses/LinkServiceUnavailable' }
+    head:
+      operationId: headManagementLink
+      tags: [links]
+      summary: HEAD of the management link resolution.
+      security: [{ linkToken: [] }]
+      x-transaction: TX-X02
+      x-requirements: [FR-LNK-9, AC-60]
+      x-principals: [link:management]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      responses:
+        '200': { $ref: '#/components/responses/LinkHeadOk' }
+        '404': { $ref: '#/components/responses/LinkHeadInvalid' }
+        '429': { $ref: '#/components/responses/LinkHeadRateLimited' }
+        '500': { $ref: '#/components/responses/LinkHeadError' }
+        '503': { $ref: '#/components/responses/LinkHeadUnavailable' }
+
+  /api/links/manage/cancel:
+    post:
+      operationId: cancelRegistration
+      tags: [links]
+      summary: Cancel the registration (explicit, confirmed action).
+      security: [{ linkToken: [] }]
+      x-transaction: TX-R03
+      x-requirements: [FR-SELF-2, FR-SELF-3, FR-WL-2, BR-10, BR-23, FR-LNK-9, AC-8, AC-11, AC-58, AC-71, AC-127]
+      x-principals: [link:management]
+      x-idempotency: state
+      x-confirmation-required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConfirmedAction' }
+      responses:
+        '200':
+          description: The cancellation is confirmed in this response; the link stops working.
+          headers: { Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }, Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegistrationCancelled' }
+        '400': { $ref: '#/components/responses/LinkBadRequest' }
+        '403': { $ref: '#/components/responses/LinkForbidden' }
+        '404': { $ref: '#/components/responses/GenericInvalidLink' }
+        '409': { $ref: '#/components/responses/LinkConflict' }
+        '422': { $ref: '#/components/responses/LinkValidationFailed' }
+        '429': { $ref: '#/components/responses/GenericInvalidLinkRateLimited' }
+        '500': { $ref: '#/components/responses/LinkInternalError' }
+        '503': { $ref: '#/components/responses/LinkServiceUnavailable' }
+
+  /api/links/manage/resend:
+    post:
+      operationId: requestTicketResend
+      tags: [links]
+      summary: Request a ticket email resend (idempotent by requestId).
+      security: [{ linkToken: [] }]
+      x-transaction: TX-P01
+      x-requirements: [FR-SELF-4, FR-NTF-2c, FR-LNK-3, AC-113]
+      x-principals: [link:management]
+      x-idempotency: request-id
+      x-confirmation-required: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResendRequest' }
+      responses:
+        '202':
+          description: A resend is queued (a retry with the same requestId creates nothing new).
+          headers: { Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }, Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResendQueued' }
+        '400': { $ref: '#/components/responses/LinkBadRequest' }
+        '403': { $ref: '#/components/responses/LinkForbidden' }
+        '404': { $ref: '#/components/responses/GenericInvalidLink' }
+        '409': { $ref: '#/components/responses/LinkConflict' }
+        '422': { $ref: '#/components/responses/LinkValidationFailed' }
+        '429': { $ref: '#/components/responses/LinkRateLimitedOrInvalid' }
+        '500': { $ref: '#/components/responses/LinkInternalError' }
+        '503': { $ref: '#/components/responses/LinkServiceUnavailable' }
+
+  /api/links/manage/share-links:
+    post:
+      operationId: issueShareLink
+      tags: [links]
+      summary: Issue a new share link.
+      security: [{ linkToken: [] }]
+      x-transaction: TX-P02
+      x-requirements: [FR-SHR-1, FR-LNK-2, FR-LNK-10, AC-175]
+      x-principals: [link:management]
+      x-idempotency: none
+      x-confirmation-required: false
+      responses:
+        '201':
+          description: The new share link (raw token only inside the URL fragment).
+          headers: { Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }, Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShareLinkIssued' }
+        '403': { $ref: '#/components/responses/LinkForbidden' }
+        '404': { $ref: '#/components/responses/GenericInvalidLink' }
+        '409': { $ref: '#/components/responses/LinkConflict' }
+        '429': { $ref: '#/components/responses/GenericInvalidLinkRateLimited' }
+        '500': { $ref: '#/components/responses/LinkInternalError' }
+        '503': { $ref: '#/components/responses/LinkServiceUnavailable' }
+
+  /api/links/manage/rotations:
+    post:
+      operationId: rotateLink
+      tags: [links]
+      summary: Rotate the management or share link (confirmed; idempotent by requestId).
+      security: [{ linkToken: [] }]
+      x-transaction: TX-P03
+      x-requirements: [FR-ROT-1, FR-ROT-2, FR-ROT-3, FR-ROT-5, FR-ROT-6, FR-ROT-8, FR-ROT-9, FR-ROT-11, BR-20, BR-28, AC-64, AC-65, AC-67, AC-68, AC-72, AC-75, AC-95]
+      x-principals: [link:management]
+      x-idempotency: request-id
+      x-confirmation-required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RotationRequest' }
+      responses:
+        '200':
+          description: Rotated (new link shown once), or "already replaced" (FR-ROT-11 a).
+          headers: { Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }, Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RotationResult' }
+        '400': { $ref: '#/components/responses/LinkBadRequest' }
+        '403': { $ref: '#/components/responses/LinkForbidden' }
+        '404': { $ref: '#/components/responses/GenericInvalidLink' }
+        '409': { $ref: '#/components/responses/LinkConflict' }
+        '422': { $ref: '#/components/responses/LinkValidationFailed' }
+        '429': { $ref: '#/components/responses/LinkRateLimitedOrInvalid' }
+        '500': { $ref: '#/components/responses/LinkInternalError' }
+        '503': { $ref: '#/components/responses/LinkServiceUnavailable' }
+
+  # ---------------------------------------------------------------- links: share
+  /api/links/ticket:
+    get:
+      operationId: resolveShareLink
+      tags: [links]
+      summary: Share ticket view (read-only; never checks in).
+      security: [{ linkToken: [] }]
+      x-transaction: TX-X02
+      x-requirements: [FR-SHR-2, FR-SHR-3, FR-SHR-4, FR-SHR-7, FR-SHR-8, FR-LNK-5, AC-45, AC-49, AC-54, AC-55, AC-56]
+      x-principals: [link:share]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      responses:
+        '200':
+          description: One of the three share-view states.
+          headers: { Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }, Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShareView' }
+        '404': { $ref: '#/components/responses/GenericInvalidLink' }
+        '429': { $ref: '#/components/responses/GenericInvalidLinkRateLimited' }
+        '500': { $ref: '#/components/responses/LinkInternalError' }
+        '503': { $ref: '#/components/responses/LinkServiceUnavailable' }
+    head:
+      operationId: headShareLink
+      tags: [links]
+      summary: HEAD of the share view.
+      security: [{ linkToken: [] }]
+      x-transaction: TX-X02
+      x-requirements: [FR-SHR-8, FR-LNK-9, AC-55, AC-60]
+      x-principals: [link:share]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      responses:
+        '200': { $ref: '#/components/responses/LinkHeadOk' }
+        '404': { $ref: '#/components/responses/LinkHeadInvalid' }
+        '429': { $ref: '#/components/responses/LinkHeadRateLimited' }
+        '500': { $ref: '#/components/responses/LinkHeadError' }
+        '503': { $ref: '#/components/responses/LinkHeadUnavailable' }
+
+  # ---------------------------------------------------------------- links: staff invitation
+  /api/links/invite:
+    get:
+      operationId: resolveStaffInvitation
+      tags: [links]
+      summary: Resolve a staff invitation (read-only).
+      security: [{ linkToken: [] }]
+      x-transaction: TX-X02
+      x-requirements: [FR-STAFF-1, FR-STAFF-5, FR-LNK-9, AC-82, AC-101]
+      x-principals: [link:staff_invitation]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      responses:
+        '200':
+          description: Invitation page data.
+          headers: { Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }, Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InvitationView' }
+        '404': { $ref: '#/components/responses/GenericInvalidLink' }
+        '429': { $ref: '#/components/responses/GenericInvalidLinkRateLimited' }
+        '500': { $ref: '#/components/responses/LinkInternalError' }
+        '503': { $ref: '#/components/responses/LinkServiceUnavailable' }
+    head:
+      operationId: headStaffInvitation
+      tags: [links]
+      summary: HEAD of the invitation resolution.
+      security: [{ linkToken: [] }]
+      x-transaction: TX-X02
+      x-requirements: [FR-LNK-9, AC-60]
+      x-principals: [link:staff_invitation]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      responses:
+        '200': { $ref: '#/components/responses/LinkHeadOk' }
+        '404': { $ref: '#/components/responses/LinkHeadInvalid' }
+        '429': { $ref: '#/components/responses/LinkHeadRateLimited' }
+        '500': { $ref: '#/components/responses/LinkHeadError' }
+        '503': { $ref: '#/components/responses/LinkHeadUnavailable' }
+
+  /api/links/invite/accept:
+    post:
+      operationId: acceptStaffInvitation
+      tags: [links]
+      summary: Accept a staff invitation; creates a staff session cookie.
+      security: [{ linkToken: [] }]
+      x-transaction: TX-S02
+      x-requirements: [FR-STAFF-1, FR-STAFF-2, FR-STAFF-5, FR-STAFF-7, AC-82, AC-96, AC-101]
+      x-principals: [link:staff_invitation]
+      x-idempotency: state
+      x-confirmation-required: false
+      responses:
+        '200':
+          description: Accepted. The staff session cookie is set; the session ID is never in the body.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+            Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' }
+            Set-Cookie: { $ref: '#/components/headers/SetStaffSessionCookie' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Redirect' }
+        '403': { $ref: '#/components/responses/LinkForbidden' }
+        '404': { $ref: '#/components/responses/GenericInvalidLink' }
+        '429': { $ref: '#/components/responses/GenericInvalidLinkRateLimited' }
+        '500': { $ref: '#/components/responses/LinkInternalError' }
+        '503': { $ref: '#/components/responses/LinkServiceUnavailable' }
+
+  # ---------------------------------------------------------------- links: sign-in
+  /api/links/sign-in:
+    get:
+      operationId: resolveSignInLink
+      tags: [links]
+      summary: Resolve a sign-in link; issues the pre-session anti-forgery token (ADR-010).
+      description: >-
+        Read-only: no database write. Sets the short-lived __Host-ers_presession
+        cookie and returns the matching preSessionToken, bound to this sign-in
+        request (ADR-010 §4).
+      security: [{ linkToken: [] }]
+      x-transaction: TX-X02
+      x-requirements: [FR-ORG-3, FR-LNK-9, AC-60, AC-147]
+      x-principals: [link:sign_in]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      responses:
+        '200':
+          description: Masked address and the pre-session token.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+            Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' }
+            Set-Cookie: { $ref: '#/components/headers/SetPreSessionCookie' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SignInLinkView' }
+        '404': { $ref: '#/components/responses/GenericInvalidLink' }
+        '429': { $ref: '#/components/responses/GenericInvalidLinkRateLimited' }
+        '500': { $ref: '#/components/responses/LinkInternalError' }
+        '503': { $ref: '#/components/responses/LinkServiceUnavailable' }
+    head:
+      operationId: headSignInLink
+      tags: [links]
+      summary: HEAD of the sign-in link resolution (no cookie is set on HEAD).
+      security: [{ linkToken: [] }]
+      x-transaction: TX-X02
+      x-requirements: [FR-LNK-9, AC-60, AC-147]
+      x-principals: [link:sign_in]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      responses:
+        '200': { $ref: '#/components/responses/LinkHeadOk' }
+        '404': { $ref: '#/components/responses/LinkHeadInvalid' }
+        '429': { $ref: '#/components/responses/LinkHeadRateLimited' }
+        '500': { $ref: '#/components/responses/LinkHeadError' }
+        '503': { $ref: '#/components/responses/LinkHeadUnavailable' }
+
+  /api/links/sign-in/confirm:
+    post:
+      operationId: confirmSignIn
+      tags: [links]
+      summary: Confirm a sign-in; creates an organizer session cookie.
+      security: [{ linkToken: [], preSessionCookie: [], csrfToken: [] }]
+      x-transaction: TX-A02
+      x-requirements: [FR-ORG-1, FR-ORG-3, FR-ORG-4, FR-ORG-5, NFR-CON-7, AC-147, AC-149, AC-182]
+      x-principals: [link:sign_in]
+      x-idempotency: state
+      x-confirmation-required: false
+      responses:
+        '200':
+          description: Signed in. The organizer session cookie is set and the pre-session cookie cleared.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+            Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' }
+            Set-Cookie: { $ref: '#/components/headers/SetOrganizerSessionCookie' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Redirect' }
+        '403': { $ref: '#/components/responses/LinkForbidden' }
+        '404': { $ref: '#/components/responses/GenericInvalidLink' }
+        '429': { $ref: '#/components/responses/GenericInvalidLinkRateLimited' }
+        '500': { $ref: '#/components/responses/LinkInternalError' }
+        '503': { $ref: '#/components/responses/LinkServiceUnavailable' }
+
+  # ---------------------------------------------------------------- links: email change
+  /api/links/email-change:
+    get:
+      operationId: resolveEmailChangeLink
+      tags: [links]
+      summary: Resolve an email-change confirmation link (read-only).
+      security: [{ linkToken: [] }]
+      x-transaction: TX-X02
+      x-requirements: [FR-ORG-6, FR-LNK-9, AC-60, AC-150]
+      x-principals: [link:email_change]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      responses:
+        '200':
+          description: Masked new address.
+          headers: { Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }, Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmailChangeLinkView' }
+        '404': { $ref: '#/components/responses/GenericInvalidLink' }
+        '429': { $ref: '#/components/responses/GenericInvalidLinkRateLimited' }
+        '500': { $ref: '#/components/responses/LinkInternalError' }
+        '503': { $ref: '#/components/responses/LinkServiceUnavailable' }
+    head:
+      operationId: headEmailChangeLink
+      tags: [links]
+      summary: HEAD of the email-change link resolution.
+      security: [{ linkToken: [] }]
+      x-transaction: TX-X02
+      x-requirements: [FR-LNK-9, AC-60]
+      x-principals: [link:email_change]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      responses:
+        '200': { $ref: '#/components/responses/LinkHeadOk' }
+        '404': { $ref: '#/components/responses/LinkHeadInvalid' }
+        '429': { $ref: '#/components/responses/LinkHeadRateLimited' }
+        '500': { $ref: '#/components/responses/LinkHeadError' }
+        '503': { $ref: '#/components/responses/LinkHeadUnavailable' }
+
+  /api/links/email-change/confirm:
+    post:
+      operationId: confirmEmailChange
+      tags: [links]
+      summary: Confirm an email change.
+      security: [{ linkToken: [] }]
+      x-transaction: TX-A04
+      x-requirements: [FR-ORG-6, FR-ORG-8, NFR-CON-7, AC-150]
+      x-principals: [link:email_change]
+      x-idempotency: state
+      x-confirmation-required: false
+      responses:
+        '200':
+          description: Email changed; other sessions revoked; the old address is notified.
+          headers: { Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }, Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmailChanged' }
+        '403': { $ref: '#/components/responses/LinkForbidden' }
+        '404': { $ref: '#/components/responses/GenericInvalidLink' }
+        '409': { $ref: '#/components/responses/LinkConflict' }
+        '429': { $ref: '#/components/responses/GenericInvalidLinkRateLimited' }
+        '500': { $ref: '#/components/responses/LinkInternalError' }
+        '503': { $ref: '#/components/responses/LinkServiceUnavailable' }
+
+  # ---------------------------------------------------------------- auth
+  /api/auth/sign-in-requests:
+    post:
+      operationId: requestSignInLink
+      tags: [auth]
+      summary: Request a sign-in link (same response whether or not an account exists).
+      security: []
+      x-transaction: TX-A01
+      x-requirements: [FR-ORG-1, FR-ORG-3, NFR-SEC-3, NFR-REL-12, AC-146, AC-152]
+      x-principals: [anonymous]
+      x-idempotency: none
+      x-confirmation-required: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SignInRequestInput' }
+      responses:
+        '202':
+          description: Always "check your email".
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckYourEmail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/auth/session:
+    get:
+      operationId: getOrganizerSession
+      tags: [auth]
+      summary: Current organizer session and its CSRF token.
+      security: [{ orgSession: [] }]
+      x-transaction: TX-A07
+      x-requirements: [FR-ORG-4, FR-ORG-5, NFR-SEC-8, AC-148]
+      x-principals: [organizer]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      responses:
+        '200':
+          description: Session information. The session ID is never returned.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrganizerSession' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/auth/sign-out:
+    post:
+      operationId: signOut
+      tags: [auth]
+      summary: End the current session.
+      security: [{ orgSession: [], csrfToken: [] }]
+      x-transaction: TX-A06
+      x-requirements: [FR-ORG-4, FR-ORG-8]
+      x-principals: [organizer]
+      x-idempotency: state
+      x-confirmation-required: false
+      responses:
+        '204':
+          description: Signed out; the session cookie is cleared.
+          headers:
+            Set-Cookie: { $ref: '#/components/headers/ClearOrganizerSessionCookie' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/auth/sign-out-everywhere:
+    post:
+      operationId: signOutEverywhere
+      tags: [auth]
+      summary: End all sessions of the account.
+      security: [{ orgSession: [], csrfToken: [] }]
+      x-transaction: TX-A05
+      x-requirements: [FR-ORG-4, FR-ORG-8, NFR-CON-7, AC-148]
+      x-principals: [organizer]
+      x-idempotency: state
+      x-confirmation-required: false
+      responses:
+        '204':
+          description: All sessions ended; the session cookie is cleared.
+          headers:
+            Set-Cookie: { $ref: '#/components/headers/ClearOrganizerSessionCookie' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/auth/reauthentication:
+    post:
+      operationId: requestReauthentication
+      tags: [auth]
+      summary: Send a re-authentication link to the account's current address.
+      security: [{ orgSession: [], csrfToken: [] }]
+      x-transaction: TX-A01
+      x-requirements: [FR-ORG-5, AC-149]
+      x-principals: [organizer]
+      x-idempotency: none
+      x-confirmation-required: false
+      responses:
+        '202':
+          description: A link was sent. It never performs the original action.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckYourEmail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  # ---------------------------------------------------------------- account
+  /api/account:
+    get:
+      operationId: getAccount
+      tags: [account]
+      summary: The signed-in organizer's account.
+      security: [{ orgSession: [] }]
+      x-transaction: read
+      x-requirements: [FR-ORG-1]
+      x-principals: [organizer]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      responses:
+        '200':
+          description: Account.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/account/email-change-requests:
+    post:
+      operationId: requestEmailChange
+      tags: [account]
+      summary: Request an email change (recent authentication required).
+      security: [{ orgSession: [], csrfToken: [] }]
+      x-transaction: TX-A03
+      x-requirements: [FR-ORG-5, FR-ORG-6, FR-ORG-8, AC-149, AC-150]
+      x-principals: [organizer]
+      x-idempotency: none
+      x-confirmation-required: false
+      x-recent-authentication: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmailChangeRequestInput' }
+      responses:
+        '202':
+          description: Always accepted; a confirmation link goes to the new address.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckYourEmail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  # ---------------------------------------------------------------- events
+  /api/events:
+    get:
+      operationId: listEvents
+      tags: [events]
+      summary: The organizer's own events.
+      security: [{ orgSession: [] }]
+      x-transaction: read
+      x-requirements: [FR-EVT-11, NFR-SEC-6]
+      x-principals: [organizer]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/EventStatus' }
+        - $ref: '#/components/parameters/cursor'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: A page of events.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      operationId: createEvent
+      tags: [events]
+      summary: Create an event (idempotent by organizer-scoped requestId, API-D3).
+      description: >-
+        A retry with the same requestId and an identical payload returns the
+        previously created event (200). Reusing the requestId with a different
+        payload returns 409 request_id_reused and creates nothing. Requires the
+        database amendment DB-A1 (API_DESIGN.md §13).
+      security: [{ orgSession: [], csrfToken: [] }]
+      x-transaction: TX-E01
+      x-requirements: [FR-EVT-1, FR-EVT-2, FR-EVT-3, FR-EVT-4, FR-EVT-12, EC-33, AC-104, AC-118]
+      x-principals: [organizer]
+      x-idempotency: request-id
+      x-confirmation-required: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EventCreateInput' }
+      responses:
+        '200':
+          description: Replay of an earlier identical request; the existing event.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventCreated' }
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/events/{eventId}:
+    parameters:
+      - $ref: '#/components/parameters/eventId'
+    get:
+      operationId: getEvent
+      tags: [events]
+      summary: One of the organizer's events (404 for any other event).
+      security: [{ orgSession: [] }]
+      x-transaction: read
+      x-requirements: [FR-EVT-2, FR-DSH-5, NFR-SEC-6, AC-155]
+      x-principals: [organizer]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      responses:
+        '200':
+          description: Event.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Event' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    patch:
+      operationId: updateEventDetails
+      tags: [events]
+      summary: Edit title and/or description (no emails).
+      security: [{ orgSession: [], csrfToken: [] }]
+      x-transaction: TX-E02
+      x-requirements: [FR-EVT-1, FR-EVT-5, AC-105]
+      x-principals: [organizer]
+      x-idempotency: absolute
+      x-confirmation-required: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EventDetailsPatch' }
+      responses:
+        '200':
+          description: Updated event.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Event' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/events/{eventId}/capacity:
+    parameters:
+      - $ref: '#/components/parameters/eventId'
+    put:
+      operationId: setCapacity
+      tags: [events]
+      summary: Set capacity (absolute value; an increase promotes FIFO before the cutoff).
+      security: [{ orgSession: [], csrfToken: [] }]
+      x-transaction: TX-E03
+      x-requirements: [FR-EVT-7, FR-EVT-8, BR-1, BR-5, BR-11, AC-13, AC-14, AC-15]
+      x-principals: [organizer]
+      x-idempotency: absolute
+      x-confirmation-required: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CapacityInput' }
+      responses:
+        '200':
+          description: Updated event.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Event' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/events/{eventId}/reschedule:
+    parameters:
+      - $ref: '#/components/parameters/eventId'
+    post:
+      operationId: rescheduleEvent
+      tags: [events]
+      summary: Change the local date and time; the time zone is preserved (API-D5).
+      security: [{ orgSession: [], csrfToken: [] }]
+      x-transaction: TX-E04
+      x-requirements: [FR-EVT-3, FR-EVT-4, FR-EVT-6, BR-12, BR-13, BR-14, BR-15, FR-NTF-2d, FR-NTF-3, FR-NTF-4, AC-16, AC-17, AC-20, AC-39, AC-106, AC-107]
+      x-principals: [organizer]
+      x-idempotency: absolute
+      x-confirmation-required: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RescheduleInput' }
+      responses:
+        '200':
+          description: Rescheduled event (or unchanged, when the start equals the current start).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Event' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/events/{eventId}/cancellation:
+    parameters:
+      - $ref: '#/components/parameters/eventId'
+    post:
+      operationId: cancelEvent
+      tags: [events]
+      summary: Cancel the event (confirmed; recent authentication; repeat returns 200 without new emails).
+      security: [{ orgSession: [], csrfToken: [] }]
+      x-transaction: TX-E05
+      x-requirements: [FR-EVT-9, FR-ORG-5, BR-16, FR-STAFF-5, AC-18, AC-19, AC-59, AC-149]
+      x-principals: [organizer]
+      x-idempotency: state
+      x-confirmation-required: true
+      x-recent-authentication: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConfirmedAction' }
+      responses:
+        '200':
+          description: The cancelled event.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Event' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/events/{eventId}/deletion-preview:
+    parameters:
+      - $ref: '#/components/parameters/eventId'
+    get:
+      operationId: getDeletionPreview
+      tags: [events]
+      summary: Deletion eligibility, required-notice issues and a short-lived preview token.
+      security: [{ orgSession: [] }]
+      x-transaction: read
+      x-requirements: [FR-EVT-10, FR-EVT-11, FR-DSH-6, BR-29]
+      x-principals: [organizer]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      x-recent-authentication: true
+      responses:
+        '200':
+          description: Preview.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeletionPreview' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/events/{eventId}/deletion:
+    parameters:
+      - $ref: '#/components/parameters/eventId'
+    post:
+      operationId: deleteEvent
+      tags: [events]
+      summary: Delete an eligible event (confirmed; recent authentication; valid preview token).
+      security: [{ orgSession: [], csrfToken: [] }]
+      x-transaction: TX-E06
+      x-requirements: [FR-EVT-10, FR-EVT-11, FR-EVT-13, FR-EVT-14, FR-ORG-5, BR-26, BR-29, AC-21, AC-86, AC-87, AC-88, AC-97, AC-98, AC-100, AC-184]
+      x-principals: [organizer]
+      x-idempotency: state
+      x-confirmation-required: true
+      x-recent-authentication: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeleteEventInput' }
+      responses:
+        '204':
+          description: Deleted. A deletion marker and the audit records remain.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  # ---------------------------------------------------------------- participants (read-only)
+  /api/events/{eventId}/dashboard:
+    parameters:
+      - $ref: '#/components/parameters/eventId'
+    get:
+      operationId: getDashboard
+      tags: [participants]
+      summary: Event phase and counts.
+      security: [{ orgSession: [] }]
+      x-transaction: TX-X03
+      x-requirements: [FR-DSH-1, FR-DSH-3, FR-DSH-5, AC-12]
+      x-principals: [organizer]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      responses:
+        '200':
+          description: Dashboard.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Dashboard' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/events/{eventId}/participants:
+    parameters:
+      - $ref: '#/components/parameters/eventId'
+    get:
+      operationId: listParticipants
+      tags: [participants]
+      summary: Participant list with email-delivery issues (owner only).
+      security: [{ orgSession: [] }]
+      x-transaction: TX-X03
+      x-requirements: [FR-DSH-4, FR-DSH-6, NFR-REL-11, NFR-SEC-4, AC-53, AC-131, AC-171, AC-180, AC-181]
+      x-principals: [organizer]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      parameters:
+        - name: state
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/RegistrationState' }
+        - $ref: '#/components/parameters/cursor'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: A page of participants.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ParticipantPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/events/{eventId}/check-in-count:
+    parameters:
+      - $ref: '#/components/parameters/eventId'
+    get:
+      operationId: getCheckInCount
+      tags: [check-in]
+      summary: Authoritative checked-in count (owner or that event's staff).
+      security: [{ orgSession: [] }, { staffSession: [] }]
+      x-transaction: TX-X03
+      x-requirements: [FR-DSH-2, FR-DSH-3, AC-112]
+      x-principals: [organizer, staff]
+      x-staff-accessible: true
+      x-idempotency: read-only
+      x-confirmation-required: false
+      responses:
+        '200':
+          description: Count only.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckInCount' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/events/{eventId}/live:
+    parameters:
+      - $ref: '#/components/parameters/eventId'
+    get:
+      operationId: streamCheckInCount
+      tags: [live]
+      summary: Server-sent events with the live checked-in count.
+      description: >-
+        Events - "count" with data {"checkedIn": n} (first on connect, then after
+        each committed check-in or undo, coalesced up to 250 ms); "access_ended"
+        before the server closes the stream. Comment keep-alive every 15 s;
+        retry 3000. Authorization is re-validated before every push and at least
+        every 30 s (API-D6). No Last-Event-ID replay; every connection starts with
+        the authoritative count.
+      security: [{ orgSession: [] }, { staffSession: [] }]
+      x-transaction: TX-X03
+      x-requirements: [FR-DSH-2, FR-DSH-3, FR-STAFF-3, NFR-PERF-2, AC-25, AC-111, AC-112]
+      x-principals: [organizer, staff]
+      x-staff-accessible: true
+      x-idempotency: read-only
+      x-confirmation-required: false
+      x-sse-events:
+        count: { $ref: '#/components/schemas/CheckInCount' }
+        access_ended: { $ref: '#/components/schemas/AccessEnded' }
+      responses:
+        '200':
+          description: The event stream.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: 'Lines of the SSE protocol: "event:", "data:" (JSON) and ":" comments.'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  # ---------------------------------------------------------------- waitlist and undo (owner)
+  /api/events/{eventId}/registrations/{registrationId}/waitlist-removal:
+    parameters:
+      - $ref: '#/components/parameters/eventId'
+      - $ref: '#/components/parameters/registrationId'
+    post:
+      operationId: removeFromWaitlist
+      tags: [waitlist]
+      summary: Remove a WAITLISTED registration (confirmed; never promotes).
+      security: [{ orgSession: [], csrfToken: [] }]
+      x-transaction: TX-W01
+      x-requirements: [FR-WL-10, FR-WL-11, FR-WL-12, FR-WL-13, FR-WL-14, BR-24, BR-27, AC-76, AC-77, AC-78, AC-79, AC-90, AC-91, AC-92]
+      x-principals: [organizer]
+      x-idempotency: state
+      x-confirmation-required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WaitlistRemovalInput' }
+      responses:
+        '200':
+          description: Removed; a removal notice is queued.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WaitlistRemoved' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/events/{eventId}/check-ins/{checkInId}/undo:
+    parameters:
+      - $ref: '#/components/parameters/eventId'
+      - $ref: '#/components/parameters/checkInId'
+    post:
+      operationId: undoCheckIn
+      tags: [check-in]
+      summary: Undo a check-in (owner only; audited).
+      security: [{ orgSession: [], csrfToken: [] }]
+      x-transaction: TX-C02
+      x-requirements: [FR-CHK-8, BR-7, AC-26, AC-27, AC-54]
+      x-principals: [organizer]
+      x-idempotency: state
+      x-confirmation-required: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UndoInput' }
+      responses:
+        '200':
+          description: Undone.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckInUndone' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  # ---------------------------------------------------------------- check-in
+  /api/events/{eventId}/check-ins:
+    parameters:
+      - $ref: '#/components/parameters/eventId'
+    post:
+      operationId: checkIn
+      tags: [check-in]
+      summary: Check a ticket in (owner or that event's staff; idempotent by requestId).
+      description: >-
+        Every one of the seven outcomes is a 200 business result. The response
+        never contains participant data. A requestId reused by a different
+        principal returns 409 request_id_conflict (D-5).
+      security: [{ staffSession: [], csrfToken: [] }, { orgSession: [], csrfToken: [] }]
+      x-transaction: TX-C01
+      x-requirements: [FR-CHK-1, FR-CHK-2, FR-CHK-3, FR-CHK-4, FR-CHK-5, FR-CHK-7, FR-CHK-9, BR-7, AC-22, AC-23, AC-44, AC-109, AC-110, AC-124, AC-156]
+      x-principals: [organizer, staff]
+      x-staff-accessible: true
+      x-idempotency: request-id
+      x-confirmation-required: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckInInput' }
+      responses:
+        '200':
+          description: The outcome.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckInResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/staff/session:
+    get:
+      operationId: getStaffSession
+      tags: [check-in]
+      summary: Current staff session, its event and CSRF token.
+      security: [{ staffSession: [] }]
+      x-transaction: TX-A08
+      x-requirements: [FR-STAFF-2, FR-ORG-4, AC-151]
+      x-principals: [staff]
+      x-staff-accessible: true
+      x-idempotency: read-only
+      x-confirmation-required: false
+      responses:
+        '200':
+          description: Staff session information. The session ID is never returned.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StaffSession' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  # ---------------------------------------------------------------- staff management (owner)
+  /api/events/{eventId}/staff:
+    parameters:
+      - $ref: '#/components/parameters/eventId'
+    get:
+      operationId: getStaffOverview
+      tags: [staff]
+      summary: Invitations and active staff sessions of the event.
+      security: [{ orgSession: [] }]
+      x-transaction: read
+      x-requirements: [FR-STAFF-5, FR-STAFF-6, FR-STAFF-7]
+      x-principals: [organizer]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      responses:
+        '200':
+          description: Staff overview.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StaffOverview' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/events/{eventId}/staff-invitations:
+    parameters:
+      - $ref: '#/components/parameters/eventId'
+    post:
+      operationId: inviteStaff
+      tags: [staff]
+      summary: Invite (or re-invite) a staff member; replaces a pending invitation to the same address.
+      security: [{ orgSession: [], csrfToken: [] }]
+      x-transaction: TX-S01
+      x-requirements: [FR-STAFF-1, FR-STAFF-5, FR-STAFF-6, AC-82, AC-151]
+      x-principals: [organizer]
+      x-idempotency: none
+      x-confirmation-required: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StaffInvitationInput' }
+      responses:
+        '201':
+          description: Invitation created; the email is queued.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StaffInvitation' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/events/{eventId}/staff-invitations/{invitationId}/revocation:
+    parameters:
+      - $ref: '#/components/parameters/eventId'
+      - $ref: '#/components/parameters/invitationId'
+    post:
+      operationId: revokeStaffInvitation
+      tags: [staff]
+      summary: Revoke a pending invitation.
+      security: [{ orgSession: [], csrfToken: [] }]
+      x-transaction: TX-S03
+      x-requirements: [FR-STAFF-3, FR-STAFF-5, AC-82, AC-101]
+      x-principals: [organizer]
+      x-idempotency: state
+      x-confirmation-required: false
+      responses:
+        '204':
+          description: Revoked.
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /api/events/{eventId}/staff-sessions/{staffSessionId}/revocation:
+    parameters:
+      - $ref: '#/components/parameters/eventId'
+      - $ref: '#/components/parameters/staffSessionId'
+    post:
+      operationId: revokeStaffSession
+      tags: [staff]
+      summary: Revoke a staff device session (effective on its next request).
+      security: [{ orgSession: [], csrfToken: [] }]
+      x-transaction: TX-S03
+      x-requirements: [FR-STAFF-3, FR-STAFF-6, AC-111, AC-156]
+      x-principals: [organizer]
+      x-idempotency: state
+      x-confirmation-required: false
+      responses:
+        '204':
+          description: Revoked (repeating it also returns 204).
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  # ---------------------------------------------------------------- system
+  /webhooks/email:
+    post:
+      operationId: receiveProviderWebhook
+      tags: [system]
+      summary: Signed provider webhook (Svix); acknowledged only after commit.
+      security: [{ webhookSignature: [] }]
+      x-transaction: TX-M10
+      x-requirements: [NFR-REL-6, NFR-REL-10, NFR-REL-15, NFR-REL-18, NFR-REL-13, AC-115, AC-160, AC-165, AC-166, AC-181]
+      x-principals: [provider]
+      x-idempotency: request-id
+      x-confirmation-required: false
+      parameters:
+        - { name: svix-id, in: header, required: true, schema: { type: string, minLength: 1, maxLength: 200 } }
+        - { name: svix-timestamp, in: header, required: true, schema: { type: string, pattern: '^[0-9]{1,12}$' } }
+      requestBody:
+        required: true
+        description: Raw provider payload; the signature is verified on the raw bytes before parsing.
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProviderWebhookPayload' }
+      responses:
+        '204':
+          description: Stored (or a redelivery of a stored svix-id).
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /healthz:
+    get:
+      operationId: getHealth
+      tags: [system]
+      summary: Liveness and schema version.
+      security: []
+      x-transaction: read
+      x-requirements: [ENG-CI-6, AC-141]
+      x-principals: [anonymous]
+      x-idempotency: read-only
+      x-confirmation-required: false
+      responses:
+        '200':
+          description: Healthy.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+components:
+  securitySchemes:
+    orgSession:
+      type: apiKey
+      in: cookie
+      name: __Host-ers_org
+      description: Organizer session cookie (Secure; HttpOnly; SameSite=Lax; Path=/). Never readable by JavaScript (ADR-010).
+    staffSession:
+      type: apiKey
+      in: cookie
+      name: __Host-ers_staff
+      description: Staff session cookie for one event (same attributes as the organizer cookie).
+    csrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: Session-bound HMAC token from GET /api/auth/session or /api/staff/session; for sign-in confirmation, the pre-session token. Combined with an exact Origin check.
+    preSessionCookie:
+      type: apiKey
+      in: cookie
+      name: __Host-ers_presession
+      description: Short-lived pre-session nonce cookie for sign-in confirmation (ADR-010 §4).
+    linkToken:
+      type: http
+      scheme: Link
+      description: Link token taken from the URL fragment by the page and sent only in "Authorization Link <token>" (FR-LNK-10).
+    webhookSignature:
+      type: apiKey
+      in: header
+      name: svix-signature
+      description: Svix signature over svix-id, svix-timestamp and the raw body.
+
+  parameters:
+    publicId:
+      name: publicId
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[A-Za-z0-9_-]{22,64}$' }
+    eventId:
+      name: eventId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    registrationId:
+      name: registrationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    checkInId:
+      name: checkInId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    invitationId:
+      name: invitationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    staffSessionId:
+      name: staffSessionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    cursor:
+      name: cursor
+      in: query
+      required: false
+      schema: { type: string, maxLength: 512, pattern: '^[A-Za-z0-9_-]+$' }
+    limit:
+      name: limit
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+
+  headers:
+    CacheControlNoStore:
+      required: true
+      schema: { type: string, const: no-store }
+    ReferrerPolicy:
+      required: true
+      schema: { type: string, const: no-referrer }
+    RetryAfter:
+      required: true
+      schema: { type: integer, minimum: 1 }
+    CorrelationId:
+      required: false
+      schema: { type: string, maxLength: 64 }
+    SetOrganizerSessionCookie:
+      required: true
+      description: '__Host-ers_org=<session id>; Secure; HttpOnly; SameSite=Lax; Path=/; Max-Age=<seconds to absolute expiry>. Also clears __Host-ers_presession.'
+      schema: { type: string }
+    ClearOrganizerSessionCookie:
+      required: true
+      description: '__Host-ers_org=; Secure; HttpOnly; SameSite=Lax; Path=/; Max-Age=0'
+      schema: { type: string }
+    SetStaffSessionCookie:
+      required: true
+      description: '__Host-ers_staff=<session id>; Secure; HttpOnly; SameSite=Lax; Path=/; Max-Age=<seconds to the earlier of absolute expiry and check-in window end>'
+      schema: { type: string }
+    SetPreSessionCookie:
+      required: true
+      description: '__Host-ers_presession=<nonce>; Secure; HttpOnly; SameSite=Strict; Path=/; Max-Age=900'
+      schema: { type: string }
+
+  responses:
+    BadRequest:
+      description: Malformed JSON, unknown fields or wrong content type.
+      headers: { X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' } }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ValidationFailed:
+      description: Field validation failed (errors list).
+      headers: { X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' } }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unauthenticated:
+      description: No valid session (code unauthenticated), or recent authentication required (code reauthentication_required).
+      headers: { X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' } }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: Principal not allowed (forbidden), CSRF token invalid (csrf_failed) or Origin mismatch (origin_check_failed).
+      headers: { X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' } }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Not found, or not the caller's resource (existence is not revealed).
+      headers: { X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' } }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: State or invariant conflict with a stable code and only safe details.
+      headers: { X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' } }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    RateLimited:
+      description: Rate limit exceeded.
+      headers:
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+        X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    InternalError:
+      description: Unexpected error; only a correlation ID.
+      headers: { X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' } }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ServiceUnavailable:
+      description: Infrastructure unavailable (database, timeouts).
+      headers: { X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' } }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+    GenericInvalidLink:
+      description: >-
+        The generic invalid-link response (FR-LNK-7). Byte-identical body and
+        status for every unusable token of every link type. No correlation ID.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+        Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/GenericInvalidLink' }
+    GenericInvalidLinkRateLimited:
+      description: Failed-lookup limit reached (FR-LNK-7); same body as the generic 404.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+        Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' }
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/GenericInvalidLink' }
+    LinkRateLimitedOrInvalid:
+      description: >-
+        Either the generic failed-lookup 429 (same body as the generic 404), or,
+        for a valid token, an action limit (resend_limit, rotation_limit) as
+        Problem Details.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+        Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' }
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/GenericInvalidLink' }
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    LinkBadRequest:
+      description: Malformed body sent with a valid token (tokens are checked before bodies).
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+        Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    LinkValidationFailed:
+      description: Field validation failed with a valid token (for example confirmed missing).
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+        Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    LinkForbidden:
+      description: Origin mismatch on a link action (origin_check_failed), or pre-session token invalid (csrf_failed, sign-in only).
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+        Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    LinkConflict:
+      description: Business conflict for a valid token (for example cancellation_closed, request_already_processed).
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+        Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    LinkInternalError:
+      description: >-
+        Unexpected failure on a link route (API-D1). Safe body - code and
+        correlation ID only, identical for every link type and token.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+        Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' }
+        X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/SafeServerProblem' }
+    LinkServiceUnavailable:
+      description: Infrastructure failure on a link route (API-D1). Safe body, identical for every link type and token.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+        Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' }
+        X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/SafeServerProblem' }
+    LinkHeadOk:
+      description: Same status and headers as the GET, no body.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+        Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' }
+    LinkHeadInvalid:
+      description: Same status and headers as the generic 404, no body.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+        Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' }
+    LinkHeadRateLimited:
+      description: Same status and headers as the generic 429, no body.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+        Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' }
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+    LinkHeadError:
+      description: Same status and headers as the GET 500, no body.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+        Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' }
+        X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+    LinkHeadUnavailable:
+      description: Same status and headers as the GET 503, no body.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/CacheControlNoStore' }
+        Referrer-Policy: { $ref: '#/components/headers/ReferrerPolicy' }
+        X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+
+  schemas:
+    # ---------- primitives
+    Uuid: { type: string, format: uuid }
+    Instant: { type: string, format: date-time, description: RFC 3339 instant in UTC. }
+    LocalDateTime: { type: string, pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$', description: Local wall-clock time in the event's time zone. }
+    UtcOffset: { type: string, pattern: '^[+-][0-9]{2}:[0-9]{2}$' }
+    TimeZone: { type: string, minLength: 1, maxLength: 64, description: "IANA time-zone name, validated against the application's tz database." }
+    Email: { type: string, format: email, minLength: 3, maxLength: 254 }
+    MaskedEmail: { type: string, maxLength: 254, description: 'For example "j***@e***.com".' }
+    RequestId: { type: string, format: uuid, description: Client-generated with crypto.randomUUID(). }
+    IssuedLinkUrl:
+      type: string
+      format: uri
+      pattern: '#t=[A-Za-z0-9_-]{43}$'
+      description: Full link URL on our origin with the raw token in the fragment (ADR-011). Shown once; never stored by the client.
+    TicketCode: { type: string, pattern: '^[0-9A-HJKMNP-TV-Z]{12}$' }
+    TransferStatement: { type: string, const: 'This ticket can be transferred, but it admits one person, once.' }
+    ConfirmedTrue: { type: boolean, const: true, description: 'Explicit confirmation step (FR-LNK-9, API-D4).' }
+    Reason: { type: string, minLength: 1, maxLength: 500 }
+    Cursor: { type: [string, 'null'], maxLength: 512 }
+
+    # ---------- enums
+    EventStatus: { type: string, enum: [SCHEDULED, CANCELLED] }
+    EventPhase: { type: string, enum: [registration_open, registration_closed, started, cancelled] }
+    RegistrationState: { type: string, enum: [PENDING_VERIFICATION, CONFIRMED, WAITLISTED, CANCELLED, EXPIRED] }
+    CheckInOutcome: { type: string, enum: [CHECKED_IN, ALREADY_CHECKED_IN, INVALID_CODE, WRONG_EVENT, TICKET_CANCELLED, EVENT_CANCELLED, OUTSIDE_CHECK_IN_WINDOW] }
+    MessageType:
+      type: string
+      enum: [verification, existing_access, ticket_resend, management_link_replaced, staff_invitation, sign_in, email_change_confirmation, ticket_confirmation, promotion, event_change, event_cancellation, registration_cancelled, waitlist_removed, email_change_notice, waitlist_confirmation, reminder, waitlist_closed]
+    SendState: { type: string, enum: [ACCEPTED, FAILED, UNCONFIRMED, DROPPED] }
+    DeliveryLabel:
+      type: string
+      description: Owner-facing labels (NFR-REL-11). "accepted_not_confirmed" is never shown as delivered.
+      enum: [accepted_not_confirmed, delivered, delivered_later_bounced, bounced, failed, delivery_outcome_unknown, delivery_outcome_unknown_superseded, delayed_by_provider, recorded_not_sent_provider_reported]
+    ProviderOutcome: { type: string, enum: [delivered, delivered_later_bounced, bounced, failed, suppressed, complained] }
+    DeletionBlocker: { type: string, enum: [event_cancelled, has_confirmed_registrations, has_waitlisted_registrations, notifications_pending] }
+    ProblemCode:
+      type: string
+      enum: [bad_request, validation_failed, unauthenticated, reauthentication_required, csrf_failed, origin_check_failed, forbidden, not_found, registration_closed, event_not_scheduled, event_started, capacity_below_confirmed, schedule_version_mismatch, nonexistent_local_time, ambiguous_local_time, start_not_in_future, cancelled_event_not_deletable, deletion_blocked, notifications_pending, preview_invalid, request_id_reused, cancellation_closed, ticket_checked_in, not_confirmed, request_already_processed, rotation_not_available, rotation_not_applied, not_waitlisted, check_in_already_undone, request_id_conflict, check_in_window_ended, invitation_not_pending, email_change_not_possible, rate_limited, resend_limit, rotation_limit, check_in_failures, invalid_signature, internal_error, service_unavailable]
+
+    # ---------- errors
+    FieldError:
+      type: object
+      additionalProperties: false
+      required: [field, code]
+      properties:
+        field: { type: string, maxLength: 100 }
+        code: { type: string, maxLength: 64 }
+    Problem:
+      type: object
+      description: RFC 9457 Problem Details with a stable code (ADR-017). Never contains stack traces, SQL, constraint names, tokens, hashes or other people's data.
+      additionalProperties: false
+      required: [type, title, status, code]
+      properties:
+        type: { type: string, format: uri-reference }
+        title: { type: string, maxLength: 200 }
+        status: { type: integer, minimum: 400, maximum: 599 }
+        code: { $ref: '#/components/schemas/ProblemCode' }
+        detail: { type: string, maxLength: 500 }
+        correlationId: { type: string, maxLength: 64 }
+        errors: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/FieldError' } }
+        minimumCapacity: { type: integer, minimum: 1 }
+        reasons: { type: array, items: { $ref: '#/components/schemas/DeletionBlocker' } }
+        offsets: { type: array, maxItems: 2, items: { $ref: '#/components/schemas/UtcOffset' } }
+        currentScheduleVersion: { type: integer, minimum: 1 }
+        firstCheckedInAt: { $ref: '#/components/schemas/Instant' }
+    SafeServerProblem:
+      type: object
+      description: The only body allowed for 500 and 503 on link routes (API-D1).
+      additionalProperties: false
+      required: [type, title, status, code, correlationId]
+      properties:
+        type: { type: string, const: 'about:blank' }
+        title: { type: string, enum: [Internal error, Service unavailable] }
+        status: { type: integer, enum: [500, 503] }
+        code: { type: string, enum: [internal_error, service_unavailable] }
+        correlationId: { type: string, maxLength: 64 }
+    GenericInvalidLink:
+      type: object
+      description: Exact fixed body (FR-LNK-7, BR-30). Serialized with this property order and no whitespace.
+      additionalProperties: false
+      required: [code, message, hint]
+      properties:
+        code: { type: string, const: invalid_link }
+        message: { type: string, const: 'This link is not valid or has expired.' }
+        hint: { type: string, const: 'If you were trying to register, please start again from the event page.' }
+
+    # ---------- shared views
+    EventSummaryPublic:
+      type: object
+      additionalProperties: false
+      required: [title, startsAt, timeZone]
+      properties:
+        title: { type: string, maxLength: 200 }
+        startsAt: { $ref: '#/components/schemas/Instant' }
+        timeZone: { $ref: '#/components/schemas/TimeZone' }
+    PublicEvent:
+      type: object
+      additionalProperties: false
+      required: [title, description, startsAt, timeZone, phase]
+      properties:
+        title: { type: string, maxLength: 200 }
+        description: { type: [string, 'null'], maxLength: 5000 }
+        startsAt: { $ref: '#/components/schemas/Instant' }
+        timeZone: { $ref: '#/components/schemas/TimeZone' }
+        phase: { $ref: '#/components/schemas/EventPhase' }
+    CheckYourEmail:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { type: string, const: check_your_email }
+    Redirect:
+      type: object
+      additionalProperties: false
+      required: [redirect]
+      properties:
+        redirect: { type: string, enum: [/organizer/, /staff/] }
+    ConfirmedAction:
+      type: object
+      additionalProperties: false
+      required: [confirmed]
+      properties:
+        confirmed: { $ref: '#/components/schemas/ConfirmedTrue' }
+
+    # ---------- public registration
+    RegistrationSubmission:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email: { $ref: '#/components/schemas/Email' }
+
+    # ---------- verification
+    VerificationView:
+      type: object
+      additionalProperties: false
+      required: [state, event]
+      properties:
+        state: { type: string, enum: [awaiting_confirmation, already_confirmed] }
+        event: { $ref: '#/components/schemas/EventSummaryPublic' }
+    VerificationResult:
+      oneOf:
+        - $ref: '#/components/schemas/VerificationConfirmed'
+        - $ref: '#/components/schemas/VerificationWaitlisted'
+        - $ref: '#/components/schemas/VerificationAlreadyConfirmed'
+      discriminator:
+        propertyName: result
+        mapping:
+          confirmed: '#/components/schemas/VerificationConfirmed'
+          waitlisted: '#/components/schemas/VerificationWaitlisted'
+          already_confirmed: '#/components/schemas/VerificationAlreadyConfirmed'
+    VerificationConfirmed:
+      type: object
+      additionalProperties: false
+      required: [result, event, ticket, links, transferStatement]
+      properties:
+        result: { type: string, const: confirmed }
+        event: { $ref: '#/components/schemas/EventSummaryPublic' }
+        ticket: { $ref: '#/components/schemas/TicketView' }
+        links:
+          type: object
+          additionalProperties: false
+          required: [management, share]
+          properties:
+            management: { $ref: '#/components/schemas/IssuedLinkUrl' }
+            share: { $ref: '#/components/schemas/IssuedLinkUrl' }
+        transferStatement: { $ref: '#/components/schemas/TransferStatement' }
+    VerificationWaitlisted:
+      type: object
+      additionalProperties: false
+      required: [result, event, position, positionMayChange, links]
+      properties:
+        result: { type: string, const: waitlisted }
+        event: { $ref: '#/components/schemas/EventSummaryPublic' }
+        position: { type: integer, minimum: 1 }
+        positionMayChange: { type: boolean, const: true }
+        links:
+          type: object
+          additionalProperties: false
+          required: [management]
+          properties:
+            management: { $ref: '#/components/schemas/IssuedLinkUrl' }
+    VerificationAlreadyConfirmed:
+      type: object
+      additionalProperties: false
+      required: [result]
+      properties:
+        result: { type: string, const: already_confirmed }
+    TicketView:
+      type: object
+      additionalProperties: false
+      required: [code]
+      properties:
+        code: { $ref: '#/components/schemas/TicketCode' }
+
+    # ---------- management
+    ManagementView:
+      type: object
+      additionalProperties: false
+      required: [state, event, actions]
+      properties:
+        state: { type: string, enum: [CONFIRMED, WAITLISTED] }
+        event: { $ref: '#/components/schemas/EventSummaryPublic' }
+        ticket: { $ref: '#/components/schemas/TicketView' }
+        checkedIn: { type: boolean, description: Present for CONFIRMED. }
+        position: { type: integer, minimum: 1, description: Present for WAITLISTED; computed at request time. }
+        transferStatement: { $ref: '#/components/schemas/TransferStatement' }
+        actions:
+          type: object
+          additionalProperties: false
+          required: [cancel, resend, issueShareLink, rotateManagement, rotateShare]
+          properties:
+            cancel: { type: boolean }
+            resend: { type: boolean }
+            issueShareLink: { type: boolean }
+            rotateManagement: { type: boolean }
+            rotateShare: { type: boolean }
+    RegistrationCancelled:
+      type: object
+      additionalProperties: false
+      required: [result, previousState]
+      properties:
+        result: { type: string, const: cancelled }
+        previousState: { type: string, enum: [CONFIRMED, WAITLISTED] }
+    ResendRequest:
+      type: object
+      additionalProperties: false
+      required: [requestId]
+      properties:
+        requestId: { $ref: '#/components/schemas/RequestId' }
+    ResendQueued:
+      type: object
+      additionalProperties: false
+      required: [result]
+      properties:
+        result: { type: string, const: queued }
+    ShareLinkIssued:
+      type: object
+      additionalProperties: false
+      required: [shareLink]
+      properties:
+        shareLink: { $ref: '#/components/schemas/IssuedLinkUrl' }
+    RotationRequest:
+      type: object
+      additionalProperties: false
+      required: [linkType, requestId, confirmed]
+      properties:
+        linkType: { type: string, enum: [management, share] }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+        confirmed: { $ref: '#/components/schemas/ConfirmedTrue' }
+    RotationResult:
+      oneOf:
+        - $ref: '#/components/schemas/RotationRotated'
+        - $ref: '#/components/schemas/RotationAlreadyReplaced'
+      discriminator:
+        propertyName: result
+        mapping:
+          rotated: '#/components/schemas/RotationRotated'
+          already_replaced: '#/components/schemas/RotationAlreadyReplaced'
+    RotationRotated:
+      type: object
+      additionalProperties: false
+      required: [result, linkType, newLink, replacementEmailQueued]
+      properties:
+        result: { type: string, const: rotated }
+        linkType: { type: string, enum: [management, share] }
+        newLink: { $ref: '#/components/schemas/IssuedLinkUrl' }
+        replacementEmailQueued: { type: boolean, description: True for management rotations (FR-ROT-5). }
+    RotationAlreadyReplaced:
+      type: object
+      additionalProperties: false
+      required: [result]
+      properties:
+        result: { type: string, const: already_replaced }
+
+    # ---------- share view
+    ShareView:
+      oneOf:
+        - $ref: '#/components/schemas/ShareViewValid'
+        - $ref: '#/components/schemas/ShareViewCheckedIn'
+        - $ref: '#/components/schemas/ShareViewNotAvailable'
+      discriminator:
+        propertyName: state
+        mapping:
+          valid: '#/components/schemas/ShareViewValid'
+          checked_in: '#/components/schemas/ShareViewCheckedIn'
+          not_available: '#/components/schemas/ShareViewNotAvailable'
+    ShareViewValid:
+      type: object
+      additionalProperties: false
+      required: [state, event, ticket, transferStatement]
+      properties:
+        state: { type: string, const: valid }
+        event: { $ref: '#/components/schemas/EventSummaryPublic' }
+        ticket: { $ref: '#/components/schemas/TicketView' }
+        transferStatement: { $ref: '#/components/schemas/TransferStatement' }
+    ShareViewCheckedIn:
+      type: object
+      additionalProperties: false
+      required: [state, event, transferStatement]
+      properties:
+        state: { type: string, const: checked_in }
+        event: { $ref: '#/components/schemas/EventSummaryPublic' }
+        transferStatement: { $ref: '#/components/schemas/TransferStatement' }
+    ShareViewNotAvailable:
+      type: object
+      additionalProperties: false
+      required: [state, event]
+      properties:
+        state: { type: string, const: not_available }
+        event: { $ref: '#/components/schemas/EventSummaryPublic' }
+
+    # ---------- staff invitation, sign-in, email change links
+    InvitationView:
+      type: object
+      additionalProperties: false
+      required: [event]
+      properties:
+        event: { $ref: '#/components/schemas/EventSummaryPublic' }
+    SignInLinkView:
+      type: object
+      additionalProperties: false
+      required: [maskedEmail, purpose, preSessionToken]
+      properties:
+        maskedEmail: { $ref: '#/components/schemas/MaskedEmail' }
+        purpose: { type: string, enum: [sign_in, reauth] }
+        preSessionToken:
+          type: string
+          pattern: '^v1\.[0-9]{1,5}\.[0-9]{10}\.[A-Za-z0-9_-]{43}$'
+          description: 'v1.<keyId>.<expiry epoch seconds>.<HMAC> bound to the pre-session cookie nonce and this sign-in request (ADR-010 §4). Sent back in X-CSRF-Token.'
+    EmailChangeLinkView:
+      type: object
+      additionalProperties: false
+      required: [maskedNewEmail]
+      properties:
+        maskedNewEmail: { $ref: '#/components/schemas/MaskedEmail' }
+    EmailChanged:
+      type: object
+      additionalProperties: false
+      required: [result]
+      properties:
+        result: { type: string, const: email_changed }
+
+    # ---------- auth and account
+    SignInRequestInput:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email: { $ref: '#/components/schemas/Email' }
+    OrganizerSession:
+      type: object
+      additionalProperties: false
+      required: [accountId, email, authenticatedAt, recentAuthUntil, csrfToken]
+      properties:
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        email: { $ref: '#/components/schemas/Email' }
+        authenticatedAt: { $ref: '#/components/schemas/Instant' }
+        recentAuthUntil: { $ref: '#/components/schemas/Instant' }
+        csrfToken: { $ref: '#/components/schemas/CsrfToken' }
+    CsrfToken:
+      type: string
+      pattern: '^v1\.[0-9]{1,5}\.[A-Za-z0-9_-]{43}$'
+      description: 'v1.<keyId>.<HMAC-SHA-256 of the session> (ADR-010 §3). Kept in page memory only.'
+    Account:
+      type: object
+      additionalProperties: false
+      required: [accountId, email]
+      properties:
+        accountId: { $ref: '#/components/schemas/Uuid' }
+        email: { $ref: '#/components/schemas/Email' }
+    EmailChangeRequestInput:
+      type: object
+      additionalProperties: false
+      required: [newEmail]
+      properties:
+        newEmail: { $ref: '#/components/schemas/Email' }
+
+    # ---------- events
+    EventCreateInput:
+      type: object
+      additionalProperties: false
+      required: [requestId, title, localStart, timeZone, capacity]
+      properties:
+        requestId: { $ref: '#/components/schemas/RequestId' }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: [string, 'null'], maxLength: 5000 }
+        localStart: { $ref: '#/components/schemas/LocalDateTime' }
+        timeZone: { $ref: '#/components/schemas/TimeZone' }
+        utcOffset: { $ref: '#/components/schemas/UtcOffset' }
+        capacity: { type: integer, minimum: 1, description: Upper bound under OQ-9. }
+    Event:
+      type: object
+      additionalProperties: false
+      required: [id, publicId, publicUrl, title, description, startsAt, timeZone, capacity, confirmedCount, status, phase, scheduleVersion, cutoffAt, checkInOpensAt, checkInClosesAt, createdAt, cancelledAt]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        publicId: { type: string, pattern: '^[A-Za-z0-9_-]{22,64}$' }
+        publicUrl: { type: string, format: uri }
+        title: { type: string, maxLength: 200 }
+        description: { type: [string, 'null'], maxLength: 5000 }
+        startsAt: { $ref: '#/components/schemas/Instant' }
+        timeZone: { $ref: '#/components/schemas/TimeZone' }
+        capacity: { type: integer, minimum: 1 }
+        confirmedCount: { type: integer, minimum: 0 }
+        status: { $ref: '#/components/schemas/EventStatus' }
+        phase: { $ref: '#/components/schemas/EventPhase' }
+        scheduleVersion: { type: integer, minimum: 1 }
+        cutoffAt: { $ref: '#/components/schemas/Instant' }
+        checkInOpensAt: { $ref: '#/components/schemas/Instant' }
+        checkInClosesAt: { $ref: '#/components/schemas/Instant' }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        cancelledAt: { oneOf: [{ $ref: '#/components/schemas/Instant' }, { type: 'null' }] }
+    EventCreated:
+      type: object
+      additionalProperties: false
+      required: [event, warnings]
+      properties:
+        event: { $ref: '#/components/schemas/Event' }
+        warnings:
+          type: array
+          items: { type: string, enum: [registration_closed_immediately] }
+    EventPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items: { type: array, maxItems: 200, items: { $ref: '#/components/schemas/Event' } }
+        nextCursor: { $ref: '#/components/schemas/Cursor' }
+    EventDetailsPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: [string, 'null'], maxLength: 5000 }
+    CapacityInput:
+      type: object
+      additionalProperties: false
+      required: [capacity]
+      properties:
+        capacity: { type: integer, minimum: 1 }
+    RescheduleInput:
+      type: object
+      additionalProperties: false
+      required: [localStart, expectedScheduleVersion]
+      description: The event's time zone is preserved (API-D5); there is no timeZone field.
+      properties:
+        localStart: { $ref: '#/components/schemas/LocalDateTime' }
+        utcOffset: { $ref: '#/components/schemas/UtcOffset' }
+        expectedScheduleVersion: { type: integer, minimum: 1 }
+    DeletionPreview:
+      type: object
+      additionalProperties: false
+      required: [eligible, blockers, requiredNoticeIssues, previewToken, previewExpiresAt]
+      properties:
+        eligible: { type: boolean }
+        blockers: { type: array, items: { $ref: '#/components/schemas/DeletionBlocker' } }
+        requiredNoticeIssues: { type: array, items: { $ref: '#/components/schemas/NoticeIssue' } }
+        previewToken: { $ref: '#/components/schemas/PreviewToken' }
+        previewExpiresAt: { $ref: '#/components/schemas/Instant' }
+    PreviewToken:
+      type: string
+      pattern: '^v1\.[0-9]{1,5}\.[0-9]{10}\.[A-Za-z0-9_-]{43}$'
+      description: 'v1.<keyId>.<expiry>.<HMAC over account, event, schedule version and the eligibility snapshot> (API_DESIGN §7.4).'
+    NoticeIssue:
+      type: object
+      additionalProperties: false
+      required: [registrationId, messageType, sendState, label]
+      properties:
+        registrationId: { $ref: '#/components/schemas/Uuid' }
+        messageType: { type: string, enum: [registration_cancelled, waitlist_removed] }
+        sendState: { $ref: '#/components/schemas/SendState' }
+        label: { $ref: '#/components/schemas/DeliveryLabel' }
+        reason: { type: string, maxLength: 300 }
+    DeleteEventInput:
+      type: object
+      additionalProperties: false
+      required: [confirmed, previewToken]
+      properties:
+        confirmed: { $ref: '#/components/schemas/ConfirmedTrue' }
+        previewToken: { $ref: '#/components/schemas/PreviewToken' }
+
+    # ---------- participants (owner only)
+    Dashboard:
+      type: object
+      additionalProperties: false
+      required: [phase, counts, emailIssueCount]
+      properties:
+        phase: { $ref: '#/components/schemas/EventPhase' }
+        counts:
+          type: object
+          additionalProperties: false
+          required: [confirmed, waitlisted, checkedIn]
+          properties:
+            confirmed: { type: integer, minimum: 0 }
+            waitlisted: { type: integer, minimum: 0 }
+            checkedIn: { type: integer, minimum: 0 }
+        emailIssueCount: { type: integer, minimum: 0 }
+    ParticipantPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items: { type: array, maxItems: 200, items: { $ref: '#/components/schemas/Participant' } }
+        nextCursor: { $ref: '#/components/schemas/Cursor' }
+    Participant:
+      type: object
+      additionalProperties: false
+      required: [registrationId, email, state, emailIssues]
+      properties:
+        registrationId: { $ref: '#/components/schemas/Uuid' }
+        email: { $ref: '#/components/schemas/Email' }
+        state: { $ref: '#/components/schemas/RegistrationState' }
+        position: { type: integer, minimum: 1 }
+        checkedInAt: { $ref: '#/components/schemas/Instant' }
+        checkInId: { $ref: '#/components/schemas/Uuid' }
+        emailIssues: { type: array, items: { $ref: '#/components/schemas/EmailIssue' } }
+    EmailIssue:
+      type: object
+      additionalProperties: false
+      required: [messageType, sendState, label, at, anomaly]
+      properties:
+        messageType: { $ref: '#/components/schemas/MessageType' }
+        sendState: { $ref: '#/components/schemas/SendState' }
+        label: { $ref: '#/components/schemas/DeliveryLabel' }
+        providerOutcome: { $ref: '#/components/schemas/ProviderOutcome' }
+        reason: { type: string, maxLength: 300 }
+        at: { $ref: '#/components/schemas/Instant' }
+        anomaly: { type: boolean, description: True when provider evidence contradicts a DROPPED or FAILED state (NFR-REL-13 g). }
+
+    # ---------- waitlist and check-in
+    WaitlistRemovalInput:
+      type: object
+      additionalProperties: false
+      required: [confirmed]
+      properties:
+        confirmed: { $ref: '#/components/schemas/ConfirmedTrue' }
+        reason: { $ref: '#/components/schemas/Reason' }
+    WaitlistRemoved:
+      type: object
+      additionalProperties: false
+      required: [result]
+      properties:
+        result: { type: string, const: removed }
+    UndoInput:
+      type: object
+      additionalProperties: false
+      properties:
+        reason: { $ref: '#/components/schemas/Reason' }
+    CheckInUndone:
+      type: object
+      additionalProperties: false
+      required: [result]
+      properties:
+        result: { type: string, const: undone }
+    CheckInInput:
+      type: object
+      additionalProperties: false
+      required: [code, requestId]
+      properties:
+        code: { type: string, minLength: 1, maxLength: 32, description: 'Normalized server-side (upper case, Crockford look-alikes) before lookup.' }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+    CheckInResult:
+      type: object
+      description: Outcome only - never participant identity, email or ticket lists (FR-CHK-4, FR-CHK-7).
+      additionalProperties: false
+      required: [outcome]
+      properties:
+        outcome: { $ref: '#/components/schemas/CheckInOutcome' }
+        firstCheckedInAt: { $ref: '#/components/schemas/Instant' }
+    CheckInCount:
+      type: object
+      additionalProperties: false
+      required: [checkedIn]
+      properties:
+        checkedIn: { type: integer, minimum: 0 }
+    AccessEnded:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, enum: [revoked, expired, event_cancelled, window_ended] }
+    StaffSession:
+      type: object
+      additionalProperties: false
+      required: [eventId, event, windowOpensAt, windowClosesAt, csrfToken]
+      properties:
+        eventId: { $ref: '#/components/schemas/Uuid' }
+        event: { $ref: '#/components/schemas/EventSummaryPublic' }
+        windowOpensAt: { $ref: '#/components/schemas/Instant' }
+        windowClosesAt: { $ref: '#/components/schemas/Instant' }
+        csrfToken: { $ref: '#/components/schemas/CsrfToken' }
+
+    # ---------- staff management (owner only)
+    StaffInvitationInput:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email: { $ref: '#/components/schemas/Email' }
+    StaffInvitation:
+      type: object
+      additionalProperties: false
+      required: [id, email, status, createdAt, expiresAt, canReinvite]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        email: { $ref: '#/components/schemas/Email' }
+        status: { type: string, enum: [pending, accepted, expired, revoked, replaced] }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        expiresAt: { $ref: '#/components/schemas/Instant' }
+        acceptedAt: { $ref: '#/components/schemas/Instant' }
+        canReinvite: { type: boolean }
+    StaffSessionSummary:
+      type: object
+      additionalProperties: false
+      required: [id, createdAt, lastSeenAt]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        createdAt: { $ref: '#/components/schemas/Instant' }
+        lastSeenAt: { $ref: '#/components/schemas/Instant' }
+    StaffOverview:
+      type: object
+      additionalProperties: false
+      required: [invitations, sessions]
+      properties:
+        invitations: { type: array, items: { $ref: '#/components/schemas/StaffInvitation' } }
+        sessions: { type: array, items: { $ref: '#/components/schemas/StaffSessionSummary' } }
+
+    # ---------- system
+    ProviderWebhookPayload:
+      type: object
+      description: Provider event as sent by Resend (opaque to the contract; validated after the signature check).
+      required: [type]
+      properties:
+        type: { type: string, maxLength: 64 }
+        created_at: { type: string }
+        data: { type: object }
+    Health:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, database]
+      properties:
+        schemaVersion: { type: integer, minimum: 1 }
+        database: { type: string, const: ok }
