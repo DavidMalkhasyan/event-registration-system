@@ -349,6 +349,58 @@ export async function cancelByManagementLink(
   return outcome;
 }
 
+// ---------------------------------------------------------------- capacity (FR-EVT-7, FR-EVT-8, BR-1, BR-5, BR-11)
+
+export const capacitySchema = z.object({ capacity: z.number().int().min(1).max(100_000) }).strict();
+
+/**
+ * TX-E03: sets an absolute capacity under the exclusive event lock, so it is serialized with
+ * verification, cancellation, promotion, reschedule and the cutoff task (AC-14). A decrease is
+ * never below the confirmed count (the error names the minimum). An increase writes the new
+ * capacity first, then promotes FIFO into the new seats before the cutoff, in the same
+ * transaction (AC-15, BR-5). Absolute values make retries idempotent: repeating a request
+ * changes nothing and promotes no one again.
+ */
+export async function setCapacity(
+  ctx: AppContext,
+  principal: OrganizerPrincipal,
+  eventId: string,
+  input: z.infer<typeof capacitySchema>,
+  correlationId: string,
+) {
+  if (!z.uuid().safeParse(eventId).success) throw new AppError(404, 'not_found');
+  const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
+    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
+    if (event.status !== 'SCHEDULED') return 'not_scheduled' as const;
+    if (input.capacity < event.confirmed_count) return { minimumCapacity: event.confirmed_count };
+    if (input.capacity === event.capacity) return 'unchanged' as const;
+
+    await trx
+      .updateTable('app.events')
+      .set({ capacity: input.capacity, updated_at: now })
+      .where('id', '=', eventId)
+      .execute();
+    // promoteFifo reads the new capacity and does nothing from the cutoff onward (BR-9).
+    const promoted =
+      input.capacity > event.capacity ? await promoteFifo(trx, eventId, now, correlationId) : [];
+    await recordAudit(trx, {
+      now,
+      action: 'capacity_change',
+      actorKind: 'owner',
+      actorAccountId: principal.accountId,
+      eventId,
+      outcome: 'success',
+      details: { from: event.capacity, to: input.capacity, promoted: promoted.length },
+    });
+    return 'changed' as const;
+  });
+  if (result === null || result === 'not_found') throw new AppError(404, 'not_found');
+  if (result === 'unauthenticated') throw new AppError(401, 'unauthenticated');
+  if (result === 'not_scheduled') throw new AppError(409, 'event_not_scheduled');
+  if (typeof result === 'object') throw new AppError(409, 'capacity_below_confirmed', result);
+}
+
 // ---------------------------------------------------------------- reschedule (FR-EVT-6, BR-12 to BR-15)
 
 export const rescheduleSchema = z

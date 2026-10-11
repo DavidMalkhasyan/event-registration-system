@@ -17,8 +17,10 @@ import {
 import {
   cancelByManagementLink,
   managementView,
+  capacitySchema,
   rescheduleEvent,
   rescheduleSchema,
+  setCapacity,
   shareView,
 } from './lifecycle.js';
 import { confirmVerification, resolveVerification, submitRegistration } from './registrations.js';
@@ -95,6 +97,14 @@ export function registerEventCoreRoutes(app: FastifyInstance, ctx: AppContext): 
     const principal = await requireOrganizer(ctx, request, { csrf: true });
     const eventId = params.parse(request.params).eventId;
     await rescheduleEvent(ctx, principal, eventId, rescheduleSchema.parse(request.body), request.id);
+    return getOwnedEvent(ctx, principal, eventId);
+  });
+
+  // setCapacity (API catalogue #34): absolute value; retries are idempotent.
+  app.put('/api/events/:eventId/capacity', async (request) => {
+    const principal = await requireOrganizer(ctx, request, { csrf: true });
+    const eventId = params.parse(request.params).eventId;
+    await setCapacity(ctx, principal, eventId, capacitySchema.parse(request.body), request.id);
     return getOwnedEvent(ctx, principal, eventId);
   });
 
