@@ -10,7 +10,7 @@
 | Operating system | Windows 10 Enterprise 10.0.19045 | Session environment |
 | Shells | Git Bash, Windows PowerShell 5.1 | Session environment |
 | Git | 2.55.0.windows.3 | `git --version` (S-01) |
-| GitHub CLI | 2.101.0. Installed but **not used**; no remote has been created. | `gh --version` (S-01) |
+| GitHub CLI | 2.101.0. Used in S-03, with the owner's existing login, to inspect the empty repository and read the CI runs and logs. The push used plain `git`. | `gh --version`, `gh auth status` (S-03) |
 | Python | 3.12.10, used only for documentation checks | `python --version` (S-01) |
 | Validation libraries | `openapi-spec-validator` 0.7.1, PyYAML 6.0.2, and their dependencies, installed from PyPI into a temporary folder **outside the repository** | Session S-01 and the API-design phase |
 | Container runtime | **None installed** (`docker` not found) | S-01 |
@@ -54,6 +54,7 @@ Significant prompts, summarized in order. The stakeholder's own instructions are
 | 6 | Finalize R60, initialize Git, set up Kanban and milestones, AI transparency. "Do not fabricate historical timestamps, Git commits, test results or AI tool usage." | Session S-01: commits `da80a85`, `3fe9cb7` and the process documents |
 | 7 | "We are starting implementation NOW": 5 days; approved stack (Node 24, pnpm, TypeScript, Fastify, React and Vite, PostgreSQL 18, Kysely, Vitest, GitHub Actions); vertical slices with real PostgreSQL and tests; autonomy for routine decisions. "Do not attempt to generate the entire application in one unverified batch." | S-02: toolchain, migrations, server, integration tests |
 | 8 | "FINAL DELIVERY STRATEGY": the P0 list of 15 mandatory features plus general requirements; P1 and P2 only afterwards; ASSIGNMENT_SCOPE.md traceability; quality gates after each feature; "Do not fabricate progress or test outcomes", "Do not present deferred features as implemented", "Do not claim integration tests passed if PostgreSQL was unavailable". | S-02: client, quality gates, CI, E2E, README, ASSIGNMENT_SCOPE.md |
+| 9 | "Final submission validation": publish to the given repository, inspect the real CI results, verify from a clean clone by following the README exactly, re-check the assignment evidence. "Do not report CI as passing until the actual remote workflow passes." No new features; no history rewriting. | S-03: push, two green CI runs, clean-clone verification, two README fixes |
 
 **Context management:** Claude Code summarized earlier parts of the long session automatically to stay within the context window. Decisions taken before a summary were re-read from the documents and the transcript whenever exact wording mattered.
 
@@ -76,6 +77,7 @@ Caught during implementation (S-02), all by tests, typecheck or runtime checks b
 - **Wrong mailbox path:** the worker wrote email under `apps/server/var/` because relative paths were resolved from the package directory.
 - **Double sign-in effect:** React StrictMode's doubled effects resolved a sign-in link twice (PD-19).
 - **Over-strict lint rule:** the first ESLint layering rule wrongly forbade the composition layer from importing modules.
+- **Verification-script bug (S-03):** the clean-clone walkthrough script picked an already-used sign-in email. It failed loudly; the script was fixed, and the application was unchanged.
 - **Overstated decision-log entry:** a first draft claimed ADR-003, 016, 019 and 020 were "implemented in their recommended form". Checking the ADR index showed ADR-016 names no library and ADR-019 specifies Testcontainers, so the entry was corrected before commit.
 
 ## 6. Data handling

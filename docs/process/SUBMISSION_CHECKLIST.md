@@ -11,14 +11,14 @@ Nothing is marked Done without evidence.
 
 | # | Requirement | Status | Evidence or next step |
 |---|---|---|---|
-| 1 | GitHub repository containing the **working** project | **In progress** | The project works locally: 23 integration, 3 unit and 4 E2E tests pass, and a smoke test passed (journal S-02). No remote yet (K-005, blocked on PD-Q5). |
-| 2 | Exact AI model and development tools, with a short rationale | **In progress** | [AI_USAGE.md](AI_USAGE.md) §1–2, updated for S-02; finalize at submission |
-| 3 | Important prompts, decision logs, or a safely handled session export | **In progress** | [AI_USAGE.md](AI_USAGE.md) §4 (prompts 1–8); [DECISION_LOG.md](DECISION_LOG.md) (PD-1 to PD-21). The transcript is not exported (PD-7). |
-| 4 | Real incremental progress shown by Git commits and timestamped records | **In progress** | Commits `da80a85` to `b7a164f` and onward; journal S-01 and S-02 |
-| 5 | Clear setup and deployment instructions | **In progress** | [README.md](../../README.md) §1–4. Not yet followed from a clean clone; no deployment target (P2). |
-| 6 | Accurate description of the current state | **In progress** | [ASSIGNMENT_SCOPE.md](../../ASSIGNMENT_SCOPE.md); README §8 |
-| 7 | Incomplete work and recommended next improvements | **In progress** | README §8–9; ASSIGNMENT_SCOPE §3–4 |
-| 8 | Attribution for reused templates, generators or third-party solutions | **In progress** | [AI_USAGE.md](AI_USAGE.md) §7 (packages added in S-02; no templates or generators used) |
+| 1 | GitHub repository containing the **working** project | **Done** | https://github.com/DavidMalkhasyan/event-registration-system. CI passed on GitHub (runs 38141682841, 38142263115); clean-clone verification passed (journal S-03). |
+| 2 | Exact AI model and development tools, with a short rationale | **Done** | [AI_USAGE.md](AI_USAGE.md) §1–2 |
+| 3 | Important prompts, decision logs, or a safely handled session export | **Done** | [AI_USAGE.md](AI_USAGE.md) §4 (prompts 1–9); [DECISION_LOG.md](DECISION_LOG.md) (PD-1 to PD-24). The transcript is not exported (PD-7). |
+| 4 | Real incremental progress shown by Git commits and timestamped records | **Done** | Unrewritten history from `da80a85`; journal sessions S-01 to S-03, with times from Git and the session transcript |
+| 5 | Clear setup and deployment instructions | **Done** | [README.md](../../README.md) §1–5, verified from a clean clone (S-03). Production deployment is out of scope (P2); a production-like single-origin run is documented and verified. |
+| 6 | Accurate description of the current state | **Done** | [ASSIGNMENT_SCOPE.md](../../ASSIGNMENT_SCOPE.md); README §8 |
+| 7 | Incomplete work and recommended next improvements | **Done** | README §8–9; ASSIGNMENT_SCOPE §3–4 |
+| 8 | Attribution for reused templates, generators or third-party solutions | **Done** | [AI_USAGE.md](AI_USAGE.md) §7 |
 
 ## 2. Before every push
 
@@ -28,21 +28,20 @@ Nothing is marked Done without evidence.
 4. **Personal data:** only example addresses in documents and fixtures.
 5. **`git status`** is clean, and the journal entry for the session is committed.
 
-## 3. Setting up the GitHub remote (owner action; not done yet)
+## 3. GitHub remote (done in S-03)
 
-1. The owner creates an **empty** repository on GitHub, with no README, licence or `.gitignore`, to avoid an unrelated history. The name and visibility are decision PD-Q5.
-2. Run the §2 checks.
-3. `git remote add origin https://github.com/<owner>/<repository>.git`
-4. `git push -u origin main`
-5. Record the URL, the date and time, and the pushed commit hash in the journal. Mark K-005 Done only after the push is verified on GitHub.
-
-No repository URL exists yet, and none is assumed anywhere in the documentation.
+1. The owner created the empty, public repository `DavidMalkhasyan/event-registration-system`.
+2. The §2 checks were run over the **whole history**: clean.
+3. `git remote add origin https://github.com/DavidMalkhasyan/event-registration-system.git`
+4. `git push -u origin main` at 17:03:42 +04:00. The remote `main` was verified as `c45ecaf`.
+5. Recorded in journal S-03.
 
 ## 4. Final submission (M6)
 
-- [ ] Every row in §1 is **Done**, with evidence.
-- [ ] CI is green on the submitted commit; AC-142 passes from a clean clone.
-- [ ] The README contains setup, run, deployment guidance, current state, known limitations and incomplete work.
-- [ ] The journal covers every development session, with real timestamps and commit hashes.
-- [ ] AI usage and attribution are final.
-- [ ] The final secret scan is clean; the release is tagged.
+- [x] Every row in §1 is **Done**, with evidence.
+- [x] CI is green on the submitted commit, and the setup passes from a clean clone (S-03). Recheck the final commit's run before submitting.
+- [x] The README contains setup, run, a production-like run, current state, known limitations and incomplete work.
+- [x] The journal covers every development session, with real timestamps and commit hashes.
+- [x] AI usage and attribution are final.
+- [x] The final secret scan is clean (full history, S-03).
+- [ ] Release tag: optional; the owner decides.

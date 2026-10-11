@@ -15,13 +15,13 @@
 
 | Milestone | Base estimate | Depends on | Status |
 |---|---:|---|---|
-| M0 Documentation alignment, Git initialization, process tracking | 6 h | — | **In progress**: local work done; review and GitHub remote outstanding |
+| M0 Documentation alignment, Git initialization, process tracking | 6 h | — | **Done** except the stakeholder review of K-001 and K-004; published in S-03 |
 | M1 Project foundation and CI | 16 h | M0; decisions PD-Q2 to PD-Q5 | **Mostly done** (S-02); CI awaits its first GitHub run |
 | M2 PostgreSQL migrations and database tests | 28 h | M1; container runtime; Proposed ADR-018 | **Done with reduced scope** (S-02): 2 migrations, 16 tables, local PostgreSQL instead of Testcontainers |
 | M3 Core backend functionality | 56 h | M2; Proposed ADR-003, ADR-016 | **P0 parts done** (S-02); edit, cancel and delete event and check-in undo are deferred |
 | M4 Remaining backend functionality and integrations | 48 h | M3; Proposed ADR-005 to ADR-009, ADR-014, ADR-015 | **P0 parts done** (reminders, live count, fake provider); the rest is P1/P2 |
 | M5 Frontend and end-to-end integration | 44 h | M3, M4 (APIs); OQ-8 for user-facing text | **P0 parts done** (S-02); 4 E2E tests |
-| M6 Testing, documentation and final submission | 20 h | M1 to M5 | **In progress**: README and ASSIGNMENT_SCOPE written; remote and submission outstanding |
+| M6 Testing, documentation and final submission | 20 h | M1 to M5 | **Done** (S-03): published, CI green, clean-clone verified; submission is the owner's action |
 | **Base total** | **218 h** | | |
 | **Contingency (25% of base)** | **55 h** | Not assigned to any milestone; drawn down only through a journal entry that names the cause | Unused |
 | **Planned total** | **273 h** | | |

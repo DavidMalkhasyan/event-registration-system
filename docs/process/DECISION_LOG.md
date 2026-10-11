@@ -54,6 +54,9 @@ The design documents first entered version control in commit `da80a85`, on 2026-
 | PD-19 | 2026-10-11 16:22:06 | The public link pages render without React StrictMode | Agent | StrictMode's doubled effects resolved a sign-in link twice and set two different pre-session cookies |
 | PD-20 | 2026-10-11 16:33 | E2E tests run against real processes (built client served by the web process, separate worker) on the test database. Locally they use the installed Edge (`PW_CHANNEL=msedge`); CI installs Chromium. | Agent | Tests what is shipped; avoids a browser download on the development machine |
 | PD-21 | 2026-10-11 16:15:58 | Work written from 14:04 to 16:15 was committed as three logical commits in one command, so they share the timestamp 16:15:59. They were not split further or backdated. | Agent | PD-3 forbids artificial splitting and backdating; the journal records when the work was actually done |
+| PD-22 | 2026-10-11 17:03 (S-03) | Publish the unchanged history to the **public** repository `DavidMalkhasyan/event-registration-system`, chosen by the owner. The author email stays as committed (PD-4), and no history is rewritten. | Stakeholder (repository, instruction); agent (checks) | Genuine history is required; the email is the owner's own address and was noted in PD-4 |
+| PD-23 | 2026-10-11 17:06 (S-03) | Clean-clone verification on the development machine, in a new directory, with a **new** PostgreSQL cluster on the README's default port, sharing nothing with the original working directory except the installed Node.js and PostgreSQL binaries and pnpm's package cache | Agent | No second machine is available; this still exercises every README step from a fresh checkout |
+| PD-24 | 2026-10-11 17:14 (S-03) | Leave the GitHub Actions versions (v4) unchanged during verification despite the Node.js 20 deprecation warning; recorded as a known limitation | Agent | The warning isn't a failure. Changing CI during final verification adds risk without changing results. |
 
 ## 4. Open decisions
 
@@ -65,7 +68,7 @@ Updated in S-02. Resolved items keep their row, with the resolving decision.
 | PD-Q2 | Node.js version | **Resolved:** PD-10 |
 | PD-Q3 | Package manager | **Resolved:** PD-10 |
 | PD-Q4 | CI platform | **Resolved:** PD-14. Scanning tools are still open (K-105). |
-| PD-Q5 | GitHub repository name, account, visibility and licence | **Open.** The owner decides; this blocks K-005. |
+| PD-Q5 | GitHub repository name, account, visibility and licence | **Resolved** (S-03): the owner provided `DavidMalkhasyan/event-registration-system`, public (PD-22). No licence file has been added; that is the owner's decision. |
 | PD-Q6 | Container runtime for Testcontainers | **Resolved:** PD-12 (no container runtime; local PostgreSQL) |
 | ADR-018 | Migration tool | Implemented as recommended (PD-13); the ADR text was not edited |
 | ADR-003, 016, 019, 020 | Typed transactions, time handling, test architecture, configuration | Still **Proposed**; the ADR documents were not edited. What was built: ADR-003, lock helpers with retries but no test-mode lock recorder. ADR-016, Luxon with an injected test clock offset. ADR-019, Vitest, Playwright and the fake provider, with local PostgreSQL instead of Testcontainers (PD-12). ADR-020, zod fail-fast configuration. |

@@ -167,3 +167,52 @@
 1. The owner creates the GitHub repository; then run the secret scan, push, and confirm the first CI run (K-005, K-103).
 2. Follow the README from a clean clone.
 3. Highest-priority remaining work: the P1 cutoff job, then event cancellation and capacity changes.
+
+---
+
+## S-03: Publishing, first CI runs, clean-clone verification
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-11 17:03:05 +04:00 (first command after the stakeholder's submission-validation prompt) |
+| **End** | 2026-10-11, at the closing documentation commit listed below. The activity table ends at 17:14:42. |
+| **Cards** | K-005, K-103, K-601, K-603 |
+| **Tools and model** | Claude Code 2.1.296, model `claude-opus-5-5`; Git 2.55.0; GitHub CLI 2.101.0 (authenticated as the repository owner); the S-02 toolchain |
+| **Significant prompt** | "Final submission validation": publish to the given repository, inspect the real CI results, verify from a clean clone by following the README exactly, re-check the assignment evidence, no new features, no history rewriting. |
+
+**Activity:**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 17:03:05 | Checked Git status, history and author identity | Clean tree; 14 commits on `main`. Author and committer on every commit: `David Malkhasyan <Malkhasyandavid2@gmail.com>`, the owner's address, which becomes public with the push (PD-4). |
+| 17:03 | Secret scan of the **whole history** (every commit, not only HEAD) | The only sensitive-looking file ever tracked is `.env.example`. No private-key, cloud, provider or GitHub token patterns. None of the local `.env` secrets, database passwords or the PostgreSQL superuser password appear in any commit. No local paths or host names. |
+| 17:03 | Checked the remote | `DavidMalkhasyan/event-registration-system`: **public**, empty |
+| 17:03:34–17:03:42 | `git remote add origin …`; `git push -u origin main` | `origin/main` = `c45ecaf`; history pushed unchanged |
+| 17:03:48 | First GitHub Actions run, [38141682841](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38141682841) | **Passed** in 1 min 37 s. Migrations applied to a PostgreSQL 18.6 service; server 23/23, client 3/3, E2E 4/4 (Chromium); format, lint, typecheck and build passed. Annotations (warnings, not failures): the v4 actions target the deprecated Node.js 20 runtime; the `ubuntu-latest` label moves to Ubuntu 26 on 2026-10-19. |
+| 17:06:15 | Stopped the S-02 dev servers so the README's default ports were free | Ports 3000, 5173, 5432 and 3100 free |
+| 17:06:20 | `git clone` of the published repository into a new, empty directory | Commit `c45ecaf`; no `.env`, `node_modules` or `var/` |
+| 17:06:28 | README §2: `corepack enable`; `pnpm install` | Exit 0 in 3.3 s (pnpm's global package store was already populated; nothing came from the original working directory) |
+| 17:06:43–17:06:50 | README §2.1, portable binaries: `initdb` with the README's flags on a **new** data directory; `pg_ctl … start` (default port 5432); provisioning script | PostgreSQL 18.6; roles `app_owner` and `app_runtime`; databases `ers_dev` and `ers_test`. **Gap found:** `psql` asks for the superuser password, which the README didn't say. |
+| 17:07:01 | README §2.2–2.3: `cp .env.example .env`, placeholders replaced (secrets from the README's `node -e` command); `pnpm migrate` twice | "2 migration(s) applied", then "schema is up to date" |
+| 17:07:12 | README §3: `pnpm dev:web`, `pnpm dev:worker`, `pnpm dev:client` | `/healthz` through Vite: schema version 2; organizer page and `/dev/mailbox` return 200 |
+| 17:08:01 | README §4 walkthrough in a browser (Edge, scripted, kept outside the repository), links taken from `/dev/mailbox` | Steps 1–7 passed. Step 8 failed because of **a bug in the verification script**: it took the already-used first sign-in email before the second had arrived. The script was fixed, not the application. |
+| 17:09:00–17:09:12 | README §4 walkthrough, full rerun | **All 8 steps passed:** sign-in; event created; Anna confirmed with ticket and QR code, and the email contains the code; Ben waitlisted at position 1; the duplicate in upper case got an access email with the counts unchanged (1/1); cancellation promoted Ben, whose email contains his ticket code (counts 1/0); reschedule sent "Date changed"; a second device checked Ben in, the dashboard's live count went 0 → 1 without a reload, and a second scan showed "Already checked in". |
+| 17:09:22–17:10:27 | README §5 in the clone: `pnpm test`, `lint`, `typecheck`, `format:check`, `build`, `PW_CHANNEL=msedge pnpm e2e` | All exit 0: 23/23, 3/3, 4/4. 20 emails in the clone's own `var/mailbox`. `git status` clean. |
+| 17:10:52 | README §3 production-like run: `pnpm start:web` with `CLIENT_DIST_DIR` and `PUBLIC_ORIGIN=http://localhost:3000`, plus `pnpm start:worker` | Health, organizer page and asset all 200; a sign-in request (202) was delivered by the compiled worker. **Gap found:** the emailed link pointed to `localhost:5173`, because the README's worker command lacked `PUBLIC_ORIGIN`. |
+| 17:11 | Restarted the worker with `PUBLIC_ORIGIN=http://localhost:3000` | Link origin :3000; the sign-in page loads (200); the link resolves (200) |
+| 17:11:37 | Stopped the clone's processes and the verification cluster | No node processes left; ports free |
+| 17:12:33 | README fixes committed and pushed | `67346ac` |
+| 17:12:43 | Second GitHub Actions run, [38142263115](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38142263115) | **Passed** in 1 min 36 s: 23/23, 3/3, 4/4 |
+| 17:13–17:14 | Checked ASSIGNMENT_SCOPE.md against the P0 list | Each of the 15 P0 rows cites tests that exist; all 20 cited test names were found in the test files. Statuses updated with CI and clean-clone evidence. Camera scanning is optional and stays "Implemented but unverified". |
+
+**Not changed:** application code, tests, REQUIREMENTS.md and scope. Only the README and the process documents changed.
+
+**Commits in S-03:**
+
+| Hash | Time (+04:00) | Message |
+|---|---|---|
+| `c45ecaf` | 16:47:46 | docs: README, assignment scope and S-02 process records. S-02's closing commit, recorded here as promised. |
+| `67346ac` | 17:12:33 | docs(readme): fix setup gaps found by the clean-clone verification |
+| *(closing commit)* | after 17:14:42 | docs: record S-03 publishing, CI and clean-clone verification |
+
+**Next steps:** submit the repository URL. Optional before submission: update the GitHub Actions versions to clear the Node.js 20 deprecation warning. P1 work only if time remains.

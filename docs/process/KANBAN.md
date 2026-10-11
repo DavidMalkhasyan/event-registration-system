@@ -4,7 +4,7 @@
 |---|---|
 | **Columns** | Backlog → To Do → In Progress → Review → Done, plus **Deferred** for extended scope that was intentionally not built |
 | **Work-in-progress limits** | In Progress ≤ 2, Review ≤ 3 |
-| **Last updated** | 2026-10-11, session S-02 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
+| **Last updated** | 2026-10-11, session S-03 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
 | **Scope** | Re-planned in S-02 by the final delivery strategy (PD-15): P0 is mandatory, then P1, with P2 deferred. Requirement-level status is in [ASSIGNMENT_SCOPE.md](../../ASSIGNMENT_SCOPE.md). |
 
 ## Rules
@@ -36,6 +36,9 @@
 | K-501 Client workspace, **reduced scope** | M5 | `cc5bcbc`: two HTML entries (public and organizer; no staff entry), fragment bootstrap with 3 unit tests, security headers |
 | K-502 Public and link pages | M5 | `cc5bcbc`; E2E `participant-flow` (`b7a164f`) |
 | K-503 Organizer area, **reduced scope** | M5 | `cc5bcbc`: sign-in, events, creation, dashboard, reschedule. E2E `b7a164f`. |
+| K-005 Create the GitHub repository; add the remote; push `main` after a final secret scan | M0 | S-03: full-history scan clean; pushed 17:03:42 to https://github.com/DavidMalkhasyan/event-registration-system (`c45ecaf`) |
+| K-103 CI pipeline | M1 | S-03: GitHub Actions runs [38141682841](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38141682841) and [38142263115](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38142263115) passed. The AC-140 deliberate-failure check was not done; an equivalent mutation check exists for the E2E live-count test (S-02). |
+| K-601 README | M6 | S-03: followed from a clean clone with a new PostgreSQL cluster; two gaps found and fixed (`67346ac`) |
 | K-505 Playwright suites, **reduced scope** | M5 | `b7a164f`: 4 tests, including two simultaneous clients. 4/4 passed in 3 runs; a mutation check proved the live-count test fails when the feature breaks. |
 
 ## Review
@@ -44,21 +47,18 @@
 |---|---|---|
 | K-001 Apply R60; synchronize the documents | M0 | Stakeholder check (commit `3fe9cb7`) |
 | K-004 Process documentation | M0 | Stakeholder review |
-| K-103 CI pipeline | M1 | First run on GitHub; it can't run before the remote exists (K-005). Workflow commits `d6fec3a` and `b7a164f`; the same scripts pass locally. The AC-140 deliberate-failure check is not done. |
-| K-601 README | M6 | Following the setup from a clean clone on another machine |
 
 ## In Progress
 
 | Card | Milestone | State |
 |---|---|---|
-| K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Updated in S-02; to be finalized at submission |
+| K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Updated in S-03 |
 
 ## To Do
 
 | Card | Milestone | Notes |
 |---|---|---|
-| K-005 Create the GitHub repository; add the remote; push `main` after a final secret scan | M0 | **BLOCKED**: needs the owner's account, repository name and visibility (PD-Q5). Steps in [SUBMISSION_CHECKLIST.md](SUBMISSION_CHECKLIST.md) §3. |
-| K-604 Final secret scan; release tag; submission | M6 | After K-005 |
+| K-604 Release tag and submission | M6 | The secret scan was done in S-03. Tagging and submitting are the owner's actions. |
 | K-404b Registration cutoff job: expire pending registrations; "waiting list closed" email | M4 | Highest-priority P1 item. Reminder fan-out (K-404a) is done. |
 
 ## Partly done (remaining parts are in Backlog or Deferred)
