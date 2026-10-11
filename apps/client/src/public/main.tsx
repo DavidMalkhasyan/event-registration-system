@@ -634,6 +634,50 @@ function SignInPage() {
   );
 }
 
+// ---------------------------------------------------------------- staff invitation (FR-STAFF-1)
+function InvitePage() {
+  const token = linkToken();
+  const [view, setView] = useState<{ event: EventSummary }>();
+  const [invalid, setInvalid] = useState(!token);
+  const [error, setError] = useState<string>();
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!token) return;
+    api<{ event: EventSummary }>('/api/links/invite', { linkToken: token })
+      .then(setView)
+      .catch(() => setInvalid(true));
+  }, [token]);
+  const accept = async () => {
+    setBusy(true);
+    try {
+      await api('/api/links/invite/accept', { method: 'POST', linkToken: token });
+      window.location.assign('/staff');
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'invalid_link') setInvalid(true);
+      else setError(errorMessage(e));
+      setBusy(false);
+    }
+  };
+  if (invalid) return <InvalidLink />;
+  if (!view) return <Loading />;
+  return (
+    <Page title="Check-in invitation">
+      <Card title={view.event.title}>
+        <p>{formatLocal(view.event.startsAt, view.event.timeZone)}</p>
+        <p>
+          You were invited to check in participants at the entrance. Accept on the device you will use. You
+          will be able to check tickets in and see the checked-in count for this event only, during its
+          check-in window.
+        </p>
+        <button onClick={accept} disabled={busy}>
+          {busy ? 'Accepting…' : 'Accept'}
+        </button>
+        {error && <Alert>{error}</Alert>}
+      </Card>
+    </Page>
+  );
+}
+
 function App() {
   const path = window.location.pathname;
   const eventMatch = /^\/e\/([A-Za-z0-9_-]{22,64})$/.exec(path);
@@ -642,6 +686,7 @@ function App() {
   if (path === '/manage') return <ManagePage />;
   if (path === '/ticket') return <TicketPage />;
   if (path === '/sign-in') return <SignInPage />;
+  if (path === '/invite') return <InvitePage />;
   return <InvalidLink />;
 }
 
