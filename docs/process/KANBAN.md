@@ -4,7 +4,7 @@
 |---|---|
 | **Columns** | Backlog → To Do → In Progress → Review → Done, plus **Deferred** for extended scope that was intentionally not built |
 | **Work-in-progress limits** | In Progress ≤ 2, Review ≤ 3 |
-| **Last updated** | 2026-10-11, session S-04 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
+| **Last updated** | 2026-10-11, session S-05 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
 | **Scope** | Re-planned in S-02 by the final delivery strategy (PD-15): P0 is mandatory, then P1, with P2 deferred. Requirement-level status is in [ASSIGNMENT_SCOPE.md](../../ASSIGNMENT_SCOPE.md). |
 
 ## Rules
@@ -39,13 +39,13 @@
 | K-005 Create the GitHub repository; add the remote; push `main` after a final secret scan | M0 | S-03: full-history scan clean; pushed 17:03:42 to https://github.com/DavidMalkhasyan/event-registration-system (`c45ecaf`) |
 | K-103 CI pipeline | M1 | S-03: GitHub Actions runs [38141682841](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38141682841) and [38142263115](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38142263115) passed. The AC-140 deliberate-failure check was not done; an equivalent mutation check exists for the E2E live-count test (S-02). |
 | K-601 README | M6 | S-03: followed from a clean clone with a new PostgreSQL cluster; two gaps found and fixed (`67346ac`) |
+| K-404b Registration cutoff job (F8, TX-J03, FR-WL-5, FR-NTF-4, D-3) | M4 | `d25d3dd`, `2d78ca5`; [PR #1](https://github.com/DavidMalkhasyan/event-registration-system/pull/1) into `dev`; CI [run 38144704826](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38144704826) passed (3 migrations on a fresh database; 27/27, 3/3, 4/4); merged 2026-10-11 17:51:34 as `5818fb4`. Not in `main` (PD-29). |
 | K-505 Playwright suites, **reduced scope** | M5 | `b7a164f`: 4 tests, including two simultaneous clients. 4/4 passed in 3 runs; a mutation check proved the live-count test fails when the feature breaks. |
 
 ## Review
 
 | Card | Milestone | Awaiting |
 |---|---|---|
-| K-404b Registration cutoff job (F8, TX-J03, FR-WL-5, FR-NTF-4, D-3) | M4 | Done on branch `feature/k-404b-cutoff-job` (`d25d3dd`): 4 new integration tests including two concurrency tests; mutation checks; full suite and E2E pass locally. **Awaiting:** CI on a pull request and the owner's merge into `main` (PD-25). |
 | K-001 Apply R60; synchronize the documents | M0 | Stakeholder check (commit `3fe9cb7`) |
 | K-004 Process documentation | M0 | Stakeholder review |
 
@@ -53,6 +53,7 @@
 
 | Card | Milestone | State |
 |---|---|---|
+| K-304a Capacity change (FR-EVT-7, FR-EVT-8, TX-E03, AC-13 to AC-15) | M3 | **In progress** on `feature/k-304a-capacity`. An increase promotes FIFO before the cutoff in the same transaction; a decrease is never below the confirmed count, and the error names the minimum. Needs concurrency tests against cancellation and verification. |
 | K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Updated in S-04 |
 
 ## To Do
@@ -60,7 +61,6 @@
 | Card | Milestone | Notes |
 |---|---|---|
 | K-604 Release tag and submission | M6 | The secret scan was done in S-03. Tagging and submitting are the owner's actions. |
-| K-304a Capacity change (FR-EVT-7, FR-EVT-8, TX-E03, AC-15) | M3 | **Next.** An increase promotes FIFO before the cutoff in the same transaction; a decrease is never below the confirmed count, and the error names the minimum. Needs concurrency tests against cancellation and verification. |
 | K-304b Title and description edit (FR-EVT-5) | M3 | No emails |
 | K-304c Event cancellation (FR-EVT-9, BR-16, TX-E05) | M3 | **Dependency:** FR-EVT-9 requires recent authentication (FR-ORG-5), which is not implemented. Needs a decision before starting: implement re-authentication, or record a deviation. |
 | K-304d Event deletion (FR-EVT-10, 11, 13, 14) | M3 | Largest part: eligibility checks in the deletion transaction, a deletion marker, audit survival |
@@ -73,7 +73,7 @@
 | K-306 Check-in | Check-in with replay, window and outcomes (P0 #9, #10) | Undo |
 | K-401 Messaging | Outbox claim, fenced send, reaper, sweeps, pre-claim counter | Budget, pause, render-time re-check |
 | K-403 Notifications | 9 of 17 message types | The rest, with their features |
-| K-404 Jobs | Reminder fan-out (P0 #13); cutoff job (K-404b, in Review) | — |
+| K-404 Jobs | Reminder fan-out (P0 #13); cutoff job (K-404b, done in `dev`) | — |
 | K-408 Email providers | Fake provider | Resend adapter (P2) |
 | K-504 Scanner and live count | Owner check-in screen with live count | Staff scanner (P1) |
 
