@@ -16,7 +16,8 @@
     "migrate": "pnpm --filter @ers/server migrate",
     "dev:web": "pnpm --filter @ers/server dev:web",
     "dev:worker": "pnpm --filter @ers/server dev:worker",
-    "dev:client": "pnpm --filter @ers/client dev"
+    "dev:client": "pnpm --filter @ers/client dev",
+    "e2e": "pnpm --filter @ers/e2e e2e"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
