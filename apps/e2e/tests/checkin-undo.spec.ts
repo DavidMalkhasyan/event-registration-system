@@ -2,9 +2,11 @@ import { expect, test } from '@playwright/test';
 import {
   HOUR,
   address,
+  checkInResult,
   createEvent,
   linkIn,
   localIn,
+  openSection,
   registerParticipant,
   signIn,
   stat,
@@ -24,16 +26,17 @@ test('owner undoes a check-in after confirming; the share view shows the ticket 
   const [ticketMail] = await waitForMail(guest, 'Your ticket');
   const shareUrl = linkIn(ticketMail!, 'ticket');
   // Into the check-in window (opens 2 hours before the start).
+  await openSection(page, 'Settings');
   await page.getByLabel(/New date and time/).fill(localIn(1 * HOUR));
   await page.getByRole('button', { name: 'Reschedule and notify' }).click();
   await expect(page.getByText('Rescheduled.')).toBeVisible();
 
   const checkInOnce = async () => {
-    await page.getByRole('link', { name: /entrance check-in screen/ }).click();
+    await openSection(page, 'Check-in');
     await page.getByLabel('Ticket code').fill(ticketCode!);
     await page.getByRole('button', { name: 'Check in' }).click();
-    await expect(page.getByText('✔ Checked in')).toBeVisible();
-    await page.getByRole('link', { name: '← Dashboard' }).click();
+    await expect(checkInResult(page)).toHaveText('Checked in');
+    await openSection(page, 'Participants');
     await expect(stat(page, 'Checked in')).toHaveText('1');
   };
   await checkInOnce();
@@ -67,6 +70,7 @@ test('owner undoes a check-in after confirming; the share view shows the ticket 
 
   // A staff device of this event has no undo control, and the server refuses it.
   const helper = address('helper');
+  await openSection(page, 'Staff');
   await page.getByLabel('Staff email address').fill(helper);
   await page.getByRole('button', { name: 'Send invitation' }).click();
   const [invitation] = await waitForMail(helper, 'You are invited to help with check-in');

@@ -75,21 +75,28 @@ export async function signIn(page: Page, email: string): Promise<void> {
   const mails = await waitForMail(email, 'Your sign-in link', before + 1);
   await page.goto(linkIn(mails[mails.length - 1]!, 'sign-in'));
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByRole('heading', { name: 'Your events' })).toBeVisible();
+  // The global dashboard of all the organizer's events (K-507).
+  await expect(page.getByRole('heading', { level: 1, name: 'Good things happen together.' })).toBeVisible();
 }
 
-/** Creates an event through the form and opens its dashboard. */
+/** Creates an event through the form, which opens the new event's workspace. */
 export async function createEvent(
   page: Page,
   input: { title: string; capacity: number; startsInMs: number },
 ): Promise<{ eventId: string; publicUrl: string }> {
-  await page.getByLabel('Title').fill(input.title);
+  await page
+    .getByRole('navigation', { name: 'Main navigation' })
+    .getByRole('link', { name: 'Create event' })
+    .click();
+  const [date, time] = localIn(input.startsInMs).split('T');
+  await page.getByLabel('Event title').fill(input.title);
   await page.getByLabel('Description').fill('Created by the end-to-end test.');
-  await page.getByLabel('Date and time (local)').fill(localIn(input.startsInMs));
+  await page.getByLabel('Date', { exact: true }).fill(date!);
+  await page.getByLabel('Start time').fill(time!);
   await page.getByLabel('Capacity').fill(String(input.capacity));
   await page.getByRole('button', { name: 'Create event' }).click();
-  await page.getByRole('link', { name: input.title }).click();
-  await expect(page.getByRole('heading', { name: input.title })).toBeVisible();
+  await page.waitForURL(/\/organizer\/events\/[0-9a-f-]{36}$/);
+  await expect(page.getByRole('heading', { level: 1, name: input.title })).toBeVisible();
   const eventId = /\/organizer\/events\/([0-9a-f-]{36})$/.exec(page.url())![1]!;
   const publicUrl = await page.getByLabel('Public registration link').inputValue();
   return { eventId, publicUrl };
@@ -126,6 +133,24 @@ export async function registerParticipant(browser: Browser, publicUrl: string, e
   const result = await readResult(page);
   await context.close();
   return result;
+}
+
+/** Opens a section of the event workspace (Overview, Participants, Waiting list, Check-in, Staff, Settings). */
+export async function openSection(page: Page, name: string): Promise<void> {
+  await page
+    .getByRole('navigation', { name: 'Event sections' })
+    .getByRole('link', { name: new RegExp(`^${name}`) })
+    .click();
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Event sections' })
+      .getByRole('link', { name: new RegExp(`^${name}`) }),
+  ).toHaveAttribute('aria-current', 'page');
+}
+
+/** The heading of the latest check-in result ("Checked in", "Already checked in", …). */
+export function checkInResult(page: Page) {
+  return page.getByRole('status', { name: 'Check-in result' }).getByRole('heading');
 }
 
 /** The number shown on a dashboard statistic tile. */

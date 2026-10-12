@@ -4,7 +4,9 @@ import {
   HOUR,
   address,
   createEvent,
+  checkInResult,
   linkIn,
+  openSection,
   registerParticipant,
   signIn,
   stat,
@@ -13,7 +15,7 @@ import {
 
 // K-304c in the browser: FR-EVT-9, BR-16, FR-ORG-5, AC-19, PD-41, PD-42.
 
-const cancelCard = (page: Page) => page.locator('section.card', { hasText: 'Cancel event' });
+const cancelCard = (page: Page) => page.getByRole('region', { name: 'Cancel event' });
 
 async function cancelThroughUi(page: Page) {
   await cancelCard(page).getByRole('button', { name: 'Cancel this event…' }).click();
@@ -35,6 +37,7 @@ test('fresh session: cancel with confirmation; organizer and public pages show C
   expect((await registerParticipant(browser, publicUrl, waiting)).result).toBe('waitlisted');
   await page.reload();
   await expect(stat(page, 'Confirmed')).toHaveText('1');
+  await openSection(page, 'Settings');
 
   // "Keep the event" backs out without doing anything.
   await cancelCard(page).getByRole('button', { name: 'Cancel this event…' }).click();
@@ -73,10 +76,10 @@ test('fresh session: cancel with confirmation; organizer and public pages show C
   await page.goto(`/organizer/events/${eventId}/check-in`);
   await page.getByLabel('Ticket code').fill(ticketCode!);
   await page.getByRole('button', { name: 'Check in' }).click();
-  await expect(page.getByText('✖ Event cancelled')).toBeVisible();
+  await expect(checkInResult(page)).toHaveText('Event cancelled');
 
-  // The events list shows the status.
-  await page.goto('/organizer');
+  // The list of all events shows the status.
+  await page.goto('/organizer/events');
   await expect(page.getByRole('link', { name: new RegExp(`${title}.*Cancelled`) })).toBeVisible();
 });
 
@@ -93,6 +96,7 @@ test('stale session: re-authenticate by email, come back, and confirm the cancel
     startsInMs: 72 * HOUR,
   });
   await registerParticipant(browser, publicUrl, guest);
+  await openSection(page, 'Settings');
   const eventUrl = page.url();
   expect(await ageOrganizerSessions(organizer, 16)).toBe(1); // controlled test-database setup
   await page.reload();

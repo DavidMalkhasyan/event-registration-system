@@ -1,5 +1,14 @@
 import { expect, test } from '@playwright/test';
-import { HOUR, address, createEvent, registerParticipant, signIn, stat, waitForMail } from './helpers.js';
+import {
+  HOUR,
+  address,
+  createEvent,
+  openSection,
+  registerParticipant,
+  signIn,
+  stat,
+  waitForMail,
+} from './helpers.js';
 
 // K-304a in the organizer interface: FR-EVT-7 (increase promotes FIFO), FR-EVT-8 (minimum).
 test('organizer raises capacity to promote the waiting list, and cannot go below the confirmed count', async ({
@@ -24,6 +33,7 @@ test('organizer raises capacity to promote the waiting list, and cannot go below
   await expect(stat(page, 'Waiting list')).toHaveText('2');
 
   // Increase by one: the first person in line is promoted at once and emailed a ticket.
+  await openSection(page, 'Settings');
   await page.getByLabel('Number of seats').fill('2');
   await page.getByRole('button', { name: 'Update capacity' }).click();
   await expect(page.getByText('Capacity is now 2.')).toBeVisible();
@@ -37,6 +47,6 @@ test('organizer raises capacity to promote the waiting list, and cannot go below
   await page.getByRole('button', { name: 'Update capacity' }).click();
   await expect(page.getByText('The minimum allowed capacity is 2.')).toBeVisible();
   await page.reload();
-  await expect(page.getByText(/capacity 2/)).toBeVisible();
+  await expect(stat(page, 'Event capacity')).toHaveText('2');
   await expect(stat(page, 'Confirmed')).toHaveText('2');
 });
