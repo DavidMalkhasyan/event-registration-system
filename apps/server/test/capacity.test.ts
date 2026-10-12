@@ -202,9 +202,9 @@ describe('capacity changes (K-304a: FR-EVT-7, FR-EVT-8, TX-E03)', () => {
     await expectInvariants(event.id);
   });
 
-  it('a decrease is allowed down to the confirmed count; below it is rejected with the minimum (AC-13)', async () => {
+  it('any decrease is refused with the current capacity, also above the confirmed count; nothing changes (A-2)', async () => {
     const { s, event, results } = await setup(5, ['a@example.test', 'b@example.test'], []);
-    // A check-in must survive any capacity change.
+    // A check-in must survive any capacity request.
     moveClockTo(new Date(event.startsAt), -HOUR);
     const checkIn = await h.app.inject({
       method: 'POST',
@@ -214,22 +214,33 @@ describe('capacity changes (K-304a: FR-EVT-7, FR-EVT-8, TX-E03)', () => {
     });
     expect(checkIn.json().outcome).toBe('CHECKED_IN');
 
-    const below = await setCapacity(s, event.id, 1);
-    expect(below.statusCode).toBe(409);
-    expect(below.json().code).toBe('capacity_below_confirmed');
-    expect(below.json().minimumCapacity).toBe(2);
-
-    const toMinimum = await setCapacity(s, event.id, 2);
-    expect(toMinimum.statusCode).toBe(200);
-    expect(toMinimum.json().capacity).toBe(2);
+    for (const lower of [4, 2, 1]) {
+      const refused = await setCapacity(s, event.id, lower);
+      expect(refused.statusCode).toBe(409);
+      expect(refused.json()).toMatchObject({ code: 'capacity_decrease_not_allowed', currentCapacity: 5 });
+    }
+    const same = await setCapacity(s, event.id, 5);
+    expect(same.statusCode).toBe(200);
+    expect(same.json().capacity).toBe(5);
     expect(await dashboard(s, event.id)).toEqual({ confirmed: 2, waitlisted: 0, checkedIn: 1 });
-    const checkIns = await h.db
-      .selectFrom('app.check_ins')
+    const audits = await h.db
+      .selectFrom('app.audit_records')
       .select('id')
       .where('event_id', '=', event.id)
+      .where('action', '=', 'capacity_change')
       .execute();
-    expect(checkIns).toHaveLength(1);
+    expect(audits).toHaveLength(0); // neither refusals nor the unchanged value are changes
     await expectInvariants(event.id, false);
+  });
+
+  it('rejects values outside 1 to 100 000 and fractions instead of changing them', async () => {
+    const { s, event } = await setup(5, [], []);
+    for (const capacity of [0, -3, 100_001, 2.5]) {
+      const response = await setCapacity(s, event.id, capacity);
+      expect(response.statusCode).toBe(422);
+      expect(response.json().code).toBe('validation_failed');
+    }
+    expect((await setCapacity(s, event.id, 100_000)).json().capacity).toBe(100_000);
   });
 
   it('an increase after the cutoff promotes no one (FR-WL-4, BR-9)', async () => {
@@ -266,27 +277,21 @@ describe('capacity changes (K-304a: FR-EVT-7, FR-EVT-8, TX-E03)', () => {
     await expectInvariants(event.id);
   });
 
-  it('a verification racing a capacity decrease never breaks confirmed ≤ capacity (AC-14, concurrency)', async () => {
+  it('a verification racing a capacity increase never breaks confirmed ≤ capacity (AC-14, concurrency)', async () => {
     for (let round = 0; round < 4; round += 1) {
       await resetData(h);
-      const { s, event } = await setup(2, ['a@example.test'], []);
+      const { s, event } = await setup(1, ['a@example.test'], []);
       const token = await registerAndGetVerifyToken(h, event.publicId, 'late@example.test');
-      const [verification, change] = await Promise.all([confirm(h, token), setCapacity(s, event.id, 1)]);
+      const [verification, change] = await Promise.all([confirm(h, token), setCapacity(s, event.id, 2)]);
 
-      // Serialized by the event lock: either the decrease won (the verifier joins the waiting
-      // list), or the verification won (the decrease is rejected with the new minimum).
-      const outcome = verification.json().result;
-      if (outcome === 'waitlisted') {
-        expect(change.statusCode).toBe(200);
-        expect(await people(event.id)).toEqual({
-          confirmed: ['a@example.test'],
-          waiting: ['late@example.test'],
-        });
-      } else {
-        expect(outcome).toBe('confirmed');
-        expect(change.statusCode).toBe(409);
-        expect(change.json().minimumCapacity).toBe(2);
-      }
+      // Serialized by the event lock. If the increase won, the verifier takes the new seat; if the
+      // verification won, it joined the waiting list and the increase promoted it. Either way: confirmed.
+      expect(change.statusCode).toBe(200);
+      expect(['confirmed', 'waitlisted']).toContain(verification.json().result);
+      expect(await people(event.id)).toEqual({
+        confirmed: ['a@example.test', 'late@example.test'],
+        waiting: [],
+      });
       await expectInvariants(event.id);
     }
   });
@@ -318,7 +323,7 @@ describe('capacity changes (K-304a: FR-EVT-7, FR-EVT-8, TX-E03)', () => {
     }
   });
 
-  it('simultaneous different capacity changes leave a consistent state (concurrency)', async () => {
+  it('simultaneous different capacity changes end at the highest value, never lower (concurrency)', async () => {
     const { s, event } = await setup(
       1,
       ['a@example.test'],
@@ -329,15 +334,21 @@ describe('capacity changes (K-304a: FR-EVT-7, FR-EVT-8, TX-E03)', () => {
       setCapacity(s, event.id, 2),
       setCapacity(s, event.id, 4),
     ]);
-    // Decreases below the confirmed count reached by an earlier increase are rejected.
-    for (const r of responses) expect([200, 409]).toContain(r.statusCode);
+    // Each is decided against the capacity committed before it: an increase succeeds; a value below
+    // an increase that committed first is refused with that capacity. The highest value always wins.
+    for (const r of responses) {
+      if (r.statusCode === 409) expect(r.json().code).toBe('capacity_decrease_not_allowed');
+      else expect(r.statusCode).toBe(200);
+    }
+    expect(responses[2]!.statusCode).toBe(200);
     const { capacity, confirmed_rows } = await expectInvariants(event.id);
+    expect(capacity).toBe(4);
     const { confirmed, waiting } = await people(event.id);
-    expect(confirmed_rows).toBe(capacity); // every seat filled, since enough people were waiting
-    // FIFO: the confirmed set is a prefix of the original queue, and the rest wait in order.
+    expect(confirmed_rows).toBe(4);
+    // FIFO: the first three in line are confirmed, the last one waits.
     const queue = ['w1@example.test', 'w2@example.test', 'w3@example.test', 'w4@example.test'];
-    expect(confirmed).toEqual(['a@example.test', ...queue.slice(0, capacity - 1)].sort());
-    expect(waiting).toEqual(queue.slice(capacity - 1));
+    expect(confirmed).toEqual(['a@example.test', ...queue.slice(0, 3)].sort());
+    expect(waiting).toEqual(queue.slice(3));
     await drain(h);
     for (const email of queue) expect(promotionMail(email)).toHaveLength(confirmed.includes(email) ? 1 : 0);
   });
