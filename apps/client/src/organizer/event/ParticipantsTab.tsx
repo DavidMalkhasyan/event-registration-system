@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Check, Search, Users, X } from 'lucide-react';
 import { Alert, Empty, Status } from '../../shared/ui';
 import type { EventItem, Notice, Participant, Session } from '../types';
-import { RemoveFromWaitlist, UndoCheckIn } from './ParticipantActions';
+import { CancelRegistration, RemoveFromWaitlist, UndoCheckIn } from './ParticipantActions';
 
 export const STATE: Record<string, { label: string; tone: string }> = {
   CONFIRMED: { label: 'Confirmed', tone: 'confirmed' },
@@ -10,6 +10,15 @@ export const STATE: Record<string, { label: string; tone: string }> = {
   PENDING_VERIFICATION: { label: 'Pending confirmation', tone: 'neutral' },
   CANCELLED: { label: 'Cancelled', tone: 'cancelled' },
   EXPIRED: { label: 'Expired', tone: 'expired' },
+};
+
+/** Why an ended registration ended; cancelled people stay in the list (K-703). */
+const END_REASON: Record<string, string> = {
+  participant_cancelled: 'by the participant',
+  cancelled_by_organizer: 'by you',
+  removed_by_organizer: 'removed from the waiting list',
+  event_cancelled: 'event cancelled',
+  cutoff: 'not confirmed before registration closed',
 };
 
 const ISSUE: Record<string, string> = {
@@ -36,6 +45,8 @@ export function ParticipantsTab({
   const [search, setSearch] = useState('');
   const [state, setState] = useState('ALL');
   const scheduled = event.status === 'SCHEDULED';
+  const beforeStart = scheduled && event.phase !== 'started';
+  const waiting = participants.filter((p) => p.state === 'WAITLISTED').length;
   const base = waitingOnly
     ? participants
         .filter((p) => p.state === 'WAITLISTED')
@@ -131,6 +142,7 @@ export function ParticipantsTab({
                     <td data-label="Registration">
                       <Status tone={s.tone}>{s.label}</Status>
                       {p.state === 'WAITLISTED' && <small>Position #{p.position}</small>}
+                      {p.endReason && END_REASON[p.endReason] && <small>{END_REASON[p.endReason]}</small>}
                     </td>
                     <td data-label="Check-in">
                       {p.checkedInAt ? (
@@ -151,6 +163,16 @@ export function ParticipantsTab({
                     </td>
                     <td>
                       <div className="row-actions">
+                        {beforeStart && (
+                          <CancelRegistration
+                            session={session}
+                            eventId={event.id}
+                            participant={p}
+                            waiting={waiting}
+                            promotionOpen={event.phase === 'registration_open'}
+                            onDone={onNotice}
+                          />
+                        )}
                         {scheduled && (
                           <RemoveFromWaitlist
                             session={session}
