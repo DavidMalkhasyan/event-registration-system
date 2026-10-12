@@ -740,6 +740,12 @@ svg {
   gap: 5px;
   color: var(--success);
 }
+/* K-706: the sections panel is at least a screen tall, so switching to a short section never forces
+   the browser to clamp the scroll position and move the tabs. */
+.workspace-sections {
+  min-height: calc(100vh - 96px);
+  min-height: calc(100dvh - 96px);
+}
 /* Organizer refresh (K-704) */
 .refresh-control {
   display: inline-flex;

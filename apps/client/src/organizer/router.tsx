@@ -2,10 +2,22 @@ import { useEffect, useState, type AnchorHTMLAttributes } from 'react';
 
 // Path-based routing for the organizer entry (no hash routing; URLs from UI_INVENTORY §3 keep working).
 
+/** The view a path shows: a page, or one event (all sections of an event are the same view). */
+function viewOf(path: string): string {
+  const route = parseRoute(path);
+  return route.page === 'event' ? `event:${route.eventId}` : route.page;
+}
+
+/**
+ * Client-side navigation (K-706). A new view (another page or another event) starts at the top; moving
+ * between sections of the same event keeps the scroll position, so the workspace and its tabs stay
+ * where they were. Back and forward use the browser's own scroll restoration.
+ */
 export function navigate(path: string) {
+  const newView = viewOf(window.location.pathname) !== viewOf(path);
   window.history.pushState(null, '', path);
   window.dispatchEvent(new PopStateEvent('popstate'));
-  window.scrollTo({ top: 0 });
+  if (newView) window.scrollTo({ top: 0 });
 }
 
 export function useLocationPath(): { path: string; search: string } {

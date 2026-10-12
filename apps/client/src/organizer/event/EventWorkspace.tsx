@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -155,6 +155,24 @@ export function EventWorkspace({
     eventId,
     participantsShown,
   );
+  // K-706: sections opened once stay mounted (hidden while another is shown), so their search, filters
+  // and unsaved form values survive switching sections. Check-in is the exception: leaving it stops the
+  // camera. Every section still shows the same, shared event data.
+  const [visited, setVisited] = useState<ReadonlySet<EventTab>>(() => new Set([tab]));
+  if (!visited.has(tab)) setVisited(new Set(visited).add(tab));
+  const kept = (key: EventTab) => visited.has(key) || tab === key;
+  // K-706: the section tabs stay where they were on screen when a section changes, even when the
+  // content above them changes height (the check-in screen hides the cover and the figures).
+  const tabsRef = useRef<HTMLElement>(null);
+  const tabsTopBefore = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const before = tabsTopBefore.current;
+    tabsTopBefore.current = null;
+    const tabs = tabsRef.current;
+    if (before === null || !tabs) return;
+    const shift = tabs.getBoundingClientRect().top - before;
+    if (Math.abs(shift) > 1) window.scrollBy({ top: shift });
+  }, [tab]);
   // A result message belongs to the section where the action happened.
   const [tagged, setTagged] = useState<{ tab: EventTab; notice: Notice }>();
   const notice = tagged?.tab === tab ? tagged.notice : undefined;
@@ -246,14 +264,17 @@ export function EventWorkspace({
           </div>
         </>
       )}
-      <section className="panel">
-        <nav className="tabs" aria-label="Event sections">
+      <section className="panel workspace-sections">
+        <nav className="tabs" aria-label="Event sections" ref={tabsRef}>
           {TABS.map((t) => (
             <Link
               key={t.key}
               to={eventPath(event.id, t.key)}
               className="tab"
               aria-current={tab === t.key ? 'page' : undefined}
+              onClick={() => {
+                tabsTopBefore.current = tabsRef.current?.getBoundingClientRect().top ?? null;
+              }}
             >
               {t.label}
               {t.key === 'participants' && participants && (
@@ -270,19 +291,25 @@ export function EventWorkspace({
         )}
         <div className="tab-panel">
           {tab === 'overview' && <OverviewTab event={event} counts={counts} />}
-          {(tab === 'participants' || tab === 'waiting-list') &&
-            (participants ? (
-              <ParticipantsTab
-                session={session}
-                event={event}
-                participants={participants}
-                waitingOnly={tab === 'waiting-list'}
-                notice={notice}
-                onNotice={onNotice}
-              />
-            ) : (
-              <PageSkeleton />
-            ))}
+          {(['participants', 'waiting-list'] as const).map(
+            (key) =>
+              kept(key) && (
+                <div key={key} hidden={tab !== key}>
+                  {participants ? (
+                    <ParticipantsTab
+                      session={session}
+                      event={event}
+                      participants={participants}
+                      waitingOnly={key === 'waiting-list'}
+                      notice={tab === key ? notice : undefined}
+                      onNotice={onNotice}
+                    />
+                  ) : (
+                    <PageSkeleton />
+                  )}
+                </div>
+              ),
+          )}
           {tab === 'check-in' && (
             <CheckInTab
               session={session}
@@ -292,9 +319,15 @@ export function EventWorkspace({
               onNotice={onNotice}
             />
           )}
-          {tab === 'staff' && <StaffTab session={session} event={event} />}
-          {tab === 'settings' && (
-            <SettingsTab session={session} event={event} counts={counts} onDone={changed} />
+          {kept('staff') && (
+            <div hidden={tab !== 'staff'}>
+              <StaffTab session={session} event={event} active={tab === 'staff'} />
+            </div>
+          )}
+          {kept('settings') && (
+            <div hidden={tab !== 'settings'}>
+              <SettingsTab session={session} event={event} counts={counts} onDone={changed} />
+            </div>
           )}
         </div>
       </section>
