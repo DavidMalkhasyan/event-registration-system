@@ -46,13 +46,14 @@
 | K-304c Event cancellation (FR-EVT-9, BR-16, BR-23, TX-E05, AC-18, AC-19, AC-59; D1–D7) | M3 | `b3379f5`, `7575432`, `44b453e`, `754621c`; [PR #5](https://github.com/DavidMalkhasyan/event-registration-system/pull/5) into `dev`; CI runs [38162451724](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38162451724) and [38162851806](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38162851806) passed (73/73, 5/5, 9/9); merged 2026-10-11 22:15:17 as `fef8a81`. Not in `main`. |
 | K-304d Event deletion (FR-EVT-10, 11, 13, 14; TX-E06; API #37, #38) | M3 | `13ba1eb`, `17d85f4`, `39f1159`, `e235112`; [PR #6](https://github.com/DavidMalkhasyan/event-registration-system/pull/6) into `dev`; CI runs [38164273828](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38164273828) and [38164505147](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38164505147) passed (4 migrations; 83/83, 5/5, 12/12); merged 2026-10-11 22:39:04 as `d90062e`. Not in `main`. |
 | K-405 Participant self-service: ticket resend, share links, management and share rotation (FR-SELF-4, FR-SHR-1, FR-ROT-1 to FR-ROT-11; TX-P01 to TX-P03) | M4 | `c1ba465`, `da1ee09`, `704c241`, `8567170`; [PR #7](https://github.com/DavidMalkhasyan/event-registration-system/pull/7) into `dev`; CI runs [38174098814](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38174098814) and [38174318350](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38174318350) passed (5 migrations; 99/99, 6/6, 14/14); merged 2026-10-12 00:59:52 as `35d9213`. Not in `main`. |
+| K-406 Staff invitations and sessions (FR-STAFF-1 to FR-STAFF-7; TX-S01 to TX-S03; API #14 to #16, #41, #42, #45 to #50), including the K-304c dependency | M4 | `bf73afd`, `c6437d6`, `465acbf`, `7ebecf6`; [PR #8](https://github.com/DavidMalkhasyan/event-registration-system/pull/8) into `dev`; CI runs [38176421220](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38176421220) and [38176668486](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38176668486) passed (6 migrations; 110/110, 6/6, 15/15); merged 2026-10-12 01:33:57 as `f547477`. Not in `main`. AC-186 (c) is not covered by an automated test. |
 | K-505 Playwright suites, **reduced scope** | M5 | `b7a164f`: 4 tests, including two simultaneous clients. 4/4 passed in 3 runs; a mutation check proved the live-count test fails when the feature breaks. |
 
 ## Review
 
 | Card | Milestone | Awaiting |
 |---|---|---|
-| K-406 Staff invitations and sessions (FR-STAFF-1 to FR-STAFF-7; TX-S01 to TX-S03; API #14 to #16, #41, #42, #45 to #50), including the K-304c dependency | M4 | Done on `feature/k-406-staff-invitations` (`c6437d6` server, migration `0006` and tests, `465acbf` UI and E2E): 11 integration tests (AC-156 forced orders and lock-held races, AC-186 a on a real server), 1 E2E test, mutation checks. [PR #8](https://github.com/DavidMalkhasyan/event-registration-system/pull/8) into `dev`; CI [run 38176421220](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38176421220) passed (6 migrations; 110/110, 6/6, 15/15). **Awaiting:** merge into `dev`; Done is recorded after the merge. |
+| K-306 Check-in undo (FR-CHK-8, BR-7, TX-C02, API #44; AC-26, AC-27, AC-54). Check-in itself is done (P0 #9, #10). | M4 | Done on `feature/k-306-checkin-undo` (`f5d4b34` server and tests, `4a598ac` UI and E2E): 9 integration tests (simultaneous undos and undo vs. check-in while both wait on the lock, live count on a real server), 1 E2E test, six mutation checks. **Awaiting:** pull request, CI and merge; Done is recorded after the merge. |
 | K-001 Apply R60; synchronize the documents | M0 | Stakeholder check (commit `3fe9cb7`) |
 | K-004 Process documentation | M0 | Stakeholder review |
 
@@ -73,7 +74,6 @@
 | Card | Done | Remaining |
 |---|---|---|
 | K-304 Event lifecycle | Create, reschedule (P0); capacity (K-304a), details (K-304b), cancellation (K-304c), deletion (K-304d), all done in `dev` | — |
-| K-306 Check-in | Check-in with replay, window and outcomes (P0 #9, #10) | Undo |
 | K-401 Messaging | Outbox claim, fenced send, reaper, sweeps, pre-claim counter | Budget, pause, render-time re-check |
 | K-403 Notifications | 9 of 17 message types | The rest, with their features |
 | K-404 Jobs | Reminder fan-out (P0 #13); cutoff job (K-404b, done in `dev`) | — |

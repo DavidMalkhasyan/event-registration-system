@@ -586,3 +586,40 @@
 | `c6437d6` | 01:17:22 | feat(staff): staff invitations, device sessions and staff check-in (K-406) |
 | `465acbf` | 01:26:47 | feat(client): staff invitation, staff check-in screen and owner staff card (K-406) |
 | *(closing commit)* | after 01:28 | docs: record K-406. Pushed to PR #8; the CI result and the merge are recorded at the start of the next branch. |
+
+---
+
+## S-12: K-406 merged; K-306 Check-in undo
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-12 09:16:19 +04:00 (prompt 16: "CONTINUE THE EXISTING EVENT REGISTRATION SYSTEM ROADMAP … Begin with closing K-406, then implement K-306") |
+| **End** | 2026-10-12, at the closing documentation commit on `feature/k-306-checkin-undo`. The activity table ends at 10:24. |
+| **Cards** | K-406 (Review → Done), K-306 (Partly done → In Progress → Review) |
+| **Tools and model** | Claude Code, model `claude-opus-5-5`; GitHub CLI; the S-02 toolchain |
+
+**Activity:**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 09:16 | `dev` synchronized: `dev` = `origin/dev` = `f547477`; [PR #8](https://github.com/DavidMalkhasyan/event-registration-system/pull/8) merged 01:33:57 with merge commit `f547477`; its final CI run [38176668486](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38176668486) **passed**; the development database reports schema version 6; `main` = `8c1247d`, unchanged | `feature/k-306-checkin-undo` from `origin/dev` |
+| 09:17–09:19 | Read: FR-CHK-8, BR-7, AC-26, AC-27, AC-54; API #44 with `UndoInput` and `CheckInUndone`; TX-C02; DATABASE_DESIGN §8 and the `audit_records` column rules; CK-30, U-13, TR-06 and TR-07 in `0001` | The participant list already returns `checkInId`; TR-07 already notifies on UPDATE. No migration is needed. |
+| 09:20:14 | Commit | `710b9bd` docs(process): K-406 Done; decisions PD-59 (where the reason is kept) and PD-60 (eligibility) |
+| 09:20–09:22 | `undoCheckIn` in `checkin.ts`, the route, the `check_in_already_undone` problem code; typecheck | Passes |
+| 09:22:55 | `checkin-undo.test.ts` (9 tests) | **6 passed, 3 failed**, all because of mistakes in the tests: the participant list is under `items`, not `participants`; a check-in after the window answers `OUTSIDE_CHECK_IN_WINDOW` before `ALREADY_CHECKED_IN`; and the stream reader matched the earlier count already in its buffer. Fixed. The cancelled-event case first got 401 because moving the clock into the window expired the recent sign-in that cancellation needs, so the test now signs in again first. Then **9/9**. |
+| before 09:29 | Mutation checks, each run against the undo tests and then restored | No "already undone" check → 2 tests fail; no owner check → 1; shared instead of exclusive lock → 1 (the simultaneous-undo test); no audit record → 4; check-in of any event → 1; no CSRF → 1 |
+| 09:29:02 | Server suite **119/119**; commit | `f5d4b34` feat(checkin): owner undo of a check-in with audit record |
+| 09:30–10:15 | Owner UI: "Undo check-in" in the participants table with a confirmation step, an optional reason and a result message; E2E `checkin-undo.spec.ts` | The first E2E run **failed**: after the undo, the test reloaded the share page, which correctly showed "Link not valid", because the link token is kept only in memory (the bootstrap removes it from the address). The test now opens the link again in a new tab. That run was slow and also reported "2 errors were not a part of any test"; its output was cut off, so the cause was not seen. None of the following runs repeated it. |
+| 10:15:44 | E2E `checkin-undo.spec.ts` alone | 1/1 |
+| 10:16:32–10:20:39 | Full suite | `format:check`, `lint`, `typecheck`, `test` (server 119/119, client 6/6), `build` and `e2e` (**16/16**) exit 0 |
+| 10:20:50 | Commit | `4a598ac` feat(client): owner undo of a check-in with confirmation |
+| 10:20–10:23:49 | E2E twice more | 16/16 both times |
+
+**Commits in S-12 (so far):**
+
+| Hash | Time (+04:00) | Message |
+|---|---|---|
+| `710b9bd` | 09:20:14 | docs(process): K-406 Done; K-306 undo started with decisions PD-59 and PD-60 |
+| `f5d4b34` | 09:29:02 | feat(checkin): owner undo of a check-in with audit record (K-306) |
+| `4a598ac` | 10:20:50 | feat(client): owner undo of a check-in with confirmation (K-306) |
+| *(closing commit)* | after 10:24 | docs: record K-306. Pushed with the pull request; the CI result and the merge are recorded at the start of the next branch. |
