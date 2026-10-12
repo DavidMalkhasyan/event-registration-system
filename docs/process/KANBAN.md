@@ -4,7 +4,7 @@
 |---|---|
 | **Columns** | Backlog → To Do → In Progress → Review → Done, plus **Deferred** for extended scope that was intentionally not built |
 | **Work-in-progress limits** | In Progress ≤ 2, Review ≤ 3 |
-| **Last updated** | 2026-10-12, session S-15 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
+| **Last updated** | 2026-10-12, session S-16 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
 | **Scope** | Re-planned in S-02 by the final delivery strategy (PD-15): P0 is mandatory, then P1, with P2 deferred. Requirement-level status is in [ASSIGNMENT_SCOPE.md](../../ASSIGNMENT_SCOPE.md). |
 
 ## Rules
@@ -58,13 +58,14 @@
 | K-001 Apply R60; synchronize the documents | M0 | Commit `3fe9cb7` (S-01): R60 applied to REQUIREMENTS.md v1.7 and 11 design documents. **Approved by the stakeholder on 2026-10-12 (S-15)** for the R60 synchronization only; the approval does not settle the specification's open items (OQ-8 and others). |
 | K-605 Release hardening: token bootstrap order (PD-71), FR-LNK-8 headers (PD-72), camera scanning (PD-74), K-105 scanning (PD-75) | M6 | `e5dfbdc`, `8f0586a`, `9a52edd`, `47977c4`, `c2c38e7`, `7d8439b`, `25e9ffc`; [PR #14](https://github.com/DavidMalkhasyan/event-registration-system/pull/14) into `dev`; CI run [38244890522](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38244890522) passed (secret scan, dependency audit, 7 migrations and idempotency; 135/135, 11/11, 22/22); merged 2026-10-12 15:51:48 as `cf35cbd`. **Approved by the stakeholder (S-15).** Not in `main`. |
 | K-105 Dependency and secret scanning in CI | M1 | `47977c4` (part of K-605): `pnpm check:secrets`, `pnpm check:deps` and a migration idempotency step run in CI (run 38244890522). |
+| K-004 Process documentation | M0 | Kanban, milestones, journal, decision log, AI usage and submission checklist, kept current from S-01; final accuracy pass in S-15 ([PR #15](https://github.com/DavidMalkhasyan/event-registration-system/pull/15)). **Approved by the stakeholder on 2026-10-12 (S-16).** |
+| K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | S-15: `18cd457` to `093ccfe`; [PR #15](https://github.com/DavidMalkhasyan/event-registration-system/pull/15) into `dev`, CI [run 38253717986](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38253717986) passed (secret scan, dependency audit, 7 migrations and idempotency; 135/135, 11/11, 22/22); merged 2026-10-12 17:15:12 as `bb6db50`. **Approved by the stakeholder (S-16)**, subject to recording that evidence, which the S-16 journal entry does. |
 
 ## Review
 
 | Card | Milestone | Awaiting |
 |---|---|---|
-| K-004 Process documentation | M0 | Stakeholder review. Not approved in S-15 pending a final accuracy pass; the pass was made in S-15 (SUBMISSION_CHECKLIST, ASSIGNMENT_SCOPE, README, MILESTONES, AI_USAGE and a cross-document audit). |
-| K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Final pass in S-15 on `feature/final-docs-audit`: current figures (135/11/22, 7 migrations, 39 API routes), v0 and image attribution, ChatGPT disclosure as stated by the stakeholder. **Awaiting:** pull request, CI, merge and stakeholder review. |
+| — | | Nothing awaiting review |
 
 ## In Progress
 
