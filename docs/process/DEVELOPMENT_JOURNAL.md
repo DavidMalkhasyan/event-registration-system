@@ -697,3 +697,28 @@
 | 14:25 | New E2E `link-pages.spec.ts` | 1/1; a mutation check (a hosted font in `public.html`) makes it fail; restored |
 | 14:32:53–14:37:42 | Full suite | `format:check`, `lint`, `typecheck`, `test` (131/131, 11/11), `build` and `e2e` (**20/20**) exit 0. A two-line copy change for cancelled events followed (typecheck and lint rerun); the part 2 CI run covers it. |
 | 14:40 | Commits | `67764a9` participant and link pages; `fbe2a33` link-page test |
+| 14:46:02 | [PR #13](https://github.com/DavidMalkhasyan/event-registration-system/pull/13) merged after CI [run 38237911736](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38237911736) passed (131/131, 11/11, 20/20) | `82b1c1c` on `dev`; `main` unchanged |
+
+---
+
+## S-14: Release hardening (PD-71 approved), FR-LNK-8 headers, camera tests, K-105
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-12 14:54:24 +04:00, branch created (prompt 19: "FINAL SECURITY HARDENING AND RELEASE READINESS") |
+| **Cards** | K-507 (Review → Done), K-605 (new, Review), K-105, K-603 |
+| **Tools and model** | Claude Code, model `claude-opus-5-5`; GitHub CLI; the S-02 toolchain; Playwright with Edge |
+
+**Activity:**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 14:54 | `feature/security-hardening` from `dev` (`82b1c1c`). Read FR-LNK-8, FR-LNK-10, AC-51, ADR-011 and the header code | No CSP header anywhere; `no-store` only on `/api` and `/dev`; `noindex` only as a meta tag |
+| 14:55–14:57 | Prototype: `boot.ts` (only static import: the bootstrap) plus a dynamic `import()` of the app; production build inspected | The entry chunk still began with `import "./modulepreload-polyfill-….js"`; with `modulePreload.polyfill: false` the entry has **no static imports** and starts with the capture; the app chunk imports `linkToken` from the evaluated entry (one instance) |
+| 14:57–14:59 | `token-bootstrap.spec.ts`: a probe prepended to every non-entry chunk and a `fetch` wrapper, on the production build, for verification, management, ticket, sign-in, invitation and invalid links | 1/1. **Mutations:** the pre-fix entry fails ("/assets/ui-….js executed before the token was captured", hash `#t=…`); a re-enabled polyfill fails the same way. Restoring the second mutation with `git checkout` also discarded an uncommitted comment change, which was re-applied. Commit `e5dfbdc`. |
+| 15:00–15:02 | FR-LNK-8 headers in the shared `onSend` hook; `security-headers.test.ts` (temporary dist); E2E checks of the headers and of CSP violations | 4/4; E2E 4/4 with no violations; an inline script in `public.html` is reported and fails the test. Commit `8f0586a`. |
+| 15:02–15:04 | Camera scanning review and `camera-scan.spec.ts` (controlled `getUserMedia` and `BarcodeDetector`, real staff session and endpoint) | Defect fixed: a code held in view was re-submitted about every 2.3 s. 1/1; mutations (the old loop, no track cleanup) fail. **No physical device was tested.** Commit `9a52edd`. |
+| 15:04–15:06 | K-105: `scripts/check-secrets.mjs`, `pnpm audit --audit-level=high`, a migration idempotency step in CI | Clean (177 files; no known vulnerabilities); a planted token is caught. Commit `47977c4`. README walkthrough and table updated: `c2c38e7`. |
+| 15:06:24–15:11:30 | Full suite | **lint failed** (Node globals for `scripts/*.mjs`) and **E2E 21/22**: the last spec got "Too many requests" because 22 tests exceeded the real per-IP registration limit. The limit was kept; a fixture clears the counters in the test database before each test (PD-73). Then 22/22. Commit `7d8439b`. |
+| 15:17–15:45 | Clean setup from the README: a fresh clone and a new PostgreSQL 18 cluster on port 54399 (the development database untouched) | First run: the script stopped at a `grep -c` returning 1 for zero placeholders, and its output was held by the throwaway server inheriting the pipe; second run: pnpm could not write its task state in the long scratch path (a Windows path-length limit of the test location). Third run in a short directory: install, provisioning, 7 migrations, "schema is up to date", secret scan, format, lint, typecheck, **135/135 and 11/11**, build, the production-like run with the FR-LNK-8 headers, and **E2E 22/22**. The work directory and cluster were removed. |
+| 15:40 | Development mode: a real verification link through the Vite dev server | Works; the fragment is removed; no errors |
