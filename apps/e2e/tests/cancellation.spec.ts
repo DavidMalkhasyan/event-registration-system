@@ -57,12 +57,13 @@ test('fresh session: cancel with confirmation; organizer and public pages show C
     expect(mail!.text).not.toMatch(/#t=/);
   }
 
-  // Public page: clearly cancelled, no registration form; the API refuses new registrations.
+  // Public page: clearly cancelled, the registration form disabled (PD-81); the API refuses new registrations.
   const visitor = await browser.newContext();
   const publicPage = await visitor.newPage();
   await publicPage.goto(publicUrl);
   await expect(publicPage.getByText('The organizer has cancelled this event.')).toBeVisible();
-  await expect(publicPage.getByLabel('Email address')).toHaveCount(0);
+  await expect(publicPage.getByLabel('Email address')).toBeDisabled();
+  await expect(publicPage.getByRole('button', { name: 'Event cancelled' })).toBeDisabled();
   const publicId = publicUrl.split('/e/')[1]!;
   const attempt = await publicPage.request.post(`/api/public/events/${publicId}/registrations`, {
     data: { email: address('late') },

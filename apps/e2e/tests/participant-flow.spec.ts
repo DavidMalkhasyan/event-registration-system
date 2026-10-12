@@ -1,6 +1,7 @@
 import { expect, test } from './fixtures.js';
 import {
   HOUR,
+  REGISTER_BUTTON,
   address,
   createEvent,
   linkIn,
@@ -46,7 +47,7 @@ test('organizer creates an event; participants register, join the waiting list, 
   const againPage = await again.newPage();
   await againPage.goto(publicUrl);
   await againPage.getByLabel('Email address').fill(anna.toUpperCase());
-  await againPage.getByRole('button', { name: 'Register' }).click();
+  await againPage.getByRole('button', REGISTER_BUTTON).click();
   await expect(againPage.getByText('Check your email.')).toBeVisible();
   await waitForMail(anna, 'Your registration');
   await again.close();
