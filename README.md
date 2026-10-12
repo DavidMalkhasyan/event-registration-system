@@ -190,14 +190,14 @@ Errors use RFC 9457 Problem Details (`application/problem+json`) with a stable `
 - **Email:** the fake provider is the only one. There is no Resend integration, no delivery webhooks and no bounce handling.
 - **Participant self-service:** view, cancel, ticket resend, share links and link rotation are implemented; changing the registration's email address is not.
 - **Language:** English only.
-- **Camera scanning:** QR scanning uses the browser's `BarcodeDetector` where it exists (desktop Chromium on Windows and Linux has none), so the scan button appears only there; manual code entry always works. The browser test `camera-scan` covers scanning with **simulated** camera and `BarcodeDetector` APIs; everything after detection is real. It has **not been tried on a physical phone or camera**.
+- **Camera scanning** (accepted as a documented limitation for this release): QR scanning uses the browser's `BarcodeDetector` where it exists (desktop Chromium on Windows and Linux has none), so the scan button appears only there; manual code entry always works. The browser test `camera-scan` covers scanning with **simulated** camera and `BarcodeDetector` APIs; everything after detection is real. It has **not been tried on a physical phone or camera**.
 - **Test environment:** tests use a local PostgreSQL database instead of Testcontainers (no container runtime on the development machine).
 - **Verified on one platform only:** the setup was verified from a clean clone on Windows (Git Bash) in S-03 and again in S-14, and in CI on Ubuntu; macOS and Linux desktops have not been tried.
 - **CI warnings:** GitHub reports that the v4 actions target the deprecated Node.js 20 runtime (they run on Node.js 24). Updating the action versions is pending.
 - **Upgrading an existing setup:** after pulling, run `pnpm migrate` (migrations `0003` to `0007`) and add `PREVIEW_SECRET` to `.env`; the processes refuse to start with an outdated schema or a missing variable.
 - **Development server headers:** the Vite development server does not send the production page headers (content security policy and others) and injects its own client script. The production-like run (§3) is the tested path.
-- **Bundled images:** the three event photographs come from the v0 design and are AI-generated according to their embedded metadata ("Made with Google AI"). No licence for them is recorded, so their reuse rights are not established ([AI_USAGE.md](docs/process/AI_USAGE.md) §7).
-- **Release state:** the published `main` branch still holds the first release (the P0 scope, 2026-10-11). Everything else described here is on the `dev` branch until the release pull request into `main` is approved and merged.
+- **Event artwork:** events have no uploaded image; each gets one of six original CSS posters (geometric shapes and type in the EventFlow palette, chosen per event from its public ID; no image files). The v0 design's three AI-generated photographs were removed before the release because their reuse rights were not established; they remain in earlier commits, since the history is not rewritten ([AI_USAGE.md](docs/process/AI_USAGE.md) §7).
+- **Release state:** the published `main` branch still holds the first release (the P0 scope, 2026-10-11). Everything else described here is on the `dev` branch until the release pull request into `main` is merged, which needs the stakeholder's authorization.
 - **Not production-ready:** no deployment exists, and there is no deployment configuration, TLS termination, backups or load testing.
 
 ## 9. Future improvements
@@ -205,7 +205,6 @@ Errors use RFC 9457 Problem Details (`application/problem+json`) with a stable `
 1. **Real email:** a Resend provider behind configuration, with delivery webhooks and a delivery-problem view.
 2. **Test infrastructure:** Testcontainers once a container runtime is available, and a load test of the last-seat path.
 3. **Camera check on real devices:** scan tickets with a phone and a laptop camera, and record which browsers offer `BarcodeDetector`.
-4. **Images:** confirm the licence of the three bundled photographs, or replace them with CSS posters like the three the artwork set already has.
 
 ## 10. How this was built
 

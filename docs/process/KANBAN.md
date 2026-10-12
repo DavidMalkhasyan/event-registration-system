@@ -77,7 +77,7 @@
 
 | Card | Milestone | Notes |
 |---|---|---|
-| K-604 Release tag and submission | M6 | **Not done.** Needs the stakeholder's authorization for a release pull request `dev` → `main`, then the tag and the submission (SUBMISSION_CHECKLIST §4). |
+| K-604 Release tag and submission | M6 | **Not done.** Opening the release pull request `dev` → `main` is authorized (PD-79); merging it, the tag and the submission need the stakeholder's authorization (SUBMISSION_CHECKLIST §4). |
 
 ## Partly done (remaining parts are in Backlog or Deferred)
 
