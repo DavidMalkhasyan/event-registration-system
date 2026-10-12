@@ -860,3 +860,31 @@ The last two rows were added in S-18 from GitHub's records.
 | 22:12–22:14 | `organizer-refresh.spec.ts` (3): participants and waiting list with search and filter kept, the Refresh button, an unsaved title through two polls, staff acceptance and revocation, the events list in list view with its search, the overview's Refresh; no page load in any | First run 2/3: the overview assertion guessed a wrong locator; the existing `overviewTotal` pattern used, with the value checked before and after Refresh: 3/3. **Mutation:** workspace polling off makes the first test fail; restored |
 | 22:15:12–22:16:31 | Visual check on the development stack | The web and worker had stopped at 21:47–21:51 with "schema version 7 does not match the expected version 8" (the safety check, before the development database was migrated at 21:54:57); restarted (schema 8, database ok). Screens at 1440 and 390 px: the Refresh control in the section toolbar, no horizontal overflow |
 | 22:16:44–22:23:40 | Full gates | `check:secrets`, `check:deps`, `format:check`, `lint`, `typecheck`, `migrate` ("schema is up to date", schema 8), `test` (server **156/156**, client **24/24** in 6 files), `build` and `e2e` (**29/29**, Edge) exit 0 |
+| 22:23:53–22:24:20 | Commits `a325ff2` (client), `1bf628c` (browser test), `668fe04` (records); pushed; [PR #23](https://github.com/DavidMalkhasyan/event-registration-system/pull/23) opened | CI [run 38290681280](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38290681280), 22:24:23–22:28:33, **passed** (secret scan of 193 files, dependency audit, 8 migrations and an idempotent repeat, 156/156, 24/24, build, 29/29) |
+| 22:28:49–22:28:53 | Diff reviewed (client, tests and records; no reload, storage or external URL); `gh pr merge 23 --merge` | `937baac` on `dev`; its tree equals the tested head `668fe04`; `main` unchanged |
+
+The last two rows were added in S-19 from GitHub's records.
+
+---
+
+## S-19: Post-release roadmap plan; organizer navigation and scroll (K-706)
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-12 23:31:12 +04:00 (prompt 28: "run"); prompt 29 at 2026-10-13 00:04:46 ("EVENTFLOW — COMPLETE POST-RELEASE PRODUCT ENHANCEMENT ROADMAP") |
+| **Cards** | K-704 → Done (PR #23); K-705 split; K-706 (new) → Review; K-707 to K-715 (new) |
+| **Tools and model** | Claude Code 2.1.296, model `claude-opus-5-5`; the S-02 toolchain; Playwright with Edge |
+
+**Activity:**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 23:31:21–23:31:29 | Prompt 28: the stack was already running (`/healthz` schema 8); the organizer page opened | — |
+| 00:05:02 | Prompt 29: state confirmed on GitHub and locally | `dev` `937baac`, `main` `8e7f6c1`; PRs #21 to #23 merged; Node 24's built-in `crypto.argon2` is available (no native hashing package needed) |
+| 00:05:18–00:05:48 | Read the organizer router; a scroll probe (scrolled page; every section, Refresh, back and forward) at 1440 and 390 px | Every section change jumped to the top (`navigate()` called `scrollTo(0)`); on phones the check-in field's `autoFocus` then scrolled the tabs off screen |
+| 00:06:31 | `feature/navigation-capacity` from `dev` (`937baac`) | — |
+| 00:07–00:09 | Router scrolls only for a new view; `preventScroll` focus; the workspace keeps the tabs in place across section changes; a minimum height for the sections panel | Probe at 1440, 768 and 390 px: the tabs stay at the same place for every section, Refresh, back and forward |
+| 00:09–00:10 | Sections opened once stay mounted while hidden; separate Participants and Waiting list instances; the hidden Staff section does not poll | Typecheck and lint pass |
+| 00:10–00:14 | `navigation.spec.ts` (2) | Corrected in the test: two search fields shared a name (the waiting list's is now "Search the waiting list"), a status text matched a hidden copy, two measurements ran before rendering. **Mutation:** restoring the unconditional `scrollTo(0)` was not caught at first (the tab anchoring compensates on tab clicks); a link inside a section ("Meet your participants") was added, and the mutation then fails the test. 2/2 |
+| 00:16 | Plan: [POST_RELEASE_PLAN.md](POST_RELEASE_PLAN.md) (PRs A to J, assumptions, map provider options); amendments A-1 approved, A-2 to A-6 recorded; cards K-706 to K-715 | The map provider is the open decision |
+| 00:16:21–00:22:57 | Full gates | `check:secrets`, `check:deps`, `format:check`, `lint`, `typecheck`, `migrate` ("schema is up to date"), `test` (server **156/156**, client **24/24**), `build` and `e2e` (**31/31**, Edge) exit 0 |

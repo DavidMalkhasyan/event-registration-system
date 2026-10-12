@@ -4,7 +4,12 @@
 
 | ID | Status |
 |---|---|
-| A-1 | **Proposed** (S-18, 2026-10-12): awaiting the stakeholder's amendment of REQUIREMENTS.md. Implemented in `dev` under PD-83 (K-703) on the stakeholder's explicit authorization (prompt 27). |
+| A-1 | **Approved** by the stakeholder on 2026-10-13 (prompt 29, S-19); proposed in S-18. Implemented in `dev` under PD-83 (K-703, PR #22). REQUIREMENTS.md itself is unchanged; this record is the amendment. |
+| A-2 | **Approved** (prompt 29, S-19): capacity can only be increased. To be implemented by K-707. |
+| A-3 | **Approved** (prompt 29, S-19): organizations, organizer accounts with passwords, Super Admin approval. To be implemented by K-708 to K-710. |
+| A-4 | **Approved** (prompt 29, S-19): event photographs and a gallery. To be implemented by K-712 and K-713. |
+| A-5 | **Approved** (prompt 29, S-19): event location and venue-change notices. To be implemented by K-711. |
+| A-6 | **Approved in principle** (prompt 29, S-19): a real map for confirmed participants; the map data provider awaits the stakeholder's choice (POST_RELEASE_PLAN.md). K-714. |
 
 ## A-1 Organizer cancellation of one confirmed registration
 
@@ -25,3 +30,27 @@
 | FR-ORG-CXL-7 | An audit record holds the action, the owner, the event, the registration and counts only (no personal data, AC-100). Cancelled registrations stay visible in the owner's participant list with their end reason. |
 
 **Not changed:** waiting-list removal (FR-WL-10 to FR-WL-14, BR-24, BR-27), its FIFO rules and its notice; participant cancellation (FR-SELF-2); event cancellation (FR-EVT-9).
+
+## A-2 Capacity can only be increased
+
+**Conflict.** FR-EVT-7 and FR-EVT-8 allow decreasing capacity down to the confirmed count (`capacity_below_confirmed`).
+
+**Approved change.** After creation, capacity can only be increased, up to 100 000 (FR-EVT-1's range). A request for a lower value than the current capacity is refused (the API reports the current capacity); a value outside 1 to 100 000 is a validation error. Increases keep TX-E03: the exclusive event lock, the authoritative value read under it, FIFO promotion into the new seats before the cutoff, idempotent absolute values. The forms normalize out-of-range values on commit (create: 1 to 100 000; edit: current capacity to 100 000).
+
+## A-3 Organizations, organizer accounts and Super Admin
+
+**Conflict.** REQUIREMENTS.md v1.7 has one organizer per event (co-organizers out of scope, §1.2, Q3), passwordless organizer sign-in (FR-ORG-1 to FR-ORG-5) and no platform admin role (§1.2, Q3).
+
+**Approved change.** Events belong to organizations; an organization has several organizer accounts with roles; organizers sign in with a password (Argon2id) after email verification, with password reset by an expiring single-use emailed link; a new organization needs Super Admin approval before it can create or manage events; a separate Super Admin area approves, rejects and suspends organizations, with audit records; the first Super Admin is created by an operator command, never publicly. Participants keep email-only registration; staff stay event-scoped device sessions. Existing organizers, events and history are migrated without loss (POST_RELEASE_PLAN.md, assumptions 1 and 2).
+
+## A-4 Event photographs and gallery
+
+**Change.** An event can have one cover photograph and up to 8 gallery photographs, uploaded by its organization's organizers, validated by content, re-encoded without metadata and served from our own origin; events without photographs keep the CSS posters.
+
+## A-5 Event location and venue-change notices
+
+**Change.** An event can have a venue (name, street address, city, optional region, country, optional postal code, optional arrival instructions, coordinates only when established). Existing events without a location stay valid. A change of the venue after registrations exist queues one notice per confirmed and waiting participant through the transactional outbox.
+
+## A-6 Participant map
+
+**Change, approved in principle.** Confirmed participants see the venue on a real map, with its address and a directions link, served without third-party requests from participant link pages and without passing participant tokens or data to any provider. The data provider is a separate stakeholder decision.
