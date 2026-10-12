@@ -78,6 +78,7 @@ export interface RegistrationsTable {
   confirmed_at: Timestamp | null;
   ended_at: Timestamp | null;
   end_reason: string | null;
+  removal_reason: string | null;
   updated_at: Timestamp;
 }
 

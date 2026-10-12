@@ -26,6 +26,7 @@ export type ProblemCode =
   | 'invitation_not_pending'
   | 'check_in_window_ended'
   | 'check_in_already_undone'
+  | 'not_waitlisted'
   | 'schedule_version_mismatch'
   | 'nonexistent_local_time'
   | 'ambiguous_local_time'
@@ -64,6 +65,7 @@ const TITLES: Record<ProblemCode, string> = {
   invitation_not_pending: 'This invitation is no longer pending',
   check_in_window_ended: 'The check-in window of this event has ended',
   check_in_already_undone: 'This check-in was already undone',
+  not_waitlisted: 'This registration is no longer on the waiting list',
   schedule_version_mismatch: 'The event was changed by another request; reload and try again',
   nonexistent_local_time: 'This local time does not exist in the time zone',
   ambiguous_local_time: 'This local time is ambiguous in the time zone',
