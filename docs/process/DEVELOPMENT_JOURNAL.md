@@ -661,3 +661,32 @@
 | 11:00:04–11:03:35 (UTC 07:00–07:03) | [PR #10](https://github.com/DavidMalkhasyan/event-registration-system/pull/10), `dev` ← `feature/waitlist-removal`; diff reviewed (14 files, no secrets) | CI [run 38215349977](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38215349977) **passed**: 7 migrations on a fresh database; 130/130, 6/6, 17/17 |
 | 11:03:50 | `gh pr merge 10 --merge` | `d219576` on `dev`; tree equals the tested head; `main` unchanged |
 | 11:04–11:06 | `feature/ui-inventory` from `origin/dev`. Read the client files, both HTML entries, the Vite and server entry routing, the API calls of every screen, the styles, and every locator in the 11 E2E specs and their helpers | `docs/frontend/UI_INVENTORY.md` (K-506, PD-64). Three first-draft statements were corrected against the code before commit: the navigation helper's size, the locator count (about 200 lines, not 220), and the offline check-in wording. No application code changed; the redesign was not started. |
+
+---
+
+## S-13: UI redesign to the approved v0 design (K-507)
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-12 11:34 +04:00 (prompt 17: implement the approved v0 design in the existing application) |
+| **Cards** | K-506 (Review → Done), K-507 (In Progress), K-504 remainder |
+| **Tools and model** | Claude Code, model `claude-opus-5-5`; GitHub CLI; the S-02 toolchain; Playwright with Edge for screenshots |
+
+**Activity:**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 11:34 | `git clone https://git.v0.app/…/eventflow-v0-design.git` | **Blocked:** `401 Unauthorized`, `Www-Authenticate: Bearer realm="v0 managed git"`. The clone waited in Git Credential Manager; it was stopped and its empty directory (no objects) removed. Reported to the stakeholder; no credentials requested. |
+| 11:52 | The stakeholder published the design on GitHub; cloned to the sibling directory `../eventflow-v0-design` (`6a62aac`) | Read every source file: `src/App.tsx`, `components/*.tsx`, `demo-store.ts`, `app/globals.css` (3,029 lines), the shadcn primitives, `package.json`, Vite config, assets |
+| 11:54–11:58 | `pnpm install` in the design repository; preview on port 5190; screenshots of nine screens at 1440 and 390 px with Playwright (Edge) | The preview runs. Findings: a prototype on an in-memory demo store with hash routing; `next` and `@vercel/analytics` are declared but unused by the Vite entry; several classes the components use have **no CSS** (poster fallbacks for events without photos, the event cover caption, the overview's bottom sections), so those parts render unstyled in v0 itself |
+| 12:00–12:02 | Read `UI_INVENTORY.md`, both client entries in full, the E2E helpers and specs; confirmed 15 handlers in `HANDLERS`; reviewed PD-63 and migration `0007` (written only by TX-W01, constrained to `removed_by_organizer`, deleted with the registration) | No schema change needed. `feature/ui-redesign` from `origin/dev` (`dd23b93`). Decisions PD-65 to PD-70. |
+| 12:04:09 | `GET /api/events` with per-event `waitlistedCount` and `checkedInCount`; an integration test with two events of one organizer, another organizer's event and an undone check-in | Pass; a mutation check (no `undone_at` filter) makes it fail. Commit `7156c81`. |
+| 12:05–12:20 | `lucide-react` 1.17.0 added (ISC); the three v0 photographs compressed from 4.7 MB to 359 KB; `shared/styles.css` rewritten from v0's CSS; `shared/ui.tsx` primitives | Typecheck passes |
+| 12:20 | The Claude Code process ended while background tasks were running; work in the tree was intact. On resuming, two copies of the dev web server and worker were found (processes from before the restart had survived their stop request); all four were stopped and one of each restarted. | No data affected; `/healthz` schema 7 |
+| 12:20–12:50 | Organizer modules (router, shell, auth, overview, All events, creation, workspace sections), `checkin/` and `staff.html` | Lint found `setState` in effects and a ref read during render; fixed by moving the state change into the click handler, tagging result messages with their section, and destructuring the navigation hook |
+| 12:52–12:55 | Browser review on the real stack: an organizer signed in through the UI and the emailed link; four events, eleven registrations, a waiting list, two check-ins and a cancellation created through the API; screenshots of ten organizer screens at 1440, 768 and 390 px (Playwright, Edge) | No horizontal overflow at any width. Found and fixed: poster text under the date pill; a wrapping "All events" link on phones; a `favicon.ico` 404 (now an inline SVG). The check-in panel heading became `h2` inside the workspace. |
+| 12:56–13:00 | E2E suite after updating its helpers | **0/17**: the copy button's label ("Copy Public registration link") also matched `getByLabel`, and then the scanner region's label contained "ticket code". Both were ambiguous names in the new markup and were fixed there; `/capacity 2/` became the "Event capacity" tile. Then 17/17. |
+| 13:00–13:02 | New E2E `organizer-workspace.spec.ts` | **Failed** on a real defect: the overview showed stale totals after participants registered elsewhere, because the event list was loaded once. Fixed by reloading it on every navigation; 2/2. |
+| 13:03:50–13:08:19 | Full suite | `format:check`, `lint`, `typecheck`, `test` (server 131/131, client 11/11), `build` and `e2e` (**19/19**) exit 0 |
+| 13:08–13:10 | Bundle inspection | `staff.html` loads 1.7 KB of its own code plus the shared UI and check-in chunks; no organizer endpoint in the staff or public bundles. The shared library chunk evaluates before the token bootstrap on link pages; a build of `dd23b93` shows the same order, so this predates the redesign (PD-71). |
+| 13:10 | Commits | `1689c9b` design system; `459b897` organizer area, check-in and staff entry; `bb2606b` tests |

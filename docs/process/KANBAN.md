@@ -49,13 +49,13 @@
 | K-406 Staff invitations and sessions (FR-STAFF-1 to FR-STAFF-7; TX-S01 to TX-S03; API #14 to #16, #41, #42, #45 to #50), including the K-304c dependency | M4 | `bf73afd`, `c6437d6`, `465acbf`, `7ebecf6`; [PR #8](https://github.com/DavidMalkhasyan/event-registration-system/pull/8) into `dev`; CI runs [38176421220](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38176421220) and [38176668486](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38176668486) passed (6 migrations; 110/110, 6/6, 15/15); merged 2026-10-12 01:33:57 as `f547477`. Not in `main`. AC-186 (c) is not covered by an automated test. |
 | K-306 Check-in undo (FR-CHK-8, BR-7, TX-C02, API #44; AC-26, AC-27, AC-54) | M4 | `710b9bd`, `f5d4b34`, `4a598ac`, `9e83ed1`; [PR #9](https://github.com/DavidMalkhasyan/event-registration-system/pull/9) into `dev`; CI run [38212459702](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38212459702) passed (6 migrations; 119/119, 6/6, 16/16); merged 2026-10-12 10:29:00 as `2efd8f1`. Not in `main`. |
 | K-305b Waiting-list removal by the owner (FR-WL-10 to FR-WL-14, FR-NTF-14, BR-23, BR-24, BR-27, TX-W01, API #43; AC-76 to AC-79, AC-90 to AC-92) | M3 | `9b59de4`, `a38a313`, `4e7ccc8`, `3065378`; [PR #10](https://github.com/DavidMalkhasyan/event-registration-system/pull/10) into `dev`; CI run [38215349977](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38215349977) passed (7 migrations; 130/130, 6/6, 17/17); merged 2026-10-12 11:03:50 as `d219576`. Not in `main`. |
+| K-506 UI implementation inventory before a redesign (no visual change) | M5 | `b457bfa`, `16a4800`; [PR #11](https://github.com/DavidMalkhasyan/event-registration-system/pull/11) into `dev`; CI run [38215945495](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38215945495) passed (7 migrations; 130/130, 6/6, 17/17); merged 2026-10-12 11:10:21 as `dd23b93`. Documentation only. |
 | K-505 Playwright suites, **reduced scope** | M5 | `b7a164f`: 4 tests, including two simultaneous clients. 4/4 passed in 3 runs; a mutation check proved the live-count test fails when the feature breaks. |
 
 ## Review
 
 | Card | Milestone | Awaiting |
 |---|---|---|
-| K-506 UI implementation inventory before a redesign (no visual change) | M5 | [docs/frontend/UI_INVENTORY.md](../frontend/UI_INVENTORY.md) on `feature/ui-inventory`. **Awaiting:** pull request, CI and merge. The redesign itself is not started. |
 | K-001 Apply R60; synchronize the documents | M0 | Stakeholder check (commit `3fe9cb7`) |
 | K-004 Process documentation | M0 | Stakeholder review |
 
@@ -63,6 +63,7 @@
 
 | Card | Milestone | State |
 |---|---|---|
+| K-507 UI redesign to the approved v0 design ([eventflow-v0-design](https://github.com/DavidMalkhasyan/eventflow-v0-design)), with the K-504 remainder (dedicated staff entry) | M5 | S-13: design system, organizer area (global overview, All events, creation, event workspace), shared check-in and the dedicated staff entry done on `feature/ui-redesign` (first pull request); participant and link pages next. Decisions PD-65 to PD-71 |
 | K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Updated in S-07 |
 
 ## To Do
@@ -77,10 +78,10 @@
 |---|---|---|
 | K-304 Event lifecycle | Create, reschedule (P0); capacity (K-304a), details (K-304b), cancellation (K-304c), deletion (K-304d), all done in `dev` | — |
 | K-401 Messaging | Outbox claim, fenced send, reaper, sweeps, pre-claim counter | Budget, pause, render-time re-check |
-| K-403 Notifications | 9 of 17 message types | The rest, with their features |
+| K-403 Notifications | 15 of 17 message types (checked against `HANDLERS` in `notifications/handlers.ts` on 2026-10-12) | `email_change_confirmation` and `email_change_notice`, which belong to the deferred email change (FR-ORG-6) |
 | K-404 Jobs | Reminder fan-out (P0 #13); cutoff job (K-404b, done in `dev`) | — |
 | K-408 Email providers | Fake provider | Resend adapter (P2) |
-| K-504 Scanner and live count | Owner check-in screen with live count; minimal staff check-in screen at `/staff` (K-406, PD-57) | A dedicated staff entry and scanner polish (UI work) |
+| K-504 Scanner and live count | Owner check-in with live count; dedicated staff entry `staff.html` at `/staff` with the shared check-in panel (K-507, PD-69) | — (closed with the K-507 merge) |
 
 ## Backlog
 

@@ -6,6 +6,7 @@ import {
   createEvent,
   linkIn,
   mailFor,
+  openSection,
   openVerification,
   registerParticipant,
   signIn,
@@ -14,7 +15,7 @@ import {
 
 // K-304d in the browser: FR-EVT-10, FR-EVT-11, FR-EVT-13, FR-ORG-5.
 
-const deleteCard = (page: Page) => page.locator('section.card', { hasText: 'Delete event' });
+const deleteCard = (page: Page) => page.getByRole('region', { name: 'Delete event' });
 
 test('deletes an eligible event; it disappears, and a pending registrant’s link stops working', async ({
   page,
@@ -28,6 +29,7 @@ test('deletes an eligible event; it disappears, and a pending registrant’s lin
   const visitor = await browser.newContext();
   const visitorPage = await visitor.newPage();
   await openVerification(visitorPage, publicUrl, pending);
+  await openSection(page, 'Settings');
 
   await deleteCard(page).getByRole('button', { name: 'Delete this event…' }).click();
   await expect(page.getByText(`Delete “${title}” permanently?`)).toBeVisible();
@@ -55,6 +57,7 @@ test('explains why an event can’t be deleted, and offers no deletion for a can
   });
   await registerParticipant(browser, publicUrl, address('guest'));
   await page.reload();
+  await openSection(page, 'Settings');
 
   await deleteCard(page).getByRole('button', { name: 'Delete this event…' }).click();
   await expect(deleteCard(page).getByText('It still has confirmed participants.')).toBeVisible();
@@ -64,7 +67,7 @@ test('explains why an event can’t be deleted, and offers no deletion for a can
 
   // After cancellation there is no delete action at all (FR-EVT-11).
   await page
-    .locator('section.card', { hasText: 'Cancel event' })
+    .getByRole('region', { name: 'Cancel event' })
     .getByRole('button', { name: 'Cancel this event…' })
     .click();
   await page.getByRole('button', { name: 'Yes, cancel the event permanently' }).click();
@@ -77,6 +80,7 @@ test('a stale session confirms it’s you, comes back, and confirms the deletion
   await signIn(page, organizer);
   const title = `Stale delete ${Date.now()}`;
   await createEvent(page, { title, capacity: 2, startsInMs: 72 * HOUR });
+  await openSection(page, 'Settings');
   const eventUrl = page.url();
   expect(await ageOrganizerSessions(organizer, 16)).toBe(1); // controlled test-database setup
   await page.reload();

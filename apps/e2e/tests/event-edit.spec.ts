@@ -4,6 +4,7 @@ import {
   address,
   createEvent,
   mailFor,
+  openSection,
   registerParticipant,
   signIn,
   stat,
@@ -24,6 +25,7 @@ test('organizer edits the title and description; the public page shows them and 
   const mailsBefore = mailFor(participant, '').length;
 
   const renamed = `${original} (room 4)`;
+  await openSection(page, 'Settings');
   await page.getByLabel('Event title').fill(renamed);
   await page.getByLabel('Event description').fill('New room: 4.\nBring your laptop.');
   await page.getByRole('button', { name: 'Save details' }).click();
@@ -36,7 +38,7 @@ test('organizer edits the title and description; the public page shows them and 
   await page.reload();
   await expect(page.getByRole('heading', { name: renamed })).toBeVisible();
   await expect(stat(page, 'Confirmed')).toHaveText('1');
-  await expect(page.getByText(/capacity 2/)).toBeVisible();
+  await expect(stat(page, 'Event capacity')).toHaveText('2');
 
   // The public registration page shows the new details.
   const visitor = await browser.newContext();

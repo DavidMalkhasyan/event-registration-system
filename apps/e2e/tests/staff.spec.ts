@@ -3,8 +3,10 @@ import {
   HOUR,
   address,
   createEvent,
+  checkInResult,
   linkIn,
   localIn,
+  openSection,
   registerParticipant,
   signIn,
   stat,
@@ -21,11 +23,13 @@ test('owner invites staff; staff accept on their device, check tickets in, and l
   const { eventId, publicUrl } = await createEvent(page, { title, capacity: 3, startsInMs: 72 * HOUR });
   const { ticketCode } = await registerParticipant(browser, publicUrl, address('guest'));
   // Into the check-in window (opens 2 hours before the start).
+  await openSection(page, 'Settings');
   await page.getByLabel(/New date and time/).fill(localIn(1 * HOUR));
   await page.getByRole('button', { name: 'Reschedule and notify' }).click();
   await expect(page.getByText('Rescheduled.')).toBeVisible();
 
   const helper = address('helper');
+  await openSection(page, 'Staff');
   await page.getByLabel('Staff email address').fill(helper);
   await page.getByRole('button', { name: 'Send invitation' }).click();
   await expect(page.getByText(`Invitation sent to ${helper}.`)).toBeVisible();
@@ -42,7 +46,7 @@ test('owner invites staff; staff accept on their device, check tickets in, and l
   await expect(staff.getByRole('heading', { name: `Check-in: ${title}` })).toBeVisible();
   await staff.getByLabel('Ticket code').fill(ticketCode!);
   await staff.getByRole('button', { name: 'Check in' }).click();
-  await expect(staff.getByText('✔ Checked in')).toBeVisible();
+  await expect(checkInResult(staff)).toHaveText('Checked in');
   await expect(stat(staff, 'Checked in')).toHaveText('1'); // live count for staff
 
   // Staff can't use organizer endpoints (PD-56), and the invitation link works only once.

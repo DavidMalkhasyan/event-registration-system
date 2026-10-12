@@ -4,6 +4,7 @@ import {
   address,
   createEvent,
   linkIn,
+  openSection,
   registerParticipant,
   signIn,
   stat,
@@ -30,8 +31,9 @@ test('owner removes the second of three waiting entries after confirming; the re
 
   await page.reload();
   await expect(stat(page, 'Waiting list')).toHaveText('3');
+  await openSection(page, 'Waiting list');
   const row = page.getByRole('row', { name: new RegExp(waiting[1]!) });
-  await expect(row.getByText('WAITLISTED #2')).toBeVisible();
+  await expect(row.getByText('Position #2')).toBeVisible();
   // Asking, then keeping the entry, changes nothing.
   await row.getByRole('button', { name: 'Remove from waiting list' }).click();
   await row.getByRole('button', { name: 'Keep on the list' }).click();
@@ -46,10 +48,13 @@ test('owner removes the second of three waiting entries after confirming; the re
   ).toBeVisible();
   await expect(stat(page, 'Waiting list')).toHaveText('2');
   await expect(stat(page, 'Confirmed')).toHaveText('1');
-  await expect(row.getByText('CANCELLED')).toBeVisible();
+  // The waiting list shows only those still waiting; the full list shows the removal.
+  await expect(row).toHaveCount(0);
+  await openSection(page, 'Participants');
+  await expect(row.getByText('Cancelled')).toBeVisible();
   await expect(row.getByRole('button', { name: 'Remove from waiting list' })).toHaveCount(0);
   await expect(
-    page.getByRole('row', { name: new RegExp(waiting[2]!) }).getByText('WAITLISTED #2'),
+    page.getByRole('row', { name: new RegExp(waiting[2]!) }).getByText('Position #2'),
   ).toBeVisible();
 
   const [notice] = await waitForMail(waiting[1]!, 'Removed from the waiting list');

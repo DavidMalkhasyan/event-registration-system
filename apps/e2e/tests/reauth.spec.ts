@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { ageOrganizerSessions } from './db.js';
-import { HOUR, address, createEvent, linkIn, signIn, stat, waitForMail } from './helpers.js';
+import { HOUR, address, createEvent, linkIn, openSection, signIn, stat, waitForMail } from './helpers.js';
 
 // K-302b in the browser (FR-ORG-5, AC-149). A stale session is prepared in the TEST database
 // (controlled setup; the application has no backdoor), since real time can't pass 15 minutes here.
@@ -12,6 +12,7 @@ test('a stale session re-authenticates by email and returns to the event; nothin
   await signIn(page, organizer);
   const title = `Protected ${Date.now()}`;
   await createEvent(page, { title, capacity: 2, startsInMs: 72 * HOUR });
+  await openSection(page, 'Settings'); // the sign-in status sits next to the protected actions
   const eventUrl = page.url();
   await expect(page.getByText('Your sign-in counts as recent until')).toBeVisible();
 
@@ -39,7 +40,7 @@ test('a stale session re-authenticates by email and returns to the event; nothin
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
   await expect(page.getByText('Your sign-in counts as recent until')).toBeVisible();
   await expect(stat(page, 'Confirmed')).toHaveText('0'); // the event is untouched
-  await expect(page.getByText(/capacity 2/)).toBeVisible();
+  await expect(stat(page, 'Event capacity')).toHaveText('2');
 
   // The requesting session is revoked; the new one works.
   expect((await oldDevice.request.get('/api/auth/session')).status()).toBe(401);

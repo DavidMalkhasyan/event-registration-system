@@ -152,7 +152,29 @@ export async function listEvents(ctx: AppContext, principal: OrganizerPrincipal)
     .orderBy('starts_at', 'desc')
     .limit(200)
     .execute();
-  return { items: rows.map((r) => eventView(ctx, r, now)), nextCursor: null };
+  // Per-event waiting and checked-in counts for the global dashboard (PD-67), from current state only.
+  const ids = rows.map((r) => r.id);
+  const counts = new Map<string, { waitlisted: number; checkedIn: number }>(
+    ids.map((id) => [id, { waitlisted: 0, checkedIn: 0 }]),
+  );
+  if (ids.length > 0) {
+    const waiting = await sql<{ event_id: string; n: number }>`
+      SELECT event_id, count(*)::int AS n FROM app.registrations
+      WHERE event_id = ANY(${ids}::uuid[]) AND state = 'WAITLISTED' GROUP BY event_id`.execute(ctx.db);
+    const checked = await sql<{ event_id: string; n: number }>`
+      SELECT event_id, count(*)::int AS n FROM app.check_ins
+      WHERE event_id = ANY(${ids}::uuid[]) AND undone_at IS NULL GROUP BY event_id`.execute(ctx.db);
+    for (const r of waiting.rows) counts.get(r.event_id)!.waitlisted = r.n;
+    for (const r of checked.rows) counts.get(r.event_id)!.checkedIn = r.n;
+  }
+  return {
+    items: rows.map((r) => ({
+      ...eventView(ctx, r, now),
+      waitlistedCount: counts.get(r.id)!.waitlisted,
+      checkedInCount: counts.get(r.id)!.checkedIn,
+    })),
+    nextCursor: null,
+  };
 }
 
 /** Another owner's event and an unknown event look the same: 404 (AC-155). */

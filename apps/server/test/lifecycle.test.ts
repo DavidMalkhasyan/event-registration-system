@@ -202,6 +202,52 @@ describe('organizer dashboard (P0 #11)', () => {
     });
     expect(dash.json().counts).toEqual({ confirmed: 2, waitlisted: 1, checkedIn: 1 });
   });
+
+  it('lists every event of the organizer with its own counts, and only theirs (PD-67)', async () => {
+    const { s, event, results } = await setup(1, ['a@example.test', 'b@example.test', 'c@example.test']);
+    const second = await createEvent(h, s, { capacity: 5, startsInHours: 96, title: 'Second' });
+    await registerConfirmed(h, second.publicId, 'd@example.test');
+    const other = await signIn(h, 'other@example.test');
+    const foreign = await createEvent(h, other, { capacity: 5, startsInHours: 72, title: 'Foreign' });
+    await registerConfirmed(h, foreign.publicId, 'e@example.test');
+
+    moveClockTo(new Date(event.startsAt), -10 * 60_000);
+    const checkIn = await h.app.inject({
+      method: 'POST',
+      url: `/api/events/${event.id}/check-ins`,
+      headers: organizerHeaders(s),
+      payload: { code: results[0].ticket.code, requestId: randomUUID() },
+    });
+    expect(checkIn.json().outcome).toBe('CHECKED_IN');
+    const list = async (session: Session) =>
+      (await h.app.inject({ method: 'GET', url: '/api/events', headers: { cookie: session.cookie } })).json()
+        .items as { id: string; confirmedCount: number; waitlistedCount: number; checkedInCount: number }[];
+
+    const items = await list(s);
+    expect(items.map((i) => i.id).sort()).toEqual([event.id, second.id].sort());
+    expect(items.find((i) => i.id === event.id)).toMatchObject({
+      confirmedCount: 1,
+      waitlistedCount: 2,
+      checkedInCount: 1,
+    });
+    expect(items.find((i) => i.id === second.id)).toMatchObject({
+      confirmedCount: 1,
+      waitlistedCount: 0,
+      checkedInCount: 0,
+    });
+    expect((await list(other)).map((i) => i.id)).toEqual([foreign.id]);
+
+    // An undone check-in no longer counts.
+    const row = await h.db.selectFrom('app.check_ins').select('id').executeTakeFirstOrThrow();
+    const undo = await h.app.inject({
+      method: 'POST',
+      url: `/api/events/${event.id}/check-ins/${row.id}/undo`,
+      headers: organizerHeaders(s),
+      payload: {},
+    });
+    expect(undo.statusCode).toBe(200);
+    expect((await list(s)).find((i) => i.id === event.id)!.checkedInCount).toBe(0);
+  });
 });
 
 describe('event creation (FR-EVT-1, AC-185)', () => {

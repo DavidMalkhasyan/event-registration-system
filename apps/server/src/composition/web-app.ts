@@ -78,7 +78,8 @@ export async function buildWebApp(
       reply.sendFile(file);
     for (const path of ['/e/*', '/verify', '/manage', '/ticket', '/sign-in', '/invite'])
       app.get(path, entry('public.html'));
-    for (const path of ['/', '/organizer', '/organizer/*', '/staff']) app.get(path, entry('organizer.html'));
+    for (const path of ['/', '/organizer', '/organizer/*']) app.get(path, entry('organizer.html'));
+    app.get('/staff', entry('staff.html')); // dedicated staff entry (PD-69)
     app.get('/assets/*', async (request, reply) =>
       reply.sendFile((request.params as { '*': string })['*'], resolve(config.CLIENT_DIST_DIR!, 'assets')),
     );

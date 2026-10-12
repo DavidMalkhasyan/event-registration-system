@@ -5,6 +5,7 @@ import {
   createEvent,
   linkIn,
   mailFor,
+  openSection,
   openVerification,
   readResult,
   registerParticipant,
@@ -25,7 +26,7 @@ test('organizer creates an event; participants register, join the waiting list, 
 
   await signIn(page, organizer);
   const { publicUrl } = await createEvent(page, { title, capacity: 1, startsInMs: 72 * HOUR });
-  // Description shown on the dashboard (the details editor below holds it too, in its text area).
+  // Description shown on the event's overview section.
   await expect(page.locator('p', { hasText: 'Created by the end-to-end test.' })).toBeVisible();
 
   // Anna takes the only seat and sees her ticket.
@@ -72,8 +73,9 @@ test('organizer creates an event; participants register, join the waiting list, 
   await page.reload();
   await expect(stat(page, 'Confirmed')).toHaveText('1');
   await expect(stat(page, 'Waiting list')).toHaveText('0');
+  await openSection(page, 'Participants');
   const benRow = page.getByRole('row', { name: new RegExp(ben.replace(/[.+]/g, '\\$&')) });
-  await expect(benRow).toContainText('CONFIRMED');
+  await expect(benRow).toContainText('Confirmed');
   expect(mailFor(anna, 'Your ticket')).toHaveLength(1); // no duplicate ticket emails
 });
 
