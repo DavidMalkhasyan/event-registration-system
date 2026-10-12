@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { ApiError, api, errorMessage } from '../../shared/api';
+import { CAPACITY_MAX, CAPACITY_MIN, normalizeCapacity, type CapacityCheck } from '../../shared/capacity';
 import { Alert, Button, Field, PageHeader, SectionHeading, buttonClass } from '../../shared/ui';
 import { Link, navigate } from '../router';
 import type { EventItem, Session } from '../types';
@@ -21,14 +22,24 @@ export function CreateEvent({ session, onCreated }: { session: Session; onCreate
     utcOffset: '',
   });
   const [offsets, setOffsets] = useState<string[]>([]);
+  const [capacityCheck, setCapacityCheck] = useState<CapacityCheck>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   // One request ID per distinct payload: retries of the same submission are idempotent (D-17).
   const requestRef = useRef<{ key: string; id: string } | null>(null);
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
 
+  /** Corrects the capacity on leaving the field or submitting (K-707); returns whether it can be sent as is. */
+  const commitCapacity = () => {
+    const check = normalizeCapacity(form.capacity);
+    setCapacityCheck(check.note || check.error ? check : undefined);
+    if (check.value !== form.capacity) set({ capacity: check.value });
+    return !check.error && check.value === form.capacity;
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!commitCapacity()) return; // corrected or invalid: shown to the organizer before anything is sent
     setBusy(true);
     setError(undefined);
     const payload = {
@@ -142,20 +153,34 @@ export function CreateEvent({ session, onCreated }: { session: Session; onCreate
               )}
             </Field>
             <Field
-              label="Capacity"
-              hint="When the event is full, new registrations join the waiting list in order."
+              label="Capacity (1 to 100,000 seats)"
+              hint="When the event is full, new registrations join the waiting list in order. After creation, capacity can only be increased."
             >
               {(id) => (
-                <input
-                  id={id}
-                  className="input"
-                  type="number"
-                  min={1}
-                  max={100000}
-                  required
-                  value={form.capacity}
-                  onChange={(e) => set({ capacity: e.target.value })}
-                />
+                <>
+                  <input
+                    id={id}
+                    className="input"
+                    type="number"
+                    inputMode="numeric"
+                    min={CAPACITY_MIN}
+                    max={CAPACITY_MAX}
+                    step={1}
+                    required
+                    aria-invalid={capacityCheck?.error ? true : undefined}
+                    value={form.capacity}
+                    onChange={(e) => {
+                      set({ capacity: e.target.value });
+                      setCapacityCheck(undefined);
+                    }}
+                    onBlur={commitCapacity}
+                  />
+                  {capacityCheck && (
+                    <p className={capacityCheck.error ? 'field-error' : 'field-note'} role="status">
+                      {capacityCheck.error ?? capacityCheck.note}
+                    </p>
+                  )}
+                </>
               )}
             </Field>
           </div>

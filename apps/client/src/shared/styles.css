@@ -746,6 +746,19 @@ svg {
   min-height: calc(100vh - 96px);
   min-height: calc(100dvh - 96px);
 }
+/* A field corrected or refused on commit (K-707) */
+.field-note,
+.field-error {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.field-note {
+  color: var(--warm);
+}
+.field-error {
+  color: var(--destructive);
+}
 /* Organizer refresh (K-704) */
 .refresh-control {
   display: inline-flex;
