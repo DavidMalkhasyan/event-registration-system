@@ -491,6 +491,26 @@ const waitlistRemoved: MessageHandler = {
   },
 };
 
+const organizerCancellation: MessageHandler = {
+  // K-703 (PD-83): a required notice (CK-69): no freshness check, never dropped, also after a later
+  // event cancellation. No management or share link and no ticket code.
+  async freshness() {
+    return { fresh: true };
+  },
+  async issueTokens() {
+    return {};
+  },
+  async render(db, msg) {
+    const event = (await eventOf(db, msg.event_id!))!;
+    return email(`Registration cancelled by the organizer: ${event.title}`, [
+      `Your registration for "${event.title}" has been cancelled by the organizer.`,
+      `The event: "${event.title}", ${localTime(event.starts_at, event.time_zone)}.`,
+      'Your ticket is no longer valid, and links in earlier emails about this registration no longer work. Please do not come to the event with this ticket.',
+      'If you have questions, please contact the organizer.',
+    ]);
+  },
+};
+
 export const HANDLERS: Record<string, MessageHandler> = {
   sign_in: signIn,
   verification,
@@ -503,6 +523,7 @@ export const HANDLERS: Record<string, MessageHandler> = {
   waitlist_closed: waitlistClosed,
   registration_cancelled: registrationCancelled,
   waitlist_removed: waitlistRemoved,
+  organizer_cancellation: organizerCancellation,
   event_cancellation: eventCancellation,
   ticket_resend: ticketResend,
   staff_invitation: staffInvitation,

@@ -520,6 +520,91 @@ export async function cancelEvent(
   if (result === 'started') throw new AppError(409, 'event_started');
 }
 
+// ---------------------------------------------------------------- organizer cancellation of one registration (K-703)
+
+export type OrganizerCancellationResult = { result: 'cancelled'; promoted: number };
+
+/**
+ * K-703 (PD-83): the owner cancels one CONFIRMED registration. Under the exclusive event lock, so it is
+ * serialized with verification, promotion, participant cancellation, check-in, waiting-list removal and
+ * event cancellation, and decided by commit order. Everything read before is re-read under the lock.
+ * Only a CONFIRMED registration of a SCHEDULED event before its start, without an active check-in, is
+ * cancelled (a checked-in ticket stays: its history and check-in undo are kept). One transaction: the
+ * registration becomes CANCELLED with end_reason 'cancelled_by_organizer'; its ticket stops being valid
+ * through the registration state (check-in answers TICKET_CANCELLED, management and share links stop
+ * working); exactly one required notice, by logical key; the freed seat goes FIFO to the waiting list
+ * before the cutoff (promoteFifo, after the decrement); an audit record with IDs and counts only.
+ * A repeat finds the registration no longer CONFIRMED and changes nothing.
+ */
+export async function cancelRegistrationByOrganizer(
+  ctx: AppContext,
+  principal: OrganizerPrincipal,
+  eventId: string,
+  registrationId: string,
+  correlationId: string,
+): Promise<OrganizerCancellationResult> {
+  if (!z.uuid().safeParse(eventId).success || !z.uuid().safeParse(registrationId).success)
+    throw new AppError(404, 'not_found');
+  const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
+    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
+    const reg = await trx
+      .selectFrom('app.registrations')
+      .select(['id', 'email', 'state'])
+      .where('id', '=', registrationId)
+      .where('event_id', '=', eventId)
+      .executeTakeFirst();
+    if (!reg) return 'not_found' as const;
+    if (event.status !== 'SCHEDULED') return 'not_scheduled' as const;
+    if (now >= event.starts_at) return 'started' as const;
+    if (reg.state !== 'CONFIRMED') return 'not_confirmed' as const;
+    const checkedIn = await trx
+      .selectFrom('app.check_ins as c')
+      .innerJoin('app.tickets as t', 't.id', 'c.ticket_id')
+      .select('c.id')
+      .where('t.registration_id', '=', reg.id)
+      .where('c.undone_at', 'is', null)
+      .executeTakeFirst();
+    if (checkedIn) return 'checked_in' as const;
+
+    // The decrement runs before any promotion increments (NFR-CON-4 f).
+    await trx
+      .updateTable('app.registrations')
+      .set({ state: 'CANCELLED', ended_at: now, end_reason: 'cancelled_by_organizer', updated_at: now })
+      .where('id', '=', reg.id)
+      .where('state', '=', 'CONFIRMED')
+      .execute();
+    await enqueue(trx, {
+      type: 'organizer_cancellation',
+      logicalKey: `organizer_cancellation:${reg.id}`,
+      recipientEmail: reg.email,
+      now,
+      eventId,
+      registrationId: reg.id,
+      correlationId,
+    });
+    const promoted = await promoteFifo(trx, eventId, now, correlationId);
+    await recordAudit(trx, {
+      now,
+      action: 'registration_cancel_by_organizer',
+      actorKind: 'owner',
+      actorAccountId: principal.accountId,
+      eventId,
+      registrationId: reg.id,
+      outcome: 'cancelled',
+      details: { previousState: 'CONFIRMED', promoted: promoted.length },
+    });
+    return { promoted: promoted.length };
+  });
+  if (result === null || result === 'not_found') throw new AppError(404, 'not_found');
+  if (result === 'unauthenticated') throw new AppError(401, 'unauthenticated');
+  if (result === 'not_scheduled') throw new AppError(409, 'event_not_scheduled');
+  if (result === 'started') throw new AppError(409, 'event_started');
+  if (result === 'not_confirmed') throw new AppError(409, 'registration_not_confirmed');
+  if (result === 'checked_in') throw new AppError(409, 'ticket_checked_in');
+  return { result: 'cancelled', promoted: result.promoted };
+}
+
 // ---------------------------------------------------------------- title and description (FR-EVT-5)
 
 /** EventDetailsPatch: title and/or description, same limits as creation (FR-EVT-1). */
