@@ -64,7 +64,7 @@ export function ParticipantsTab({
           <Search size={16} aria-hidden="true" />
           <input
             type="search"
-            aria-label="Search participants"
+            aria-label={waitingOnly ? 'Search the waiting list' : 'Search participants'}
             placeholder="Search by email…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}

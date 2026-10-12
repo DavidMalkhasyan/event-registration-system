@@ -4,7 +4,7 @@
 |---|---|
 | **Columns** | Backlog → To Do → In Progress → Review → Done, plus **Deferred** for extended scope that was intentionally not built |
 | **Work-in-progress limits** | In Progress ≤ 2, Review ≤ 3 |
-| **Last updated** | 2026-10-12, session S-18 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
+| **Last updated** | 2026-10-13, session S-19 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
 | **Scope** | Re-planned in S-02 by the final delivery strategy (PD-15): P0 is mandatory, then P1, with P2 deferred. Requirement-level status is in [ASSIGNMENT_SCOPE.md](../../ASSIGNMENT_SCOPE.md). |
 
 ## Rules
@@ -81,15 +81,25 @@
 
 ## Post-release improvement plan (after v1.0.0)
 
-Created in S-17. Work goes through feature branches and pull requests into `dev`; `main` changes only through a release pull request. Cards are added only when the stakeholder approves the work (K-702 to K-704: prompt 27, S-18).
+Created in S-17. Work goes through feature branches and pull requests into `dev`; `main` changes only through a release pull request. Cards are added only when the stakeholder approves the work (K-702 to K-704: prompt 27, S-18; K-706 to K-715: prompt 29, S-19, planned in [POST_RELEASE_PLAN.md](POST_RELEASE_PLAN.md)).
 
 | Card | Source | State |
 |---|---|---|
 | K-701 Live public event availability: free seats, waiting list, closed and cancelled states on the public page, refreshed without a reload (PD-81) | Stakeholder requirement, prompt 25 (S-17) | **Done**: [PR #20](https://github.com/DavidMalkhasyan/event-registration-system/pull/20) into `dev`, CI [run 38281030527](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38281030527) passed (143/143, 14/14, 23/23); merged 2026-10-12 21:03:14 as `a52c3e5`. Not in `main` |
 | K-702 Organizer settings: the date field prefilled in the event time zone with a confirmed reschedule; no standing sign-in block (contextual re-authentication); one prominent Cancel event, deletion under More actions (PD-82) | Stakeholder requirement, prompt 27 (S-18), PR A | **Done**: [PR #21](https://github.com/DavidMalkhasyan/event-registration-system/pull/21) into `dev`, CI [run 38285842187](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38285842187) passed (147/147, 19/19, 25/25); merged 2026-10-12 21:46:04 as `022dff0`. Not in `main` |
-| K-703 Organizer cancellation of one confirmed registration, with a dedicated notice, FIFO promotion and audit (PD-83; proposed amendment A-1) | Prompt 27, PR B | **Done**: [PR #22](https://github.com/DavidMalkhasyan/event-registration-system/pull/22) into `dev`, CI [run 38288228868](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38288228868) passed (8 migrations; 156/156, 19/19, 26/26); merged 2026-10-12 22:07:29 as `16a6fbc`. Not in `main`. Amendment A-1 awaits the stakeholder |
-| K-704 Organizer refresh: Refresh buttons and automatic updates every 15 s while visible, for the overview, All events, the event dashboard, participants, waiting list, staff invitations and devices (PD-84) | Prompt 27, PR C | **Review**: implemented and tested on `feature/organizer-refresh`; pull request into `dev` |
-| K-705 Event images and galleries, event addresses and maps | Earlier product requests, named in prompt 27 to be tracked, not built | **Backlog**: not designed or approved for implementation yet |
+| K-703 Organizer cancellation of one confirmed registration, with a dedicated notice, FIFO promotion and audit (PD-83; proposed amendment A-1) | Prompt 27, PR B | **Done**: [PR #22](https://github.com/DavidMalkhasyan/event-registration-system/pull/22) into `dev`, CI [run 38288228868](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38288228868) passed (8 migrations; 156/156, 19/19, 26/26); merged 2026-10-12 22:07:29 as `16a6fbc`. Not in `main`. Amendment A-1 approved by the stakeholder (S-19) |
+| K-704 Organizer refresh: Refresh buttons and automatic updates every 15 s while visible, for the overview, All events, the event dashboard, participants, waiting list, staff invitations and devices (PD-84) | Prompt 27, PR C | **Done**: [PR #23](https://github.com/DavidMalkhasyan/event-registration-system/pull/23) into `dev`, CI [run 38290681280](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38290681280) passed (156/156, 24/24, 29/29); merged 2026-10-12 22:28:53 as `937baac`. Not in `main` |
+| K-705 Event images and galleries, event addresses and maps | Earlier product requests (prompt 27) | **Split** in S-19 into K-711 to K-714 (prompt 29) |
+| K-706 Organizer navigation and scroll: no jump on section changes, refreshes or actions; sections keep search, filters and unsaved edits (PD-85) | Prompt 29, PR A | **Review**: implemented and tested on `feature/navigation-capacity`; pull request into `dev` |
+| K-707 Capacity: increase-only (amendment A-2), 1 to 100 000, normalized in the forms | Prompt 29, PR B | **To Do** |
+| K-708 Organizations, memberships and roles; events owned by organizations; migration of existing organizers | Prompt 29, PR C (amendment A-3) | **To Do** |
+| K-709 Organization registration, password sign-in, email verification, password reset, transition of existing organizers | Prompt 29, PR D (A-3) | **To Do** |
+| K-710 Super Admin area: applications, approval, rejection, suspension, audit, bootstrap command | Prompt 29, PR E (A-3) | **To Do** |
+| K-711 Event location: venue, address, arrival instructions, coordinates, display, directions, venue-change notices | Prompt 29, PR F (A-5) | **To Do** |
+| K-712 Event media backend: validated uploads, re-encoding, storage adapter, serving, lifecycle | Prompt 29, PR G (A-4) | **To Do** |
+| K-713 Organizer image management and public gallery with a viewer | Prompt 29, PR H (A-4) | **To Do** |
+| K-714 Participant map | Prompt 29, PR I (A-6) | **Blocked**: awaiting the stakeholder's choice of map data provider ([POST_RELEASE_PLAN.md](POST_RELEASE_PLAN.md)) |
+| K-715 Staff experience review and refinements; final end-to-end review | Prompt 29, PR J | **To Do** |
 
 ## Partly done (remaining parts are in Backlog or Deferred)
 

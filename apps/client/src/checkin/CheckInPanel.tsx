@@ -77,6 +77,10 @@ export function CheckInPanel({
   const [cameraError, setCameraError] = useState<string>();
   const videoRef = useRef<HTMLVideoElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Ready for the next code at the door, without scrolling the page to the field (K-706).
+  useEffect(() => {
+    inputRef.current?.focus({ preventScroll: true });
+  }, []);
   const live = useLiveCount(eventId);
   const canScan = typeof window !== 'undefined' && !!window.BarcodeDetector && !!navigator.mediaDevices;
 
@@ -99,7 +103,7 @@ export function CheckInPanel({
           setResult({ kind: 'outcome', ...r });
           setCode('');
           setBusy(false);
-          inputRef.current?.focus();
+          inputRef.current?.focus({ preventScroll: true });
           return;
         } catch (err) {
           if (!(err instanceof ApiError) || err.code !== 'network_error') {
@@ -221,7 +225,6 @@ export function CheckInPanel({
                 id="ticket-code"
                 ref={inputRef}
                 className="input"
-                autoFocus
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 placeholder="Ticket code, e.g. 7K3QX9M2B4TW"

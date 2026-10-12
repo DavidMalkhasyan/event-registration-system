@@ -28,7 +28,15 @@ const INVITATION_STATUS: Record<string, { label: string; tone: string }> = {
 };
 
 /** Staff invitations and device sessions of this event (FR-STAFF-1, FR-STAFF-3, FR-STAFF-5 to FR-STAFF-7). */
-export function StaffTab({ session, event }: { session: Session; event: EventItem }) {
+export function StaffTab({
+  session,
+  event,
+  active,
+}: {
+  session: Session;
+  event: EventItem;
+  active: boolean;
+}) {
   const [overview, setOverview] = useState<StaffOverview>();
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState<Notice>();
@@ -38,9 +46,12 @@ export function StaffTab({ session, event }: { session: Session; event: EventIte
       setOverview(await api<StaffOverview>(`/api/events/${event.id}/staff`, { signal })),
     [event.id],
   );
-  const refresher = useAutoRefresh(fetchStaff, event.status === 'SCHEDULED');
+  // Polls only while the section is shown (K-706 keeps it mounted when hidden); refreshed when shown again.
+  const refresher = useAutoRefresh(fetchStaff, event.status === 'SCHEDULED' && active);
   const load = refresher.refresh;
-  useEffect(load, [load]);
+  useEffect(() => {
+    if (active) load();
+  }, [active, load]);
   if (event.status !== 'SCHEDULED')
     return <Alert kind="info">Staff access ended when this event was cancelled.</Alert>;
 
