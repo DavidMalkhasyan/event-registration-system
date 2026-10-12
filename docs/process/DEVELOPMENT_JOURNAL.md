@@ -753,3 +753,31 @@ The last three rows were added in S-15 from GitHub's records of the pull request
 | 16:59:40–17:01:02 | AI_USAGE (v0 design and images, `lucide-react`, ChatGPT as the stakeholder stated it, prompt 20) and SUBMISSION_CHECKLIST (current state; release PR, tag and submission open) | Commit `7d8f152`. ChatGPT: no repository file, commit or transcript content shows its output; recorded as the stakeholder's statement (PD-78) |
 | 17:01:09–17:02:33 | Cross-document audit: decision ranges, session ranges, pull-request count (14 merged, all into `dev`), PR #14's times from GitHub (added to S-14), K-202 and K-501 growth notes, PD-Q4 resolved by PD-75, PD-76 to PD-78 and two open decisions (PD-Q7 image rights, PD-Q8 release) | `REQUIREMENTS.md` unchanged (`git diff cf35cbd` empty) |
 | 17:02:53–17:08:35 | Full gates on the working tree (all S-15 changes) | `check:secrets` ("No secrets found in 179 tracked files"), `check:deps` ("No known vulnerabilities found"), `format:check`, `lint`, `typecheck`, `test` (server **135/135**, client **11/11**), `build` and `e2e` (**22/22**, Edge) exit 0. No application code changed in S-15; the images changed only in metadata and encoding |
+| 17:09:25 | Pushed; [PR #15](https://github.com/DavidMalkhasyan/event-registration-system/pull/15), `dev` ← `feature/final-docs-audit` | CI [run 38253717986](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38253717986), 17:09:27–17:14:31, **passed**: secret scan (179 files), dependency audit (no known vulnerabilities), format, lint, typecheck, 7 migrations and an idempotent repeat, 135/135, 11/11, build, 22/22 |
+| 17:15:12 | `gh pr merge 15 --merge` after a review of the diff (11 files; documentation and image metadata only) | `bb6db50` on `dev`; its tree equals the tested head `093ccfe`; `main` unchanged (`8c1247d`) |
+
+The last two rows were added in S-16 from GitHub's records; S-15's own entry was committed before them.
+
+---
+
+## S-16: Release preparation: K-004 and K-603 closed, photographs replaced by CSS posters, release pull request
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-12 17:20:12 +04:00 (prompt 21: "FINAL RELEASE PREPARATION — APPROVED DECISIONS") |
+| **Stakeholder decisions** | K-004 approved; K-603 approved subject to recording PR #15; remove the three AI-generated photographs and replace them with original CSS posters; the physical camera check stays a documented limitation; open the release pull request `dev` → `main` but do not merge it, tag or submit (PD-79) |
+| **Cards** | K-004 and K-603 (Review → Done); K-604 stays in To Do |
+| **Tools and model** | Claude Code 2.1.296, model `claude-opus-5-5`; GitHub CLI; the S-02 toolchain; Playwright with Edge |
+
+**Activity:**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 17:20:19 | `feature/release-prep` from `dev` (`bb6db50`); PR #15 and CI run 38253717986 checked on GitHub | Merged 13:15:12 UTC (17:15:12 +04:00) as `bb6db50`; run `success` on head `093ccfe` (event `pull_request`) |
+| 17:21:30 | Records: K-004 and K-603 Done, PR #15 rows in S-15, PD-79, PD-Q7 resolved, PD-Q8 partly resolved | Commit `654f500` |
+| 17:20–17:23 | Artwork: read `shared/artwork.tsx`, its four call sites and the poster CSS; no test referenced the images | Six CSS poster variants (orbit, sunrise, bauhaus, night, arches, ribbon) replace the three photographs and the three earlier posters; the hash and the six sidebar swatches keep their slots; `git rm` of `apps/client/src/assets/art/*.jpg`; typecheck, lint and client build pass; **0 image files** in `apps/client/dist` |
+| 17:24:52–17:25:50 | Review data on the development stack (web, worker, Vite): a review organizer, events, registrations, two check-ins and a cancellation through the real API (nothing deleted); events created until every variant was in use; each variant captured on the card, the workspace cover and the public page at 1440, 768 and 390 px | All six variants covered; no console errors, failed requests or external requests; no `img` elements |
+| 17:25–17:28 | Visual review of the captures | Fixed in CSS: the Bauhaus tiles ran under the card's open button and touched the type; the Ribbon bands crossed the type and the year; the cover type collided with the date caption on phones; on the public hero the dark Night poster turned grey under the light overlay and put the dark title on charcoal at 390 px, so the hero now uses a light Night variant. Re-captured: clear at all widths |
+| 17:28:54–17:30:47 | Regression review at 1440, 768 and 390 px: overview (global statistics), All events, creation, event workspace with every section, a cancelled event; public event page, verification, management (confirmed and waiting), ticket, sign-in, staff invitation, invalid link, staff without access; a real staff session | **No horizontal overflow** anywhere; no console errors on organizer and staff pages; the only failed responses are the intended `404` (invalid link) and `401` (staff without a session); link fragments removed and nothing stored; no external requests on link pages; a staff device gets `403` from an organizer endpoint |
+| 17:30:58–17:36:20 | Full gates | `check:secrets` ("No secrets found in 176 tracked files": the three images left the index), `check:deps` ("No known vulnerabilities found"), `format:check`, `lint`, `typecheck`, `migrate` on the development database ("schema is up to date", schema 7, data kept), `test` (server **135/135**, client **11/11**), `build`, `migrate` again ("schema is up to date") and `e2e` (**22/22**, Edge) exit 0 |
+| 17:31–17:33 | Documentation: README, ASSIGNMENT_SCOPE, SUBMISSION_CHECKLIST, MILESTONES, KANBAN (K-604), AI_USAGE (prompt 21, artwork attribution), DECISION_LOG (PD-70 annotated) | The photographs are described as removed, with their history kept; the camera check as an accepted limitation; the release pull request as authorized to open, not to merge |

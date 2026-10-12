@@ -1,47 +1,42 @@
-import communityTable from '../assets/art/community-table.jpg';
-import creativeGathering from '../assets/art/creative-gathering.jpg';
-import designSummit from '../assets/art/design-summit.jpg';
+// Deterministic local artwork (PD-70, PD-79): events have no image field, so the event's public ID picks
+// one of six original CSS posters. The organizer and the public page use the same key, so an event looks
+// the same everywhere. Posters are pure CSS shapes and type: no image files, no external resources.
 
-// Deterministic local artwork (PD-70): events have no image field, so the event's public ID picks one of
-// the v0 photographs (bundled, compressed) or a CSS poster. The organizer and the public page use the
-// same key, so an event looks the same everywhere.
+type Poster = {
+  variant: 'orbit' | 'sunrise' | 'bauhaus' | 'night' | 'arches' | 'ribbon';
+  text: [string, string];
+  /** Dominant colour, used for the small event dots in the sidebar and overview. */
+  swatch: string;
+};
 
-type Art =
-  | { kind: 'photo'; src: string; position: string }
-  | { kind: 'poster'; tone: 'lavender' | 'peach' | 'sage'; text: [string, string] };
-
-const ARTWORK: Art[] = [
-  { kind: 'photo', src: creativeGathering, position: '54% 50%' },
-  { kind: 'poster', tone: 'lavender', text: ['Together', 'is better.'] },
-  { kind: 'photo', src: communityTable, position: '50% 45%' },
-  { kind: 'poster', tone: 'peach', text: ['good people.', 'great ideas.'] },
-  { kind: 'photo', src: designSummit, position: '70% 50%' },
-  { kind: 'poster', tone: 'sage', text: ['Make', 'something.'] },
+const POSTERS: Poster[] = [
+  { variant: 'orbit', text: ['Together', 'is better.'], swatch: '#c9b8ea' },
+  { variant: 'sunrise', text: ['good people.', 'great ideas.'], swatch: '#ef7959' },
+  { variant: 'bauhaus', text: ['Make', 'something.'], swatch: '#a9c3a0' },
+  { variant: 'night', text: ['See you', 'there.'], swatch: '#3a3540' },
+  { variant: 'arches', text: ['Meet', 'the moment.'], swatch: '#f0a68a' },
+  { variant: 'ribbon', text: ['Show', 'up.'], swatch: '#b9a6e3' },
 ];
 
-export const SWATCHES = ['#c9b8ea', '#b9a6e3', '#f2b29b', '#f0a68a', '#c6d6bd', '#a9c3a0'];
+export const SWATCHES = POSTERS.map((p) => p.swatch);
 
 export function artworkIndex(key: string): number {
   let hash = 0;
   for (const ch of key) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-  return hash % ARTWORK.length;
+  return hash % POSTERS.length;
 }
 
 export function EventArtwork({ artKey, caption }: { artKey: string; caption?: string }) {
-  const art = ARTWORK[artworkIndex(artKey)]!;
-  if (art.kind === 'photo')
-    return (
-      <div className="event-art" aria-hidden="true">
-        <img src={art.src} alt="" style={{ objectPosition: art.position }} loading="lazy" />
-      </div>
-    );
+  const poster = POSTERS[artworkIndex(artKey)]!;
   return (
-    <div className={`event-art poster poster-${art.tone}`} aria-hidden="true">
-      <span className="poster-orbit" />
+    <div className={`event-art poster poster-${poster.variant}`} aria-hidden="true">
+      <span className="poster-shape s1" />
+      <span className="poster-shape s2" />
+      <span className="poster-shape s3" />
       <span className="poster-type">
-        {art.text[0]}
+        {poster.text[0]}
         <br />
-        {art.text[1]}
+        {poster.text[1]}
       </span>
       {caption && <span className="poster-foot">{caption}</span>}
     </div>

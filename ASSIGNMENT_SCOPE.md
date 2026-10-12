@@ -11,9 +11,9 @@ This file maps each assignment requirement to its implementation, its automated 
 - **Verified:** for a non-functional requirement, a recorded run proves it (commands and results in the journal), but it is not part of the repository's test suite.
 - **Deferred:** extended scope, intentionally not built.
 
-**Current release state (S-15, 2026-10-12):** the integration branch `dev` at `cf35cbd`. The published `main` (`8c1247d`) still holds only the S-03 P0 release; everything listed in §3 is in `dev` and reaches `main` only through the release pull request, which needs the stakeholder's authorization.
+**Current release state (S-16, 2026-10-12):** the integration branch `dev`. The published `main` (`8c1247d`) still holds only the S-03 P0 release; everything listed in §3 is in `dev` and reaches `main` only through the release pull request. Opening that pull request is authorized; merging it needs the stakeholder's separate authorization (PD-79).
 
-- **GitHub Actions** on `dev`'s latest code ([run 38244890522](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38244890522), PR #14, merged as `cf35cbd`): secret scan, dependency audit, format, lint, typecheck, 7 migrations on an empty database and a repeat run, **135/135** server integration tests (real PostgreSQL 18), **11/11** client unit tests, build, **22/22** browser tests (Chromium).
+- **GitHub Actions** on the latest feature code ([run 38244890522](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38244890522), PR #14, merged as `cf35cbd`; the documentation pass, PR #15, passed the same checks in [run 38253717986](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38253717986); the S-16 artwork change runs them again before its merge): secret scan, dependency audit, format, lint, typecheck, 7 migrations on an empty database and a repeat run, **135/135** server integration tests (real PostgreSQL 18), **11/11** client unit tests, build, **22/22** browser tests (Chromium).
 - **Clean clone** (S-14): a fresh clone and a newly initialized PostgreSQL 18 cluster, following the README: the same 135 + 11 + 22 tests passed (browser tests with Microsoft Edge), plus the production-like run with the FR-LNK-8 headers checked.
 - **History, P0 release (S-03, `c45ecaf`, [run 38141682841](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38141682841)):** 23 server, 3 client and 4 browser tests passed in CI and from a clean clone. Those test files still exist and pass within today's suites; some tests were adapted as features grew (for example, browser locators after the redesign).
 
@@ -98,13 +98,13 @@ The design documents in `docs/` describe the full system: 27 tables and 52 opera
 | **Tested (automated, real PostgreSQL)** | Every P0 feature in §1 and every P1 feature marked Tested in §3: 135 integration, 11 unit and 22 browser tests in CI. Concurrency claims (last seat, double check-in, races) are covered by forced-order and parallel tests.          |
 | **Tested with simulated browser APIs**  | Camera scanning: `getUserMedia` returns a canvas stream (or a permission error) and `BarcodeDetector` reports the code the test holds up; everything after detection (staff session, endpoint, database, live count) is real (PD-74). |
 | **Verified by a recorded manual run**   | Clean-clone setup (S-03, S-14); browser review of every screen at 1440, 768 and 390 px with real data (S-13); development-mode link handling (S-14). Recorded in the journal.                                                         |
-| **Not verified**                        | Camera scanning on a physical phone or camera; macOS and Linux desktops for the local setup; email gateways (AC-179).                                                                                                                 |
+| **Not verified**                        | Camera scanning on a physical phone or camera (accepted by the stakeholder as a documented limitation, PD-79); macOS and Linux desktops for the local setup; email gateways (AC-179).                                                 |
 | **Deferred**                            | Email-address change (FR-ORG-6), link revocation lists, localization (OQ-8), Resend, webhooks, delivery budget and pausing, production deployment, performance testing, Redis.                                                        |
 
 **Known limitations:**
 
 - `main` holds only the S-03 P0 release until the release pull request is merged.
 - Only the fake email provider exists; no real email is sent.
-- The three bundled photographs (from the v0 design) are AI-generated according to their embedded metadata ("Made with Google AI"); their reuse rights are **not established** (AI_USAGE §7).
+- Event artwork is original CSS (PD-79). The v0 design's three AI-generated photographs, whose reuse rights were not established, were removed from the current tree in S-16; earlier commits still contain them.
 - The Vite development server does not send the production page headers; the production path is the tested one (PD-71, PD-72).
 - Accepted by design: browser history may keep a link's fragment (EC-97); email gateways may rewrite links (EC-98). AC-186 (c) has no automated test.
