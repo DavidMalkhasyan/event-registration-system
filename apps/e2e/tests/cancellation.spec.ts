@@ -18,7 +18,7 @@ import {
 const cancelCard = (page: Page) => page.getByRole('region', { name: 'Cancel event' });
 
 async function cancelThroughUi(page: Page) {
-  await cancelCard(page).getByRole('button', { name: 'Cancel this event…' }).click();
+  await cancelCard(page).getByRole('button', { name: 'Cancel event' }).click();
   await expect(page.getByText('This cannot be undone.')).toBeVisible();
   await cancelCard(page).getByRole('button', { name: 'Yes, cancel the event permanently' }).click();
 }
@@ -40,7 +40,7 @@ test('fresh session: cancel with confirmation; organizer and public pages show C
   await openSection(page, 'Settings');
 
   // "Keep the event" backs out without doing anything.
-  await cancelCard(page).getByRole('button', { name: 'Cancel this event…' }).click();
+  await cancelCard(page).getByRole('button', { name: 'Cancel event' }).click();
   await cancelCard(page).getByRole('button', { name: 'Keep the event' }).click();
   await expect(page.getByText('Status: CANCELLED.')).toHaveCount(0);
 
@@ -113,7 +113,7 @@ test('stale session: re-authenticate by email, come back, and confirm the cancel
   await expect(page).toHaveURL(eventUrl);
   // The link cancelled nothing: the event is still scheduled and asks for a new confirmation.
   await expect(page.getByText('Status: CANCELLED.')).toHaveCount(0);
-  await expect(cancelCard(page).getByRole('button', { name: 'Cancel this event…' })).toBeVisible();
+  await expect(cancelCard(page).getByRole('button', { name: 'Cancel event' })).toBeVisible();
 
   await cancelThroughUi(page);
   await expect(page.getByText('Status: CANCELLED.')).toBeVisible();

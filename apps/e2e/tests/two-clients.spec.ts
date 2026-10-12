@@ -9,6 +9,7 @@ import {
   openVerification,
   readResult,
   registerParticipant,
+  reschedule,
   signIn,
   stat,
   waitForMail,
@@ -34,9 +35,7 @@ test('dashboard on one device shows check-ins made on another device without ref
 
   // Reschedule into the check-in window (opens 2 hours before the start); the guest is told (P0 #14).
   await openSection(dashboard, 'Settings');
-  await dashboard.getByLabel(/New date and time/).fill(localIn(1 * HOUR));
-  await dashboard.getByRole('button', { name: 'Reschedule and notify' }).click();
-  await expect(dashboard.getByText('Rescheduled. Every confirmed and waiting participant')).toBeVisible();
+  await reschedule(dashboard, localIn(1 * HOUR));
   await waitForMail(guest, 'Date changed');
 
   // Second device: the same organizer signs in separately and opens the entrance screen.
