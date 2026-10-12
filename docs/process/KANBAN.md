@@ -4,7 +4,7 @@
 |---|---|
 | **Columns** | Backlog → To Do → In Progress → Review → Done, plus **Deferred** for extended scope that was intentionally not built |
 | **Work-in-progress limits** | In Progress ≤ 2, Review ≤ 3 |
-| **Last updated** | 2026-10-12, session S-17 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
+| **Last updated** | 2026-10-12, session S-18 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
 | **Scope** | Re-planned in S-02 by the final delivery strategy (PD-15): P0 is mandatory, then P1, with P2 deferred. Requirement-level status is in [ASSIGNMENT_SCOPE.md](../../ASSIGNMENT_SCOPE.md). |
 
 ## Rules
@@ -81,11 +81,15 @@
 
 ## Post-release improvement plan (after v1.0.0)
 
-Created in S-17. Work goes through feature branches and pull requests into `dev`; `main` changes only through a release pull request. No other post-release enhancement has been approved or recorded so far.
+Created in S-17. Work goes through feature branches and pull requests into `dev`; `main` changes only through a release pull request. Cards are added only when the stakeholder approves the work (K-702 to K-704: prompt 27, S-18).
 
 | Card | Source | State |
 |---|---|---|
-| K-701 Live public event availability: free seats, waiting list, closed and cancelled states on the public page, refreshed without a reload (PD-81) | Stakeholder requirement, prompt 25 (S-17) | **Review**: implemented and tested on `feature/public-availability`; pull request into `dev` |
+| K-701 Live public event availability: free seats, waiting list, closed and cancelled states on the public page, refreshed without a reload (PD-81) | Stakeholder requirement, prompt 25 (S-17) | **Done**: [PR #20](https://github.com/DavidMalkhasyan/event-registration-system/pull/20) into `dev`, CI [run 38281030527](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38281030527) passed (143/143, 14/14, 23/23); merged 2026-10-12 21:03:14 as `a52c3e5`. Not in `main` |
+| K-702 Organizer settings: the date field prefilled in the event time zone with a confirmed reschedule; no standing sign-in block (contextual re-authentication); one prominent Cancel event, deletion under More actions (PD-82) | Stakeholder requirement, prompt 27 (S-18), PR A | **Review**: implemented and tested on `feature/settings-ux`; pull request into `dev` |
+| K-703 Organizer cancellation of one confirmed registration, with a dedicated notice, FIFO promotion and audit | Prompt 27, PR B | **To Do** |
+| K-704 Organizer refresh: manual Refresh controls and automatic updates while visible | Prompt 27, PR C | **To Do** |
+| K-705 Event images and galleries, event addresses and maps | Earlier product requests, named in prompt 27 to be tracked, not built | **Backlog**: not designed or approved for implementation yet |
 
 ## Partly done (remaining parts are in Backlog or Deferred)
 
