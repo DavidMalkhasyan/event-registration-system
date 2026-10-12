@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import type { Database } from '../../platform/db.js';
-import { cutoffOf } from '../../platform/time.js';
+import { checkInWindow, cutoffOf } from '../../platform/time.js';
 import type { Tx } from '../../platform/tx.js';
 import { issueToken } from '../access-tokens/tokens.js';
 
@@ -14,6 +14,7 @@ export interface OutboxRow {
   registration_id: string | null;
   sign_in_request_id: string | null;
   verification_generation: number | null;
+  request_ref?: string | null;
   schedule_version?: number | null;
   recipient_email: string;
   payload: Record<string, unknown>;
@@ -116,7 +117,22 @@ const signIn: MessageHandler = {
     });
     return { signIn: t };
   },
-  async render(_db, _msg, tokens, origin) {
+  async render(db, msg, tokens, origin) {
+    const request = await db
+      .selectFrom('app.sign_in_requests')
+      .select('purpose')
+      .where('id', '=', msg.sign_in_request_id!)
+      .executeTakeFirst();
+    if (request?.purpose === 'reauth') {
+      // FR-ORG-5, AC-149: the link only confirms identity; it never performs the action.
+      return email('Confirm it is you: Event Registration', [
+        'You asked to confirm your sign-in before a protected action, such as cancelling or deleting an event.',
+        'Confirming this link only signs you in again. It does not cancel, delete or otherwise change any event. After confirming, return to the event and confirm the action yourself.',
+        { label: 'Confirm it is you', link: `${origin}/sign-in#t=${tokens.signIn}` },
+        'The link works once and expires 15 minutes after you requested it. Confirming it signs out the browser that asked for it and signs in the browser where you open it.',
+        'If you did not request this, you can ignore this email.',
+      ]);
+    }
     return email('Your sign-in link for Event Registration', [
       'Use this link to sign in. It works once and expires 15 minutes after you requested it.',
       { label: 'Sign in', link: `${origin}/sign-in#t=${tokens.signIn}` },
@@ -316,6 +332,128 @@ const eventChange: MessageHandler = {
   },
 };
 
+const waitlistClosed: MessageHandler = {
+  // §4.9 "Waiting list closed" (FR-WL-5): event SCHEDULED, version current, still WAITLISTED. No links.
+  async freshness(trx, msg) {
+    const registration = await registrationOf(trx, msg.registration_id!);
+    const event = await trx
+      .selectFrom('app.events')
+      .select(['status', 'schedule_version'])
+      .where('id', '=', msg.event_id!)
+      .executeTakeFirst();
+    const fresh =
+      registration?.state === 'WAITLISTED' &&
+      event?.status === 'SCHEDULED' &&
+      event.schedule_version === msg.schedule_version;
+    return fresh ? { fresh: true } : { fresh: false, reason: 'obsolete' };
+  },
+  async issueTokens() {
+    return {};
+  },
+  async render(db, msg) {
+    const event = (await eventOf(db, msg.event_id!))!;
+    return email(`Registration closed: ${event.title}`, [
+      `Registration for "${event.title}" on ${localTime(event.starts_at, event.time_zone)} is now closed, and no place became available for you.`,
+      'You will not receive a ticket for this date. If the organizer moves the event to a later date, you will be told by email.',
+    ]);
+  },
+};
+
+const staffInvitation: MessageHandler = {
+  // §4.9 "Staff invitation": invitation still pending and unexpired, event SCHEDULED, window open (PD-54).
+  async freshness(trx, msg, now) {
+    const invitation = await trx
+      .selectFrom('app.staff_invitations as i')
+      .innerJoin('app.events as e', 'e.id', 'i.event_id')
+      .select(['i.status', 'i.expires_at', 'e.status as event_status', 'e.starts_at'])
+      .where('i.id', '=', msg.request_ref!)
+      .executeTakeFirst();
+    const fresh =
+      invitation?.status === 'pending' &&
+      now < invitation.expires_at &&
+      invitation.event_status === 'SCHEDULED' &&
+      now <= checkInWindow(invitation.starts_at).closes;
+    return fresh ? { fresh: true } : { fresh: false, reason: 'obsolete' };
+  },
+  async issueTokens(trx, msg, now, attemptNo) {
+    // FR-STAFF-1: invitation tokens are hash-only and issued at send time.
+    const t = await issueToken(trx, {
+      type: 'staff_invitation',
+      now,
+      staffInvitationId: msg.request_ref!,
+      eventId: msg.event_id!,
+      via: 'email',
+      outboxMessageId: msg.id,
+      attemptNo,
+    });
+    return { invite: t };
+  },
+  async render(db, msg, tokens, origin) {
+    const event = (await eventOf(db, msg.event_id!))!;
+    return email(`You are invited to help with check-in: ${event.title}`, [
+      `You have been invited to check in participants at "${event.title}" on ${localTime(event.starts_at, event.time_zone)}.`,
+      'Open the link on the device you will use at the entrance and press "Accept". Opening the link alone does not give access.',
+      { label: 'Open the invitation', link: `${origin}/invite#t=${tokens.invite}` },
+      'The link works once and expires 7 days after it was sent. Whoever accepts it first gets check-in access, so do not forward it. Access ends when the check-in window closes or the organizer revokes it.',
+    ]);
+  },
+};
+
+const ticketResend: MessageHandler = {
+  // §4.9 "Ticket resend": still CONFIRMED, event not cancelled; management and share links issued at send time.
+  ...registrationMessage('CONFIRMED', true),
+  async render(db, msg, tokens, origin) {
+    const event = (await eventOf(db, msg.event_id!))!;
+    const code = await ticketCodeOf(db, msg.registration_id!);
+    return email(`Your ticket (resent): ${event.title}`, [
+      `As requested, here is your ticket for "${event.title}" on ${localTime(event.starts_at, event.time_zone)}.`,
+      `Ticket code: ${code ?? '(unavailable)'}`,
+      TRANSFER,
+      { label: 'Manage or cancel your registration', link: `${origin}/manage#t=${tokens.manage}` },
+      FORWARD_WARNING,
+      { label: 'Share ticket', link: `${origin}/ticket#t=${tokens.share}` },
+      SHARE_HINT,
+    ]);
+  },
+};
+
+const managementLinkReplaced: MessageHandler = {
+  // §4.9 "Management link replaced" (FR-ROT-5, FR-NTF-13): registration still active, event not cancelled.
+  // Its management link is issued at send time, after the rotation, so it is valid (FR-ROT-3).
+  ...registrationMessage('ACTIVE', false),
+  async render(db, msg, tokens, origin) {
+    const event = (await eventOf(db, msg.event_id!))!;
+    return email(`Your management link was replaced: ${event.title}`, [
+      `The management link for your registration for "${event.title}" on ${localTime(event.starts_at, event.time_zone)} was replaced. Earlier management links no longer work.`,
+      { label: 'Your new management link', link: `${origin}/manage#t=${tokens.manage}` },
+      FORWARD_WARNING,
+      'If you did not do this, someone else may have had your link. Open the new link and replace it again. If you receive several of these emails, use the most recent one.',
+    ]);
+  },
+};
+
+const eventCancellation: MessageHandler = {
+  // §4.9 "Event cancellation" (BR-16): no send-time check (the catalogue lists none), no links.
+  // Created only by TX-E05, once per registration (logical key), so it can't become stale.
+  async freshness() {
+    return { fresh: true };
+  },
+  async issueTokens() {
+    return {};
+  },
+  async render(db, msg) {
+    const event = (await eventOf(db, msg.event_id!))!;
+    const wasConfirmed = msg.payload.previousState === 'CONFIRMED';
+    return email(`Event cancelled: ${event.title}`, [
+      `The organizer has cancelled "${event.title}", which was planned for ${localTime(event.starts_at, event.time_zone)}.`,
+      wasConfirmed
+        ? 'Your registration is cancelled and your ticket is no longer valid. Please do not come to the event.'
+        : 'Your registration is cancelled, and you are no longer on the waiting list.',
+      'You do not need to do anything. Links in earlier emails about this event no longer work.',
+    ]);
+  },
+};
+
 const registrationCancelled: MessageHandler = {
   // A required notice: no freshness check, never dropped (BR-23, CK-69).
   async freshness() {
@@ -335,6 +473,24 @@ const registrationCancelled: MessageHandler = {
   },
 };
 
+const waitlistRemoved: MessageHandler = {
+  // FR-NTF-14: a required notice (BR-23, CK-69): no freshness check, never dropped, also after a
+  // later event cancellation. No management or share link, no ticket wording.
+  async freshness() {
+    return { fresh: true };
+  },
+  async issueTokens() {
+    return {};
+  },
+  async render(db, msg) {
+    const event = (await eventOf(db, msg.event_id!))!;
+    return email(`Removed from the waiting list: ${event.title}`, [
+      `The organizer of "${event.title}" on ${localTime(event.starts_at, event.time_zone)} has removed you from the waiting list.`,
+      'You are no longer on the waiting list for this event, and you will not be offered a place.',
+    ]);
+  },
+};
+
 export const HANDLERS: Record<string, MessageHandler> = {
   sign_in: signIn,
   verification,
@@ -344,5 +500,11 @@ export const HANDLERS: Record<string, MessageHandler> = {
   promotion,
   reminder,
   event_change: eventChange,
+  waitlist_closed: waitlistClosed,
   registration_cancelled: registrationCancelled,
+  waitlist_removed: waitlistRemoved,
+  event_cancellation: eventCancellation,
+  ticket_resend: ticketResend,
+  staff_invitation: staffInvitation,
+  management_link_replaced: managementLinkReplaced,
 };

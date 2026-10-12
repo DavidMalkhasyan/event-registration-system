@@ -2,11 +2,11 @@ import type { AppContext } from '../../composition/context.js';
 import { hashToken, hmac, maskEmail, normalizeEmail, randomToken, safeEqual } from '../../platform/crypto.js';
 import { AppError, InvalidLinkError } from '../../platform/errors.js';
 import { RULES } from '../../platform/ratelimit.js';
-import { decisionTime, withAccountLocks } from '../../platform/tx.js';
+import { decisionTime, withAccountLocks, type Tx } from '../../platform/tx.js';
 import { findToken } from '../access-tokens/tokens.js';
 import { recordAudit } from '../audit/audit.js';
 import { enqueue } from '../messaging/outbox.js';
-import { SESSION_ABSOLUTE_MS } from './sessions.js';
+import { SESSION_ABSOLUTE_MS, sessionStillValid, type OrganizerPrincipal } from './sessions.js';
 
 const SIGN_IN_TTL_MS = 15 * 60_000; // FR-ORG-3 c, R55
 const PRE_SESSION_MAX_MS = 15 * 60_000;
@@ -33,36 +33,103 @@ export async function requestSignIn(
       .where('email', '=', email)
       .forUpdate()
       .executeTakeFirst();
-    await trx
-      .updateTable('app.sign_in_requests')
-      .set({ status: 'replaced', ended_at: now })
-      .where('email', '=', email)
-      .where('status', '=', 'active')
-      .execute();
-    const expiresAt = new Date(now.getTime() + SIGN_IN_TTL_MS);
-    const request = await trx
-      .insertInto('app.sign_in_requests')
-      .values({
-        email,
-        account_id: account?.id ?? null,
-        purpose: 'sign_in',
-        reauth_session_id: null,
-        created_at: now,
-        expires_at: expiresAt,
-      })
-      .returning('id')
-      .executeTakeFirstOrThrow();
-    await enqueue(trx, {
-      type: 'sign_in',
-      logicalKey: `sign_in:${request.id}`,
-      recipientEmail: email,
-      now,
-      horizonAt: new Date(expiresAt.getTime() - 2 * 60_000),
+    await insertSignInRequest(trx, now, {
+      email,
       accountId: account?.id ?? null,
-      signInRequestId: request.id,
+      purpose: 'sign_in',
+      reauthSessionId: null,
       correlationId,
     });
   });
+}
+
+/**
+ * TX-A01 core, under the address lock: at most one active request per normalized address
+ * (FR-ORG-3 b, partial unique index), so a new request replaces the previous one, whichever
+ * its purpose. The link is issued at send time by the priority `sign_in` message (NFR-REL-12).
+ */
+async function insertSignInRequest(
+  trx: Tx,
+  now: Date,
+  input: {
+    email: string;
+    accountId: string | null;
+    purpose: 'sign_in' | 'reauth';
+    reauthSessionId: string | null;
+    correlationId: string;
+  },
+): Promise<void> {
+  await trx
+    .updateTable('app.sign_in_requests')
+    .set({ status: 'replaced', ended_at: now })
+    .where('email', '=', input.email)
+    .where('status', '=', 'active')
+    .execute();
+  const expiresAt = new Date(now.getTime() + SIGN_IN_TTL_MS);
+  const request = await trx
+    .insertInto('app.sign_in_requests')
+    .values({
+      email: input.email,
+      account_id: input.accountId,
+      purpose: input.purpose,
+      reauth_session_id: input.reauthSessionId,
+      created_at: now,
+      expires_at: expiresAt,
+    })
+    .returning('id')
+    .executeTakeFirstOrThrow();
+  await enqueue(trx, {
+    type: 'sign_in',
+    logicalKey: `sign_in:${request.id}`,
+    recipientEmail: input.email,
+    now,
+    horizonAt: new Date(expiresAt.getTime() - 2 * 60_000),
+    accountId: input.accountId,
+    signInRequestId: request.id,
+    correlationId: input.correlationId,
+  });
+}
+
+/**
+ * POST /api/auth/reauthentication (API #27, TX-A01 with purpose `reauth`; FR-ORG-5, ADR-010 §8).
+ * The link goes only to the account's current address, read under the address lock. Confirming
+ * it creates a new session and revokes the requesting one (TX-A02). It never performs an action.
+ */
+export async function requestReauthentication(
+  ctx: AppContext,
+  principal: OrganizerPrincipal,
+  correlationId: string,
+): Promise<void> {
+  const limit = await ctx.limiter.hit(RULES.reauthPerAccount, principal.accountId);
+  if (!limit.allowed) throw new AppError(429, 'rate_limited', { retryAfterSeconds: limit.retryAfterSeconds });
+  const result = await withAccountLocks(ctx.db, [principal.email], async ({ trx, now }) => {
+    const account = await trx
+      .selectFrom('app.accounts')
+      .select(['id', 'email'])
+      .where('id', '=', principal.accountId)
+      .forUpdate()
+      .executeTakeFirst();
+    // The address may not have changed since the session was resolved, and the session must still be valid.
+    if (!account || account.email !== principal.email) return 'unauthenticated' as const;
+    if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
+    await insertSignInRequest(trx, now, {
+      email: account.email,
+      accountId: account.id,
+      purpose: 'reauth',
+      reauthSessionId: principal.sessionId,
+      correlationId,
+    });
+    // FR-ORG-8: audited by account ID only, never with addresses, tokens or session IDs.
+    await recordAudit(trx, {
+      now,
+      action: 'reauth_requested',
+      actorKind: 'account',
+      actorAccountId: account.id,
+      outcome: 'success',
+    });
+    return 'sent' as const;
+  });
+  if (result === 'unauthenticated') throw new AppError(401, 'unauthenticated');
 }
 
 interface ActiveRequest {
@@ -187,7 +254,7 @@ export async function confirmSignIn(
     }
     await recordAudit(trx, {
       now,
-      action: 'signin_confirmed',
+      action: current.purpose === 'reauth' ? 'reauth_confirmed' : 'signin_confirmed',
       actorKind: 'account',
       actorAccountId: account.id,
       subjectId: session.id,

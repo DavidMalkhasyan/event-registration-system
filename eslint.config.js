@@ -7,7 +7,10 @@ export default tseslint.config(
   { ignores: ['**/dist/**', '**/node_modules/**', 'docs/**', 'var/**', 'coverage/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
-  { files: ['apps/server/**/*.ts', 'apps/e2e/**/*.ts'], languageOptions: { globals: globals.node } },
+  {
+    files: ['apps/server/**/*.ts', 'apps/e2e/**/*.ts', 'scripts/**/*.mjs'],
+    languageOptions: { globals: globals.node },
+  },
   {
     // Layering (MODULES.md §4): the shared platform never depends on modules, composition or entry points.
     files: ['apps/server/src/platform/**/*.ts'],

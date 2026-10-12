@@ -18,6 +18,7 @@ const schema = z.object({
   CSRF_SECRET: secret,
   PRESESSION_SECRET: secret,
   RATE_LIMIT_SECRET: secret,
+  PREVIEW_SECRET: secret, // K_preview: event-deletion preview tokens (ADR-010 §7)
   EMAIL_PROVIDER: z.enum(['fake']).default('fake'),
   DEV_MAILBOX_DIR: z.string().min(1).default('var/mailbox'),
   CLIENT_DIST_DIR: z.string().min(1).optional(),

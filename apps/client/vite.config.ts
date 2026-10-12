@@ -3,14 +3,16 @@ import { resolve } from 'node:path';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
-// Two HTML entries on one origin (ADR-013): participant/link pages and the organizer area.
+// Three HTML entries on one origin (ADR-013): participant/link pages, the organizer area, and the
+// staff device page (PD-69).
 // In development the API runs on :3000 and is proxied, so the browser still sees one origin.
 const entryRouter = (): Plugin => ({
   name: 'ers-entry-router',
   configureServer(server) {
     server.middlewares.use((req, _res, next) => {
       const path = (req.url ?? '/').split('?')[0]!;
-      if (/^\/(e\/|verify$|manage$|ticket$|sign-in$)/.test(path)) req.url = '/public.html';
+      if (/^\/(e\/|verify$|manage$|ticket$|sign-in$|invite$)/.test(path)) req.url = '/public.html';
+      else if (path === '/staff') req.url = '/staff.html';
       else if (path === '/' || path === '/organizer' || path.startsWith('/organizer/'))
         req.url = '/organizer.html';
       next();
@@ -30,10 +32,14 @@ export default defineConfig({
     },
   },
   build: {
+    // PD-71 (FR-LNK-10 b): no modulepreload polyfill. It would be emitted as a static import of the
+    // public entry and so run before the token bootstrap; every supported browser preloads natively.
+    modulePreload: { polyfill: false },
     rollupOptions: {
       input: {
         public: resolve(import.meta.dirname, 'public.html'),
         organizer: resolve(import.meta.dirname, 'organizer.html'),
+        staff: resolve(import.meta.dirname, 'staff.html'),
       },
     },
   },

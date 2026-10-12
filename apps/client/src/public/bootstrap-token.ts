@@ -1,4 +1,4 @@
-// FR-LNK-10 (b), ADR-011: this module is imported first by the public entry and has no imports.
+// FR-LNK-10 (b), ADR-011, PD-71: the only static import of the public entry (boot.ts); it has no imports.
 // It reads the link token from the URL fragment, keeps it only in memory, and removes the
 // fragment from the address bar and the current history entry before any other module runs.
 
@@ -15,4 +15,12 @@ token = captureFragmentToken(window.location, window.history);
 /** The link token for this page view, or null (reloading loses it by design, FR-LNK-10 e). */
 export function linkToken(): string | null {
   return token;
+}
+
+/**
+ * After a management rotation the page switches to the new token, in memory only (FR-ROT-5,
+ * FR-LNK-10): never the address bar, cookies or browser storage.
+ */
+export function replaceLinkToken(next: string): void {
+  token = next;
 }

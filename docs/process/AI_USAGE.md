@@ -5,8 +5,8 @@
 | Item | Value | Evidence |
 |---|---|---|
 | AI agent | **Claude Code**, in the VS Code extension | Session environment |
-| Claude Code version | 2.1.295, then 2.1.296 (all of S-02) | Version metadata in the local session transcript |
-| Model | **Claude Opus 5.5** (`claude-opus-5-5`) | Model ID on every assistant message in the transcript: 581 by the end of S-01, and every S-02 message as well |
+| Claude Code version | 2.1.295, then 2.1.296 (from S-02 to S-15) | Version metadata in the local session transcript; no other version appears in it (checked in S-15) |
+| Model | **Claude Opus 5.5** (`claude-opus-5-5`), for every session S-01 to S-15 | Model ID on every assistant message in the transcript: 581 by the end of S-01, and every later message as well |
 | Operating system | Windows 10 Enterprise 10.0.19045 | Session environment |
 | Shells | Git Bash, Windows PowerShell 5.1 | Session environment |
 | Git | 2.55.0.windows.3 | `git --version` (S-01) |
@@ -19,6 +19,8 @@
 | PostgreSQL | 18.6, portable EDB zip binaries in the user profile | `postgres --version`. EDB publishes no checksum, so the zip's SHA-256 was recorded: `fbe23da234ee31547bf8a36d29dfd81e82b849df2d2b78d2eecb43d360252f8c` |
 | Browser for E2E | Microsoft Edge 155 (already installed), driven by Playwright 1.64.0 | Installed application folder; `pnpm add` output (S-02) |
 | Python | Also used in S-02 to generate local secrets and to read timestamps from the session transcript for the journal; neither output is in the repository | S-02 |
+| Vercel v0 | Used by the stakeholder, outside Claude Code, to create the approved visual design ([eventflow-v0-design](https://github.com/DavidMalkhasyan/eventflow-v0-design), first commit `ff4b60e` "Initial commit from v0", 2026-10-12). Claude Code only read that repository; it did not use v0 itself | v0 repository history (S-13) |
+| ChatGPT | Used by the stakeholder, outside Claude Code, to help draft and review development prompts and decisions. **Source: the stakeholder's statement in S-15.** The repository and the Claude Code transcript contain no ChatGPT output, so they can neither confirm nor date which prompts it helped with | Stakeholder's S-15 prompt |
 
 ## 2. Why this model and tooling
 
@@ -36,7 +38,9 @@
 | Document edits | Scripted, exact-match replacements that abort if an anchor is missing | Diffs reviewed; checks rerun after every edit |
 | Consistency checks | Writes and runs Python check scripts | Results recorded in the journal; scripts will be versioned in M1 (PD-6) |
 | Version control | Runs `git` commands and writes commit messages | No backdating; `Co-Authored-By` trailer; owner identity |
-| Implementation (S-02) | Writes the code, migrations and tests; runs them | Every claim of success is backed by a recorded run (journal S-02); a mutation check for the E2E live-count test; integration tests against real PostgreSQL; the stakeholder's quality gates (test, typecheck, runnable, record, commit) |
+| Implementation (S-02 to S-14) | Writes the code, migrations and tests; runs them | Every claim of success is backed by a recorded run (journal); mutation checks for key tests (for example the live count and the token bootstrap order); integration tests against real PostgreSQL; feature branches and pull requests into `dev` with green CI (since S-05); the stakeholder's quality gates (test, typecheck, runnable, record, commit) |
+| UI redesign (S-13) | Ports the v0 design's visual components and styles onto the existing client | The real backend, states and security architecture were kept: no demo data store, no hash routing, no analytics or third-party scripts, no hosted fonts; all browser tests rerun |
+| Prompts and decisions | Claude Code receives the stakeholder's prompts and proposes options | The stakeholder writes and sends every prompt and takes every decision; by the stakeholder's statement, some prompts and decisions were drafted or reviewed with ChatGPT first (§1) |
 
 ## 4. Prompts and session record
 
@@ -55,6 +59,18 @@ Significant prompts, summarized in order. The stakeholder's own instructions are
 | 7 | "We are starting implementation NOW": 5 days; approved stack (Node 24, pnpm, TypeScript, Fastify, React and Vite, PostgreSQL 18, Kysely, Vitest, GitHub Actions); vertical slices with real PostgreSQL and tests; autonomy for routine decisions. "Do not attempt to generate the entire application in one unverified batch." | S-02: toolchain, migrations, server, integration tests |
 | 8 | "FINAL DELIVERY STRATEGY": the P0 list of 15 mandatory features plus general requirements; P1 and P2 only afterwards; ASSIGNMENT_SCOPE.md traceability; quality gates after each feature; "Do not fabricate progress or test outcomes", "Do not present deferred features as implemented", "Do not claim integration tests passed if PostgreSQL was unavailable". | S-02: client, quality gates, CI, E2E, README, ASSIGNMENT_SCOPE.md |
 | 9 | "Final submission validation": publish to the given repository, inspect the real CI results, verify from a clean clone by following the README exactly, re-check the assignment evidence. "Do not report CI as passing until the actual remote workflow passes." No new features; no history rewriting. | S-03: push, two green CI runs, clean-clone verification, two README fixes |
+| 10 | "Continue development according to our EXISTING project plan … NEXT TASK: K-404b": a feature branch, integration and concurrency tests, then name the next task | S-04: K-404b on `feature/k-404b-cutoff-job` |
+| 11 | "CONTINUE EXISTING … DEVELOPMENT": branching strategy (`main`, `dev`, `feature/*`, `fix/*`); publish K-404b as a pull request into `dev`, verify the real CI and merge; database safety across branches; then K-304a (capacity changes) with integration, concurrency and browser tests and a pull request into `dev`. "Do not begin event cancellation until [re-authentication] is addressed." | S-05: PR #1 merged into `dev`; K-304a |
+| 12 | "CONTINUE THE EXISTING … ROADMAP": merge PR #2 into `dev`; implement K-304b (FR-EVT-5, AC-105) with integration and browser tests and a pull request into `dev`, merging once green and reviewed; then assess the re-authentication needed for K-304c and **stop before implementing it**. | S-06: PR #2 merged; K-304b; the K-304c assessment |
+| 13 | "DECISION APPROVED — IMPLEMENT RE-AUTHENTICATION FIRST": record K-304b as Done; implement K-302b following FR-ORG-5, AC-149 and ADR-010, with integration tests (boundary, race, second device, no action), a browser test using controlled test-database setup and no backdoors; a pull request into `dev`, merged when green; then plan K-304c without implementing it. | S-07: K-302b; the K-304c plan |
+| 14 | "K-304c EVENT CANCELLATION — DECISIONS APPROVED": D1–D7; implement cancellation per FR-EVT-9, BR-16, BR-23 and TX-E05 with 21 listed test cases (forced orders, no sleep-only concurrency), browser tests for fresh and stale sessions, a pull request into `dev`; then K-304d only if its requirements are sufficiently resolved. | S-08: K-304c; the K-304d readiness check |
+| 15 | "CONTINUE OUR EXISTING … DEVELOPMENT": do not merge `dev` into `main`; record K-304d Done; implement K-405 (FR-SELF, FR-LNK, FR-ROT, FR-SHR) with integration, concurrency, rollback and no-raw-token tests, browser tests and a pull request into `dev`; then K-406 staff invitations and sessions in a separate pull request, including the K-304c dependency. | S-10: K-405; S-11: K-406 |
+| 16 | "CONTINUE THE EXISTING EVENT REGISTRATION SYSTEM ROADMAP": do not merge `dev` into `main`; close K-406 with its merge evidence; implement K-306 check-in undo (owner only, exclusive lock, audit, single active check-in, live count, share view) with integration, concurrency and browser tests and a pull request into `dev`; then waiting-list removal (TX-W01) in a separate pull request; then a frontend inventory for a later UI redesign, without starting the redesign. "Do not fabricate test results." | S-12: K-406 closed; K-306 |
+| 17 | "IMPLEMENT THE APPROVED V0 DESIGN IN OUR EXISTING EVENT REGISTRATION SYSTEM": clone the v0 design into a sibling directory, inspect it, close K-506, correct K-403, then redesign organizer, participant and staff interfaces on the real backend, preserving every security guarantee and test; never fabricate data, results or access. | S-13: the v0 repository required a v0 login (`401`); reported, no credentials requested |
+| 18 | "THE V0 DESIGN IS NOW AVAILABLE ON GITHUB": the same task from the GitHub copy; use the design, not the prototype's architecture (demo store, hash routing, StrictMode on link pages, analytics, Next.js). | S-13: K-507 in two pull requests |
+| 19 | "FINAL SECURITY HARDENING AND RELEASE READINESS": the stakeholder approved fixing PD-71; guarantee the bootstrap order in the production bundle with an automated proof, implement FR-LNK-8 headers with HTTP tests, test camera scanning without claiming hardware, add K-105 checks, verify a clean setup, update the records; no merge into `main`, no tag, no submission. | S-14 |
+| 20 | "FINAL DOCUMENTATION AUDIT AND RELEASE PREPARATION": K-001 approved for the R60 synchronization only, K-605 approved, K-004 not yet approved; correct the submission checklist, scope, README and milestones to the current state; attribute the v0 design and disclose ChatGPT use "where supported by the actual project history"; review the image provenance and report uncertainty instead of inventing a licence; audit the documents for consistency without changing REQUIREMENTS.md; pull request into `dev` only. "Do not mark an action completed merely because it is planned." | S-15 |
+| 21 | "FINAL RELEASE PREPARATION — APPROVED DECISIONS": K-004 and K-603 approved; record PR #15; remove the three AI-generated photographs and replace them with original CSS posters in the EventFlow style, with no image generation dependency or hosted images; review every screen at 1440, 768 and 390 px; run all gates; merge into `dev`; open, but do not merge, the release pull request `dev` → `main`; no tag, no submission. | S-16 |
 
 **Context management:** Claude Code summarized earlier parts of the long session automatically to stay within the context window. Decisions taken before a summary were re-read from the documents and the transcript whenever exact wording mattered.
 
@@ -82,7 +98,7 @@ Caught during implementation (S-02), all by tests, typecheck or runtime checks b
 
 ## 6. Data handling
 
-- No API keys, tokens, passwords or private keys exist in the repository. A scan runs before every push (SUBMISSION_CHECKLIST §2).
+- No API keys, tokens, passwords or private keys exist in the repository. `pnpm check:secrets` runs before every push (SUBMISSION_CHECKLIST §2) and, since S-14, in CI.
 - Email addresses in the documents are examples (`bob@x.com`).
 - The commit author's real email address becomes public once the repository is pushed (PD-4).
 - No session export is committed.
@@ -97,8 +113,12 @@ Caught during implementation (S-02), all by tests, typecheck or runtime checks b
 | Conventional Commits | Commit-message convention | Specification |
 | `openapi-spec-validator` and its dependencies (`jsonschema`, `referencing`, and others), PyYAML | Local validation only; not distributed with the project | Third-party open-source packages from PyPI |
 | Resend documentation | Provider behavior cited in REQUIREMENTS §12.1a | Vendor documentation |
-| npm packages (runtime) | Fastify, @fastify/cookie, @fastify/static, Kysely, pg, zod, Luxon, React, React DOM, qrcode | Open-source dependencies, declared in each `package.json` and locked in `pnpm-lock.yaml` |
-| npm packages (development) | TypeScript, tsx, Vite, @vitejs/plugin-react, Vitest, jsdom, Testing Library, Playwright, ESLint, typescript-eslint, eslint-plugin-react-hooks, Prettier | As above |
+| **Vercel v0 design** ([eventflow-v0-design](https://github.com/DavidMalkhasyan/eventflow-v0-design)) | The approved visual design (S-13, K-507, PD-65 to PD-70): its visual components, layout and CSS were **adapted** into `apps/client` (mainly `shared/styles.css` and the page components) | Only the design was taken. The prototype's Next.js app, demo data store, hash routing, StrictMode on link pages and `@vercel/analytics` were not used; the real backend integration, event states and security architecture were kept. The design repository has no licence, README or credits file; it is the stakeholder's own repository |
+| Three photographs from the v0 design (formerly `apps/client/src/assets/art/*.jpg`) | Event artwork from S-13 (`1689c9b`, PD-70) to S-16 | **AI-generated** according to their embedded metadata: IPTC digital source type `trainedAlgorithmicMedia`, credit "Made with Google AI". No licence or terms were recorded for them, so they were **removed in S-16** (PD-79) and are not in the current tree or the production build. They remain in earlier commits, because the history is not rewritten. |
+| Event poster artwork (`apps/client/src/shared/artwork.tsx`; poster styles in `shared/styles.css`) | Event artwork since S-16: six original CSS posters (geometric shapes and type in the EventFlow palette, chosen per event from its public ID; no image files) | Written in this project in the v0 design's palette and typography; no generator, image file or external resource |
+| ChatGPT | Helped the stakeholder draft and review development prompts and decisions (§1) | Source: the stakeholder's statement (S-15). It did not write code into the repository, run code, tests or development tools, or make commits: every command, test run and commit in the record was made by Claude Code in this workspace or by GitHub Actions |
+| npm packages (runtime) | Fastify, @fastify/cookie, @fastify/static, Kysely, pg, zod, Luxon, React, React DOM, qrcode, lucide-react (icons, ISC licence, added in S-13) | Open-source dependencies, declared in each `package.json` and locked in `pnpm-lock.yaml` |
+| npm packages (development) | TypeScript, tsx, Vite, @vitejs/plugin-react, Vitest, jsdom, Testing Library, Playwright, ESLint, typescript-eslint, eslint-plugin-react-hooks, globals, Prettier | As above |
 | PostgreSQL 18 (EDB binaries), Node.js 24 | Runtime platform | Not distributed with the project |
 
-No code templates, starter kits or project generators were used. The workspace, configuration files and application code were written in the session (S-02), not generated by `create-vite` or a similar tool.
+No starter kits or project generators were used for the application. The workspace, configuration files and application code were written in the sessions (from S-02), not generated by `create-vite` or a similar tool. The one external design source is the v0 design above: since S-13 the client's look follows it, re-implemented on this project's own client code.

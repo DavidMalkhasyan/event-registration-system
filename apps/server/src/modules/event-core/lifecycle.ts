@@ -4,12 +4,18 @@ import { z } from 'zod';
 import type { AppContext } from '../../composition/context.js';
 import { ticketCode } from '../../platform/crypto.js';
 import { AppError, InvalidLinkError } from '../../platform/errors.js';
+import { RULES } from '../../platform/ratelimit.js';
 import { checkInWindow, cutoffOf, resolveLocalStart } from '../../platform/time.js';
 import { decisionTime, withEventLock, type LockedEvent, type Tx } from '../../platform/tx.js';
 import { findToken, type TokenRow } from '../access-tokens/tokens.js';
 import { recordAudit } from '../audit/audit.js';
-import { sessionStillValid, type OrganizerPrincipal } from '../identity/sessions.js';
+import {
+  requireRecentAuthentication,
+  sessionStillValid,
+  type OrganizerPrincipal,
+} from '../identity/sessions.js';
 import { enqueue, type MessageType } from '../messaging/outbox.js';
+import { revokeInvitationsOnCancellation } from '../staff/staff.js';
 
 const DAY_MS = 24 * 3_600_000;
 export const TRANSFER_STATEMENT = 'This ticket can be transferred, but it admits one person, once.';
@@ -32,6 +38,33 @@ export async function scheduleReminderTask(
       schedule_version: version,
       due_at: new Date(startsAt.getTime() - DAY_MS),
       params: '{}',
+      created_at: now,
+    })
+    .onConflict((oc) => oc.columns(['kind', 'event_id', 'schedule_version']).doNothing())
+    .execute();
+}
+
+/**
+ * One cutoff task per schedule version, due at the cutoff (F8, TX-J03; U-26 makes it idempotent).
+ * `waitlistClosedByChange`: the version's change email already told waiting participants that
+ * registration is closed (FR-NTF-4), so the task sends no separate "waiting list closed" email.
+ */
+export async function scheduleCutoffTask(
+  trx: Tx,
+  eventId: string,
+  version: number,
+  startsAt: Date,
+  now: Date,
+  waitlistClosedByChange = false,
+): Promise<void> {
+  await trx
+    .insertInto('app.scheduled_tasks')
+    .values({
+      kind: 'cutoff_processing',
+      event_id: eventId,
+      schedule_version: version,
+      due_at: cutoffOf(startsAt),
+      params: JSON.stringify(waitlistClosedByChange ? { waitlist_closed_by_change: true } : {}),
       created_at: now,
     })
     .onConflict((oc) => oc.columns(['kind', 'event_id', 'schedule_version']).doNothing())
@@ -322,6 +355,291 @@ export async function cancelByManagementLink(
   return outcome;
 }
 
+// ---------------------------------------------------------------- waiting-list removal (FR-WL-10 to FR-WL-14)
+
+export const waitlistRemovalSchema = z
+  .object({ confirmed: z.literal(true), reason: z.string().trim().min(1).max(500).optional() })
+  .strict();
+
+/**
+ * TX-W01 (FR-WL-10 to FR-WL-14, BR-24, BR-27, PD-62, PD-63): the owner removes one WAITLISTED
+ * registration. Under the exclusive event lock, so it is serialized with verification, promotion,
+ * participant cancellation and event cancellation, and decided by commit order. The state is
+ * re-checked here, so a promoted, confirmed or cancelled registration is never touched. No seat is
+ * freed, so nobody is promoted; positions are derived from waitlist_seq, so everyone behind moves up.
+ * The required removal notice and the audit record are written in the same transaction.
+ */
+export async function removeFromWaitlist(
+  ctx: AppContext,
+  principal: OrganizerPrincipal,
+  eventId: string,
+  registrationId: string,
+  input: z.infer<typeof waitlistRemovalSchema>,
+  correlationId: string,
+): Promise<{ result: 'removed' }> {
+  if (!z.uuid().safeParse(eventId).success || !z.uuid().safeParse(registrationId).success)
+    throw new AppError(404, 'not_found');
+  const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
+    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
+    const reg = await trx
+      .selectFrom('app.registrations')
+      .select(['id', 'email', 'state', 'waitlist_seq'])
+      .where('id', '=', registrationId)
+      .where('event_id', '=', eventId)
+      .executeTakeFirst();
+    if (!reg) return 'not_found' as const;
+    if (event.status !== 'SCHEDULED') return 'not_scheduled' as const;
+    if (reg.state !== 'WAITLISTED' || reg.waitlist_seq === null) return 'not_waitlisted' as const;
+    const position = await positionOf(trx, eventId, reg.waitlist_seq);
+    await trx
+      .updateTable('app.registrations')
+      .set({
+        state: 'CANCELLED',
+        ended_at: now,
+        end_reason: 'removed_by_organizer',
+        removal_reason: input.reason ?? null,
+        updated_at: now,
+      })
+      .where('id', '=', reg.id)
+      .execute();
+    await enqueue(trx, {
+      type: 'waitlist_removed',
+      logicalKey: `waitlist_removed:${reg.id}`,
+      recipientEmail: reg.email,
+      now,
+      eventId,
+      registrationId: reg.id,
+      correlationId,
+    });
+    await recordAudit(trx, {
+      now,
+      action: 'waitlist_remove',
+      actorKind: 'owner',
+      actorAccountId: principal.accountId,
+      eventId,
+      registrationId: reg.id,
+      outcome: 'removed',
+      details: { reasonGiven: input.reason !== undefined, position },
+    });
+    return 'removed' as const;
+  });
+  if (result === null || result === 'not_found') throw new AppError(404, 'not_found');
+  if (result === 'unauthenticated') throw new AppError(401, 'unauthenticated');
+  if (result === 'not_scheduled') throw new AppError(409, 'event_not_scheduled');
+  if (result === 'not_waitlisted') throw new AppError(409, 'not_waitlisted');
+  return { result: 'removed' };
+}
+
+// ---------------------------------------------------------------- event cancellation (FR-EVT-9, BR-16)
+
+/** ConfirmedAction: the explicit confirmation every destructive operation requires. */
+export const confirmedActionSchema = z.object({ confirmed: z.literal(true) }).strict();
+
+/**
+ * TX-E05 (FR-EVT-9, FR-ORG-5, BR-16, BR-18, BR-23, AC-18, AC-59): under the exclusive event lock,
+ * in this order (PD-39): owner, session and recent authentication (database decision time),
+ * then the idempotent answer for an already-cancelled event, then the start. One transaction:
+ * the event becomes CANCELLED (cancelled_at, schedule version + 1, so reminder and cutoff tasks
+ * become stale, PD-37); CONFIRMED and WAITLISTED → CANCELLED and PENDING_VERIFICATION → EXPIRED,
+ * both with end_reason 'event_cancelled', in one statement; exactly one event-cancellation email
+ * per previously confirmed or waiting participant (recipients read under the lock before the
+ * update); an audit record. Queued messages are not touched: their claim, under the shared event
+ * lock, re-checks freshness and drops them (AC-18). No registration-cancellation confirmation is
+ * created (AC-59). Tickets and check-ins stay as history; check-in answers EVENT_CANCELLED.
+ */
+export async function cancelEvent(
+  ctx: AppContext,
+  principal: OrganizerPrincipal,
+  eventId: string,
+  correlationId: string,
+): Promise<void> {
+  if (!z.uuid().safeParse(eventId).success) throw new AppError(404, 'not_found');
+  // PD-38: per account, before any event lookup, so a 429 says nothing about the event.
+  const limit = await ctx.limiter.hit(RULES.eventCancellationPerAccount, principal.accountId);
+  if (!limit.allowed) throw new AppError(429, 'rate_limited', { retryAfterSeconds: limit.retryAfterSeconds });
+
+  const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
+    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    await requireRecentAuthentication(trx, principal.sessionId, now); // 401 unauthenticated / reauthentication_required
+    if (event.status === 'CANCELLED') return 'already_cancelled' as const;
+    if (now >= event.starts_at) return 'started' as const;
+
+    const recipients = await trx
+      .selectFrom('app.registrations')
+      .select(['id', 'email', 'state'])
+      .where('event_id', '=', eventId)
+      .where('state', 'in', ['CONFIRMED', 'WAITLISTED'])
+      .orderBy('id')
+      .execute();
+    await trx
+      .updateTable('app.events')
+      .set({
+        status: 'CANCELLED',
+        cancelled_at: now,
+        schedule_version: event.schedule_version + 1,
+        updated_at: now,
+      })
+      .where('id', '=', eventId)
+      .execute();
+    const ended = await sql<{ state: string; n: number }>`
+      WITH ended AS (
+        UPDATE app.registrations
+           SET state = CASE WHEN state = 'PENDING_VERIFICATION' THEN 'EXPIRED' ELSE 'CANCELLED' END,
+               ended_at = ${now}, end_reason = 'event_cancelled', updated_at = ${now}
+         WHERE event_id = ${eventId} AND state IN ('PENDING_VERIFICATION', 'CONFIRMED', 'WAITLISTED')
+        RETURNING state)
+      SELECT state, count(*)::int AS n FROM ended GROUP BY state`.execute(trx);
+    for (const reg of recipients) {
+      await enqueue(trx, {
+        type: 'event_cancellation',
+        logicalKey: `event_cancellation:${reg.id}`, // one logical message per registration (BR-16)
+        recipientEmail: reg.email,
+        now,
+        eventId,
+        registrationId: reg.id,
+        payload: { previousState: reg.state },
+        correlationId,
+      });
+    }
+    // PD-58 (K-304c dependency, FR-STAFF-5): pending staff invitations and their links end with the event.
+    await revokeInvitationsOnCancellation(trx, eventId, now);
+    const count = (state: string) => ended.rows.find((r) => r.state === state)?.n ?? 0;
+    await recordAudit(trx, {
+      now,
+      action: 'event_cancelled',
+      actorKind: 'owner',
+      actorAccountId: principal.accountId,
+      eventId,
+      outcome: 'success',
+      details: { cancelled: count('CANCELLED'), expired: count('EXPIRED'), notified: recipients.length },
+    });
+    return 'cancelled' as const;
+  });
+  if (result === null || result === 'not_found') throw new AppError(404, 'not_found');
+  if (result === 'started') throw new AppError(409, 'event_started');
+}
+
+// ---------------------------------------------------------------- title and description (FR-EVT-5)
+
+/** EventDetailsPatch: title and/or description, same limits as creation (FR-EVT-1). */
+export const eventDetailsSchema = z
+  .object({
+    title: z.string().trim().min(1).max(200).optional(),
+    description: z.string().max(5000).nullable().optional(),
+  })
+  .strict()
+  .refine((v) => v.title !== undefined || v.description !== undefined, {
+    message: 'Provide a title, a description, or both',
+  });
+
+/**
+ * TX-E02: edits title and/or description while the event is SCHEDULED, under the exclusive event
+ * lock with an owner re-check. Changes nothing else and creates no email (FR-EVT-5, AC-105).
+ * Absolute values: an identical repeat is a no-op (no write, no audit record).
+ */
+export async function updateEventDetails(
+  ctx: AppContext,
+  principal: OrganizerPrincipal,
+  eventId: string,
+  input: z.infer<typeof eventDetailsSchema>,
+) {
+  if (!z.uuid().safeParse(eventId).success) throw new AppError(404, 'not_found');
+  const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
+    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
+    if (event.status !== 'SCHEDULED') return 'not_scheduled' as const;
+    const current = await trx
+      .selectFrom('app.events')
+      .select(['title', 'description'])
+      .where('id', '=', eventId)
+      .executeTakeFirstOrThrow();
+    // An empty description means "no description", as on the creation form.
+    const description =
+      input.description === undefined
+        ? current.description
+        : input.description === ''
+          ? null
+          : input.description;
+    const title = input.title ?? current.title;
+    const changed = [
+      ...(title !== current.title ? ['title'] : []),
+      ...(description !== current.description ? ['description'] : []),
+    ];
+    if (changed.length === 0) return 'unchanged' as const;
+    await trx
+      .updateTable('app.events')
+      .set({ title, description, updated_at: now })
+      .where('id', '=', eventId)
+      .execute();
+    await recordAudit(trx, {
+      now,
+      action: 'event_details_edit',
+      actorKind: 'owner',
+      actorAccountId: principal.accountId,
+      eventId,
+      outcome: 'success',
+      details: { changed: changed.join(',') },
+    });
+    return 'changed' as const;
+  });
+  if (result === null || result === 'not_found') throw new AppError(404, 'not_found');
+  if (result === 'unauthenticated') throw new AppError(401, 'unauthenticated');
+  if (result === 'not_scheduled') throw new AppError(409, 'event_not_scheduled');
+}
+
+// ---------------------------------------------------------------- capacity (FR-EVT-7, FR-EVT-8, BR-1, BR-5, BR-11)
+
+export const capacitySchema = z.object({ capacity: z.number().int().min(1).max(100_000) }).strict();
+
+/**
+ * TX-E03: sets an absolute capacity under the exclusive event lock, so it is serialized with
+ * verification, cancellation, promotion, reschedule and the cutoff task (AC-14). A decrease is
+ * never below the confirmed count (the error names the minimum). An increase writes the new
+ * capacity first, then promotes FIFO into the new seats before the cutoff, in the same
+ * transaction (AC-15, BR-5). Absolute values make retries idempotent: repeating a request
+ * changes nothing and promotes no one again.
+ */
+export async function setCapacity(
+  ctx: AppContext,
+  principal: OrganizerPrincipal,
+  eventId: string,
+  input: z.infer<typeof capacitySchema>,
+  correlationId: string,
+) {
+  if (!z.uuid().safeParse(eventId).success) throw new AppError(404, 'not_found');
+  const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
+    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
+    if (event.status !== 'SCHEDULED') return 'not_scheduled' as const;
+    if (input.capacity < event.confirmed_count) return { minimumCapacity: event.confirmed_count };
+    if (input.capacity === event.capacity) return 'unchanged' as const;
+
+    await trx
+      .updateTable('app.events')
+      .set({ capacity: input.capacity, updated_at: now })
+      .where('id', '=', eventId)
+      .execute();
+    // promoteFifo reads the new capacity and does nothing from the cutoff onward (BR-9).
+    const promoted =
+      input.capacity > event.capacity ? await promoteFifo(trx, eventId, now, correlationId) : [];
+    await recordAudit(trx, {
+      now,
+      action: 'capacity_change',
+      actorKind: 'owner',
+      actorAccountId: principal.accountId,
+      eventId,
+      outcome: 'success',
+      details: { from: event.capacity, to: input.capacity, promoted: promoted.length },
+    });
+    return 'changed' as const;
+  });
+  if (result === null || result === 'not_found') throw new AppError(404, 'not_found');
+  if (result === 'unauthenticated') throw new AppError(401, 'unauthenticated');
+  if (result === 'not_scheduled') throw new AppError(409, 'event_not_scheduled');
+  if (typeof result === 'object') throw new AppError(409, 'capacity_below_confirmed', result);
+}
+
 // ---------------------------------------------------------------- reschedule (FR-EVT-6, BR-12 to BR-15)
 
 export const rescheduleSchema = z
@@ -395,6 +713,7 @@ export async function rescheduleEvent(
       });
     }
     await scheduleReminderTask(trx, eventId, version, resolved.instant, now);
+    await scheduleCutoffTask(trx, eventId, version, resolved.instant, now, closedNow);
     await promoteFifo(trx, eventId, now, correlationId); // BR-15: moving later can reopen promotion
     await recordAudit(trx, {
       now,

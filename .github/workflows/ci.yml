@@ -36,6 +36,12 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
+      # K-105: no credentials in tracked files; no known high or critical advisories in dependencies.
+      - name: Secret scan of tracked files
+        run: pnpm check:secrets
+      - name: Dependency audit (high and critical)
+        run: pnpm check:deps
+
       # Throwaway credentials for the ephemeral CI database; nothing here is a real secret.
       - name: Generate CI-only credentials
         run: |
@@ -45,6 +51,7 @@ jobs:
             echo "CSRF_SECRET=$(openssl rand -hex 32)"
             echo "PRESESSION_SECRET=$(openssl rand -hex 32)"
             echo "RATE_LIMIT_SECRET=$(openssl rand -hex 32)"
+            echo "PREVIEW_SECRET=$(openssl rand -hex 32)"
           } >> "$GITHUB_ENV"
       - name: Provision roles and databases
         env:
@@ -64,6 +71,8 @@ jobs:
       - run: pnpm typecheck
       - name: Migrations apply to an empty database
         run: pnpm migrate
+      - name: Migrations are idempotent (a second run applies nothing)
+        run: pnpm migrate | tee /dev/stderr | grep -q 'schema is up to date'
       - name: Tests (integration tests use the real PostgreSQL service)
         run: pnpm test
       - run: pnpm build

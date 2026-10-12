@@ -17,6 +17,15 @@ export const RULES = {
   failedLinkLookupsPerIp: { scope: 'token_lookup_ip', limit: 20, windowSeconds: 600 },
   signInPerAddress: { scope: 'signin_email', limit: 5, windowSeconds: 900 },
   signInPerIp: { scope: 'signin_ip', limit: 30, windowSeconds: 900 },
+  // API_DESIGN §11: re-authentication requests per account (value provisional, OQ-9).
+  reauthPerAccount: { scope: 'reauth_account', limit: 5, windowSeconds: 900 },
+  // PD-38 (stakeholder D3): event cancellations per organizer account, provisional for OQ-9.
+  eventCancellationPerAccount: { scope: 'event_cancel_account', limit: 5, windowSeconds: 900 },
+  // FR-SELF-4 and FR-ROT-8 defaults (PD-48).
+  ticketResendPerRegistration: { scope: 'resend_registration', limit: 3, windowSeconds: 3600 },
+  rotationPerRegistrationAndType: { scope: 'rotation_registration_type', limit: 5, windowSeconds: 3600 },
+  // PD-55: staff invitations per event (provisional, OQ-9).
+  staffInvitationsPerEvent: { scope: 'staff_invite_event', limit: 20, windowSeconds: 3600 },
   registrationPerIp: { scope: 'register_ip', limit: 30, windowSeconds: 900 },
   registrationPerAddress: { scope: 'register_email', limit: 5, windowSeconds: 900 },
   failedCheckInsPerSession: { scope: 'checkin_fail_session', limit: 30, windowSeconds: 300 },

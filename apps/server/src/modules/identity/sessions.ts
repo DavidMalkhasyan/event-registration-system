@@ -3,6 +3,7 @@ import type { AppContext } from '../../composition/context.js';
 import { hashToken, hmac, safeEqual } from '../../platform/crypto.js';
 import { AppError } from '../../platform/errors.js';
 import { decisionTime, type Tx } from '../../platform/tx.js';
+import { STAFF_COOKIE, resolveStaff } from './staff-sessions.js';
 
 // FR-ORG-4, ADR-010 §3 and §5.
 export const ORG_COOKIE = '__Host-ers_org';
@@ -76,13 +77,53 @@ export async function requireOrganizer(
   options: { csrf: boolean },
 ): Promise<OrganizerPrincipal> {
   const principal = await resolveOrganizer(ctx, request);
-  if (!principal) throw new AppError(401, 'unauthenticated');
+  if (!principal) {
+    // API_DESIGN §5.1 (AC-26, AC-151): a staff-only caller is authenticated, but not allowed here.
+    if (request.cookies[STAFF_COOKIE] && (await resolveStaff(ctx, request)))
+      throw new AppError(403, 'forbidden');
+    throw new AppError(401, 'unauthenticated');
+  }
   if (options.csrf) {
     const header = request.headers['x-csrf-token'];
     const expected = csrfTokenFor(ctx.config.CSRF_SECRET, 'org', principal.sessionId);
     if (typeof header !== 'string' || !safeEqual(header, expected)) throw new AppError(403, 'csrf_failed');
   }
   return principal;
+}
+
+export type RecentAuthentication = 'recent' | 'unauthenticated' | 'reauthentication_required';
+
+/**
+ * FR-ORG-5, ADR-010 §8: whether the session was authenticated within the last 15 minutes.
+ * Must run INSIDE the locked transaction of the protected operation (event cancellation and
+ * deletion: after the event lock), with that transaction's decision time `now`, never with a
+ * browser timestamp or an earlier check. The session row is read FOR SHARE, so a concurrent
+ * re-authentication (which revokes this session in TX-A02) is serialized with the operation:
+ * whichever commits first wins. Recent means `now < authenticated_at + 15 min`; at exactly
+ * 15 minutes, re-authentication is required.
+ */
+export async function recentAuthentication(
+  trx: Tx,
+  sessionId: string,
+  now: Date,
+): Promise<RecentAuthentication> {
+  const row = await trx
+    .selectFrom('app.organizer_sessions')
+    .select(['revoked_at', 'absolute_expires_at', 'authenticated_at'])
+    .where('id', '=', sessionId)
+    .forShare()
+    .executeTakeFirst();
+  if (!row || row.revoked_at || now >= row.absolute_expires_at) return 'unauthenticated';
+  return now.getTime() < row.authenticated_at.getTime() + RECENT_AUTH_MS
+    ? 'recent'
+    : 'reauthentication_required';
+}
+
+/** Throws the matching 401 unless the session is recently authenticated (see recentAuthentication). */
+export async function requireRecentAuthentication(trx: Tx, sessionId: string, now: Date): Promise<void> {
+  const status = await recentAuthentication(trx, sessionId, now);
+  if (status === 'unauthenticated') throw new AppError(401, 'unauthenticated');
+  if (status === 'reauthentication_required') throw new AppError(401, 'reauthentication_required');
 }
 
 /** Re-check after the event lock (FR-ORG-4: revocation applies to every later authorization check). */

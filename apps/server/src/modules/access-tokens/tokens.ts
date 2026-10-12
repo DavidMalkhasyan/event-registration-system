@@ -11,6 +11,7 @@ export interface IssueInput {
   registrationId?: string;
   eventId?: string;
   signInRequestId?: string;
+  staffInvitationId?: string;
   via: 'page' | 'email';
   outboxMessageId?: string;
   attemptNo?: number;
@@ -19,14 +20,20 @@ export interface IssueInput {
 
 /** Issues a new token and returns the raw value; only its hash is stored (FR-LNK-1). */
 export async function issueToken(trx: Tx, input: IssueInput): Promise<string> {
+  return (await issueTokenWithId(trx, input)).raw;
+}
+
+/** As issueToken, also returning the new row's ID (rotation requests reference it, FK-17). */
+export async function issueTokenWithId(trx: Tx, input: IssueInput): Promise<{ raw: string; id: string }> {
   const raw = randomToken();
-  await trx
+  const row = await trx
     .insertInto('app.access_tokens')
     .values({
       token_type: input.type,
       token_hash: hashToken(input.type, raw)!,
       registration_id: input.registrationId ?? null,
       sign_in_request_id: input.signInRequestId ?? null,
+      staff_invitation_id: input.staffInvitationId ?? null,
       event_id: input.eventId ?? null,
       issued_at: input.now,
       issued_via: input.via,
@@ -34,8 +41,9 @@ export async function issueToken(trx: Tx, input: IssueInput): Promise<string> {
       attempt_no: input.attemptNo ?? null,
       expires_at: input.expiresAt ?? null,
     })
-    .execute();
-  return raw;
+    .returning('id')
+    .executeTakeFirstOrThrow();
+  return { raw, id: row.id };
 }
 
 export interface TokenRow {
@@ -43,6 +51,7 @@ export interface TokenRow {
   token_type: TokenType;
   registration_id: string | null;
   sign_in_request_id: string | null;
+  staff_invitation_id: string | null;
   event_id: string | null;
   issued_at: Date;
   expires_at: Date | null;
@@ -60,6 +69,7 @@ export async function findToken(db: Database | Tx, type: TokenType, raw: string)
       'token_type',
       'registration_id',
       'sign_in_request_id',
+      'staff_invitation_id',
       'event_id',
       'issued_at',
       'expires_at',

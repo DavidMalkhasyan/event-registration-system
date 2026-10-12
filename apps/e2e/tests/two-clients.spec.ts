@@ -1,9 +1,11 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures.js';
 import {
   HOUR,
   address,
+  checkInResult,
   createEvent,
   localIn,
+  openSection,
   openVerification,
   readResult,
   registerParticipant,
@@ -31,6 +33,7 @@ test('dashboard on one device shows check-ins made on another device without ref
   expect(ticketCode).toBeTruthy();
 
   // Reschedule into the check-in window (opens 2 hours before the start); the guest is told (P0 #14).
+  await openSection(dashboard, 'Settings');
   await dashboard.getByLabel(/New date and time/).fill(localIn(1 * HOUR));
   await dashboard.getByRole('button', { name: 'Reschedule and notify' }).click();
   await expect(dashboard.getByText('Rescheduled. Every confirmed and waiting participant')).toBeVisible();
@@ -47,7 +50,7 @@ test('dashboard on one device shows check-ins made on another device without ref
 
   await scanner.getByLabel('Ticket code').fill(ticketCode!.toLowerCase());
   await scanner.getByRole('button', { name: 'Check in' }).click();
-  await expect(scanner.getByText('✔ Checked in')).toBeVisible();
+  await expect(checkInResult(scanner)).toHaveText('Checked in');
 
   // The other device's dashboard updates live (P0 #12), with no page reload.
   await expect(stat(dashboard, 'Checked in')).toHaveText('1');
@@ -57,11 +60,11 @@ test('dashboard on one device shows check-ins made on another device without ref
   // The same ticket cannot be used twice (P0 #10); unknown codes are rejected (P0 #9).
   await scanner.getByLabel('Ticket code').fill(ticketCode!);
   await scanner.getByRole('button', { name: 'Check in' }).click();
-  await expect(scanner.getByText('✖ Already checked in')).toBeVisible();
+  await expect(checkInResult(scanner)).toHaveText('Already checked in');
   await expect(scanner.getByText(/First check-in at/)).toBeVisible();
   await scanner.getByLabel('Ticket code').fill('ZZZZZZZZZZZZ');
   await scanner.getByRole('button', { name: 'Check in' }).click();
-  await expect(scanner.getByText('✖ Unknown ticket code')).toBeVisible();
+  await expect(checkInResult(scanner)).toHaveText('Unknown ticket code');
   await expect(stat(dashboard, 'Checked in')).toHaveText('1');
 
   await dashboardContext.close();

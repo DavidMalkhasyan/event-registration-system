@@ -71,7 +71,7 @@ cp .env.example .env
 Then edit `.env`:
 
 - **Connection strings:** put the two passwords and your port into the four `*DATABASE_URL` values.
-- **Secrets:** replace the three secrets with random values of at least 32 characters, for example from `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
+- **Secrets:** replace the four secrets (`CSRF_SECRET`, `PRESESSION_SECRET`, `RATE_LIMIT_SECRET`, `PREVIEW_SECRET`) with random values of at least 32 characters, for example from `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
 
 A missing or invalid variable stops every process with its **name**; the value is never printed.
 
@@ -111,30 +111,32 @@ Open http://localhost:3000/organizer. The worker needs the same `PUBLIC_ORIGIN` 
 ## 4. Demo walkthrough (about 10 minutes)
 
 1. **Sign in.** Open the organizer area and enter any address, such as `organizer@example.test`. Open the mailbox, follow the sign-in link and press **Sign in**.
-2. **Create an event.** Use capacity **1** and a start date three days ahead, in your time zone. Open the event.
+2. **Create an event.** Choose **Create event**, use capacity **1** and a start date three days ahead, in your time zone. The new event's workspace opens; the **Overview** page lists all your events.
 3. **Register Anna.** Copy the **public registration link** into a private window (a separate participant browser). Register `anna@example.test`. In the mailbox, follow "Confirm your registration" and press **Confirm**. Anna gets a ticket with a QR code and a 12-character code, plus a ticket email.
 4. **Register Ben.** Repeat with `ben@example.test`. The event is full, so Ben is on the waiting list at position 1.
 5. **Try a duplicate.** Register `ANNA@example.test` again. The response is the same, no seat is taken, and Anna receives a "Your registration" access email instead.
 6. **Cancel and promote.** Open the management link in Anna's ticket email and cancel. Ben is promoted at once and receives "A place became free" with his ticket. The dashboard now shows 1 confirmed and 0 waiting.
-7. **Reschedule into the check-in window.** On the dashboard, reschedule the event to about **1 hour from now**. Every confirmed and waiting participant receives "Date changed". Check-in opens 2 hours before the start.
-8. **Check in from a second device.** In another browser profile or private window, sign in as the same organizer. Open **entrance check-in screen** and type Ben's code.
-   - The scanner shows **✔ Checked in**.
+7. **Reschedule into the check-in window.** In the event's **Settings**, reschedule it to about **1 hour from now**. Every confirmed and waiting participant receives "Date changed". Check-in opens 2 hours before the start.
+8. **Check in from a second device.** In another browser profile or private window, sign in as the same organizer, open the event and its **Check-in** section, and type Ben's code. (Invited staff use the same screen at `/staff`.)
+   - The result shows **Checked in**.
    - The first window's "Checked in (live)" count changes to 1 **without a reload**.
-   - Typing the code again shows **✖ Already checked in**, with the first check-in time.
+   - Typing the code again shows **Already checked in**, with the first check-in time.
 
 **Timing rules:**
 
 - **Registration and promotion close** 2 hours before the start.
+- **At the cutoff,** the worker expires registrations that were never confirmed, and each participant still on the waiting list gets one "Registration closed" email for that date. If a reschedule already moved the start inside the cutoff, its change email says so instead. Moving the event later reopens registration with waiting positions kept.
 - **Check-in** is open from 2 hours before the start until 12 hours after it.
 - **Reminders** go out 24 hours before the start, exactly once per confirmed participant, while the worker runs. A ticket, promotion or change email sent within those 24 hours counts as the reminder, so no second email follows. The automated tests prove the reminder with an injected test clock.
 
 ## 5. Tests and quality checks
 
-| Command                                                             | What it runs                                                                                                                                                                  | Result (2026-10-11)                       |
-| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| `pnpm test`                                                         | Server integration tests against the real `ers_test` database (its `app` schema is recreated per run), plus client unit tests                                                 | 23/23 and 3/3 passed                      |
-| `pnpm e2e`                                                          | Playwright: builds the client, recreates the test database, starts real web and worker processes on :3100, and drives browsers (2 participant-flow tests, 2 two-client tests) | 4/4 passed (Edge locally; Chromium in CI) |
-| `pnpm lint` / `pnpm typecheck` / `pnpm format:check` / `pnpm build` | ESLint (including a layering rule), TypeScript strict, Prettier, production builds                                                                                            | All pass                                  |
+| Command                                                             | What it runs                                                                                                                                                                                                                                                                                                                                                                                                                                              | Result (2026-10-12)                         |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `pnpm test`                                                         | Server integration tests against the real `ers_test` database (its `app` schema is recreated per run), plus client unit tests                                                                                                                                                                                                                                                                                                                             | 135/135 and 11/11 passed                    |
+| `pnpm e2e`                                                          | Playwright: builds the client, recreates the test database, starts real web and worker processes on :3100, and drives browsers (participant flow, two simultaneous clients, capacity changes, details editing, re-authentication, cancellation, deletion, participant self-service, staff, check-in undo, waiting-list removal, the organizer workspace, link-page security and token bootstrap order on the production build, camera scanning: 22 tests) | 22/22 passed (Edge locally; Chromium in CI) |
+| `pnpm check:secrets` / `pnpm check:deps`                            | Secret scan of tracked files; dependency audit (high and critical)                                                                                                                                                                                                                                                                                                                                                                                        | Pass                                        |
+| `pnpm lint` / `pnpm typecheck` / `pnpm format:check` / `pnpm build` | ESLint (including a layering rule), TypeScript strict, Prettier, production builds                                                                                                                                                                                                                                                                                                                                                                        | All pass                                    |
 
 **Running the end-to-end tests:**
 
@@ -143,7 +145,7 @@ Open http://localhost:3000/organizer. The worker needs the same `PUBLIC_ORIGIN` 
 
 **CI:** [.github/workflows/ci.yml](.github/workflows/ci.yml) runs every command above on GitHub Actions against a `postgres:18` service. [Results on GitHub Actions](https://github.com/DavidMalkhasyan/event-registration-system/actions).
 
-**Clean-clone verification (2026-10-11):** the published repository was cloned into a new directory and these instructions were followed against a newly initialized PostgreSQL 18.6 cluster. Install, migrations, the three development processes, the full §4 walkthrough in a browser, all commands in the table above, and the production-like run all succeeded. Details are in [DEVELOPMENT_JOURNAL.md](docs/process/DEVELOPMENT_JOURNAL.md) S-03.
+**Clean-clone verification:** first on 2026-10-11 (S-03, the P0 release): the published repository was cloned into a new directory and these instructions were followed against a newly initialized PostgreSQL 18.6 cluster. Install, migrations, the three development processes, the full §4 walkthrough in a browser, all commands in the table above, and the production-like run all succeeded. **Repeated on 2026-10-12 (S-14)** on the current code: a fresh clone and a new PostgreSQL 18 cluster; install, provisioning, 7 migrations and a repeat run ("schema is up to date"), the secret scan, format, lint, typecheck, 135/135 and 11/11 tests, the build, the production-like run with its security headers checked, and 22/22 browser tests (Microsoft Edge). Details are in [DEVELOPMENT_JOURNAL.md](docs/process/DEVELOPMENT_JOURNAL.md) S-03 and S-14.
 
 ## 6. Architecture in brief
 
@@ -163,7 +165,7 @@ Open http://localhost:3000/organizer. The worker needs the same `PUBLIC_ORIGIN` 
 
 ```
 apps/server   web + worker (src/platform: infrastructure; src/modules: features), migrations, integration tests
-apps/client   React pages: public.html (event and link pages), organizer.html (organizer area)
+apps/client   React pages: public.html (event and link pages), organizer.html (organizer area), staff.html (staff check-in)
 apps/e2e      Playwright tests and the launcher that starts the real stack
 scripts/      database provisioning
 docs/         requirements-phase design, process records (Kanban, journal, decision log, AI usage)
@@ -171,37 +173,38 @@ docs/         requirements-phase design, process records (Kanban, journal, decis
 
 ## 7. HTTP API (implemented subset)
 
-| Area                                                  | Routes                                                                                                                                                                                                                                                                     |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Public**                                            | `GET /api/public/events/:publicId` · `POST /api/public/events/:publicId/registrations`                                                                                                                                                                                     |
-| **Participant links** (`Authorization: Link <token>`) | `GET /api/links/verify` · `POST /api/links/verify/confirm` · `GET /api/links/manage` · `POST /api/links/manage/cancel` · `GET /api/links/ticket`                                                                                                                           |
-| **Organizer sign-in**                                 | `POST /api/auth/sign-in-requests` · `GET /api/links/sign-in` · `POST /api/links/sign-in/confirm` · `GET /api/auth/session` · `POST /api/auth/sign-out`                                                                                                                     |
-| **Organizer events**                                  | `GET` / `POST /api/events` · `GET /api/events/:id` · `GET /api/events/:id/dashboard` · `GET /api/events/:id/participants` · `POST /api/events/:id/reschedule` · `POST /api/events/:id/check-ins` · `GET /api/events/:id/check-in-count` · `GET /api/events/:id/live` (SSE) |
-| **Operations**                                        | `GET /healthz` · `GET /dev/mailbox` (development with the fake provider only)                                                                                                                                                                                              |
+| Area                                                  | Routes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Public**                                            | `GET /api/public/events/:publicId` · `POST /api/public/events/:publicId/registrations`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **Participant links** (`Authorization: Link <token>`) | `GET /api/links/verify` · `POST /api/links/verify/confirm` · `GET /api/links/manage` · `POST /api/links/manage/cancel` · `POST /api/links/manage/resend` · `POST /api/links/manage/share-links` · `POST /api/links/manage/rotations` · `GET /api/links/invite` · `POST /api/links/invite/accept` · `GET /api/links/ticket`                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **Organizer sign-in**                                 | `POST /api/auth/sign-in-requests` · `GET /api/links/sign-in` · `POST /api/links/sign-in/confirm` · `GET /api/auth/session` · `POST /api/auth/sign-out` · `POST /api/auth/reauthentication`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **Organizer events**                                  | `GET` / `POST /api/events` · `GET /api/events/:id` · `GET /api/events/:id/dashboard` · `GET /api/events/:id/participants` · `PATCH /api/events/:id` · `PUT /api/events/:id/capacity` · `POST /api/events/:id/cancellation` · `GET /api/events/:id/deletion-preview` · `POST /api/events/:id/deletion` · `POST /api/events/:id/reschedule` · `POST /api/events/:id/check-ins` · `POST /api/events/:id/check-ins/:checkInId/undo` · `POST /api/events/:id/registrations/:registrationId/waitlist-removal` · `GET /api/events/:id/check-in-count` · `GET /api/events/:id/live` (SSE) · `GET /api/events/:id/staff` · `POST /api/events/:id/staff-invitations` · `POST …/staff-invitations/:id/revocation` · `POST …/staff-sessions/:id/revocation` |
+| **Staff device**                                      | `GET /api/staff/session`; check-in, count and live stream of its own event (above)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **Operations**                                        | `GET /healthz` · `GET /dev/mailbox` (development with the fake provider only)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 Errors use RFC 9457 Problem Details (`application/problem+json`) with a stable `code`.
 
 ## 8. Known limitations
 
-- **Organizer features:** only rescheduling is implemented. Event editing, capacity changes, event cancellation and deletion, check-in undo, and staff accounts are not; only the event owner checks in, from any number of signed-in devices.
-- **Background jobs:** none runs at the registration cutoff. Pending registrations are not expired, and waiting participants are not told that the waiting list closed. Registration and promotion still stop correctly at the cutoff.
+- **Organizer features:** rescheduling, capacity changes, title and description editing, event cancellation and event deletion (both behind a recent sign-in) are implemented. The owner can undo a check-in (audited; staff cannot) and remove a waiting-list entry (audited, emailed, never promotes). Staff are invited per event by email; each accepted invitation is one device session with check-in access only.
 - **Email:** the fake provider is the only one. There is no Resend integration, no delivery webhooks and no bounce handling.
-- **Participant self-service:** limited to view, cancel and the ticket share link. There is no "resend my links" and no email change.
+- **Participant self-service:** view, cancel, ticket resend, share links and link rotation are implemented; changing the registration's email address is not.
 - **Language:** English only.
-- **Camera scanning:** QR scanning uses the browser's `BarcodeDetector` where it exists. It is not covered by automated tests; manual code entry is.
+- **Camera scanning** (accepted as a documented limitation for this release): QR scanning uses the browser's `BarcodeDetector` where it exists (desktop Chromium on Windows and Linux has none), so the scan button appears only there; manual code entry always works. The browser test `camera-scan` covers scanning with **simulated** camera and `BarcodeDetector` APIs; everything after detection is real. It has **not been tried on a physical phone or camera**.
 - **Test environment:** tests use a local PostgreSQL database instead of Testcontainers (no container runtime on the development machine).
-- **Verified on one platform only:** the setup was verified from a clean clone on Windows (Git Bash) and in CI on Ubuntu; macOS has not been tried.
+- **Verified on one platform only:** the setup was verified from a clean clone on Windows (Git Bash) in S-03 and again in S-14, and in CI on Ubuntu; macOS and Linux desktops have not been tried.
 - **CI warnings:** GitHub reports that the v4 actions target the deprecated Node.js 20 runtime (they run on Node.js 24). Updating the action versions is pending.
-- **Not production-ready:** no deployment configuration, TLS termination, backups or load testing.
+- **Upgrading an existing setup:** after pulling, run `pnpm migrate` (migrations `0003` to `0007`) and add `PREVIEW_SECRET` to `.env`; the processes refuse to start with an outdated schema or a missing variable.
+- **Development server headers:** the Vite development server does not send the production page headers (content security policy and others) and injects its own client script. The production-like run (§3) is the tested path.
+- **Event artwork:** events have no uploaded image; each gets one of six original CSS posters (geometric shapes and type in the EventFlow palette, chosen per event from its public ID; no image files). The v0 design's three AI-generated photographs were removed before the release because their reuse rights were not established; they remain in earlier commits, since the history is not rewritten ([AI_USAGE.md](docs/process/AI_USAGE.md) §7).
+- **Release state:** the published `main` branch still holds the first release (the P0 scope, 2026-10-11). Everything else described here is on the `dev` branch until the release pull request into `main` is merged, which needs the stakeholder's authorization.
+- **Not production-ready:** no deployment exists, and there is no deployment configuration, TLS termination, backups or load testing.
 
 ## 9. Future improvements
 
-1. **Cutoff job:** expire pending registrations and send "waiting list closed" emails.
-2. **Event management:** cancellation and capacity changes for organizers, each with participant notification.
-3. **Staff:** invitations and dedicated check-in sessions.
-4. **Real email:** a Resend provider behind configuration, with delivery webhooks and a delivery-problem view.
-5. **Participant self-service:** link resend and rotation.
-6. **Test infrastructure:** Testcontainers once a container runtime is available, and a load test of the last-seat path.
+1. **Real email:** a Resend provider behind configuration, with delivery webhooks and a delivery-problem view.
+2. **Test infrastructure:** Testcontainers once a container runtime is available, and a load test of the last-seat path.
+3. **Camera check on real devices:** scan tickets with a phone and a laptop camera, and record which browsers offer `BarcodeDetector`.
 
 ## 10. How this was built
 
@@ -211,3 +214,4 @@ The project was developed with **Claude Code** (model Claude Opus 5.5, `claude-o
 - **Sessions with real timestamps, commands and results:** [docs/process/DEVELOPMENT_JOURNAL.md](docs/process/DEVELOPMENT_JOURNAL.md)
 - **Process decisions:** [docs/process/DECISION_LOG.md](docs/process/DECISION_LOG.md)
 - **Work tracking:** [docs/process/KANBAN.md](docs/process/KANBAN.md)
+- **Client inventory before a UI redesign:** [docs/frontend/UI_INVENTORY.md](docs/frontend/UI_INVENTORY.md). The redesign adapts the approved design made with Vercel v0 ([eventflow-v0-design](https://github.com/DavidMalkhasyan/eventflow-v0-design)): its visual components and styles were ported onto this project's own backend and security architecture; see PD-65 to PD-71 and [AI_USAGE.md](docs/process/AI_USAGE.md) §7.

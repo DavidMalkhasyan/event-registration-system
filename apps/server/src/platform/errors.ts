@@ -13,6 +13,20 @@ export type ProblemCode =
   | 'event_not_scheduled'
   | 'event_started'
   | 'capacity_below_confirmed'
+  | 'cancelled_event_not_deletable'
+  | 'deletion_blocked'
+  | 'notifications_pending'
+  | 'preview_invalid'
+  | 'not_confirmed'
+  | 'request_already_processed'
+  | 'rotation_not_available'
+  | 'rotation_not_applied'
+  | 'resend_limit'
+  | 'rotation_limit'
+  | 'invitation_not_pending'
+  | 'check_in_window_ended'
+  | 'check_in_already_undone'
+  | 'not_waitlisted'
   | 'schedule_version_mismatch'
   | 'nonexistent_local_time'
   | 'ambiguous_local_time'
@@ -38,6 +52,20 @@ const TITLES: Record<ProblemCode, string> = {
   event_not_scheduled: 'The event is not scheduled',
   event_started: 'The event has started',
   capacity_below_confirmed: 'Capacity is below the number of confirmed participants',
+  cancelled_event_not_deletable: "Cancelled events can't be deleted",
+  deletion_blocked: 'The event cannot be deleted yet',
+  notifications_pending: 'Notifications are still being sent; try again later',
+  preview_invalid: 'The deletion preview is no longer valid; review it again',
+  not_confirmed: 'This registration has no ticket',
+  request_already_processed: 'This request was already processed. Please start again.',
+  rotation_not_available: 'This link cannot be replaced for this registration',
+  rotation_not_applied: 'Your link was not changed. Your current link still works. Please try again.',
+  resend_limit: 'Too many ticket emails were requested. Please try again later.',
+  rotation_limit: 'Too many link replacements. Please try again later.',
+  invitation_not_pending: 'This invitation is no longer pending',
+  check_in_window_ended: 'The check-in window of this event has ended',
+  check_in_already_undone: 'This check-in was already undone',
+  not_waitlisted: 'This registration is no longer on the waiting list',
   schedule_version_mismatch: 'The event was changed by another request; reload and try again',
   nonexistent_local_time: 'This local time does not exist in the time zone',
   ambiguous_local_time: 'This local time is ambiguous in the time zone',

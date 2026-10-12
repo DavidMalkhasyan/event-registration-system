@@ -4,7 +4,8 @@ import type { AppContext } from '../../composition/context.js';
 import { linkToken } from '../../platform/http.js';
 import { withLinkRateLimit } from '../access-tokens/link-guard.js';
 import { requireOrganizer } from '../identity/sessions.js';
-import { checkInAsOwner, checkInSchema } from './checkin.js';
+import { requireEventPrincipal } from '../identity/staff-sessions.js';
+import { checkIn, checkInSchema, undoCheckIn, undoCheckInSchema } from './checkin.js';
 import {
   createEvent,
   dashboard,
@@ -16,11 +17,20 @@ import {
 } from './events.js';
 import {
   cancelByManagementLink,
+  cancelEvent,
+  capacitySchema,
+  confirmedActionSchema,
+  eventDetailsSchema,
   managementView,
+  removeFromWaitlist,
   rescheduleEvent,
   rescheduleSchema,
+  setCapacity,
   shareView,
+  updateEventDetails,
+  waitlistRemovalSchema,
 } from './lifecycle.js';
+import { deleteEvent, deleteEventSchema, getDeletionPreview } from './deletion.js';
 import { confirmVerification, resolveVerification, submitRegistration } from './registrations.js';
 
 const registrationSchema = z.object({ email: z.email().max(254) }).strict();
@@ -98,13 +108,67 @@ export function registerEventCoreRoutes(app: FastifyInstance, ctx: AppContext): 
     return getOwnedEvent(ctx, principal, eventId);
   });
 
-  app.post('/api/events/:eventId/check-ins', async (request) => {
+  // getDeletionPreview (API #37) and deleteEvent (API #38): recent authentication; TX-E06.
+  app.get('/api/events/:eventId/deletion-preview', async (request) => {
+    const principal = await requireOrganizer(ctx, request, { csrf: false });
+    return getDeletionPreview(ctx, principal, params.parse(request.params).eventId);
+  });
+
+  app.post('/api/events/:eventId/deletion', async (request, reply) => {
     const principal = await requireOrganizer(ctx, request, { csrf: true });
-    return checkInAsOwner(
-      ctx,
-      principal,
-      params.parse(request.params).eventId,
-      checkInSchema.parse(request.body),
-    );
+    const eventId = params.parse(request.params).eventId;
+    await deleteEvent(ctx, principal, eventId, deleteEventSchema.parse(request.body ?? {}));
+    return reply.code(204).send();
+  });
+
+  // cancelEvent (API catalogue #36): confirmed, recent authentication; a repeat returns 200 (TX-E05).
+  app.post('/api/events/:eventId/cancellation', async (request) => {
+    const principal = await requireOrganizer(ctx, request, { csrf: true });
+    const eventId = params.parse(request.params).eventId;
+    confirmedActionSchema.parse(request.body ?? {});
+    await cancelEvent(ctx, principal, eventId, request.id);
+    return getOwnedEvent(ctx, principal, eventId);
+  });
+
+  // updateEventDetails (API catalogue #33): title and/or description; no emails.
+  app.patch('/api/events/:eventId', async (request) => {
+    const principal = await requireOrganizer(ctx, request, { csrf: true });
+    const eventId = params.parse(request.params).eventId;
+    await updateEventDetails(ctx, principal, eventId, eventDetailsSchema.parse(request.body));
+    return getOwnedEvent(ctx, principal, eventId);
+  });
+
+  // setCapacity (API catalogue #34): absolute value; retries are idempotent.
+  app.put('/api/events/:eventId/capacity', async (request) => {
+    const principal = await requireOrganizer(ctx, request, { csrf: true });
+    const eventId = params.parse(request.params).eventId;
+    await setCapacity(ctx, principal, eventId, capacitySchema.parse(request.body), request.id);
+    return getOwnedEvent(ctx, principal, eventId);
+  });
+
+  // checkIn (API #45): the owner or a staff session of this event (FR-STAFF-2, PD-56).
+  app.post('/api/events/:eventId/check-ins', async (request) => {
+    const eventId = params.parse(request.params).eventId;
+    const principal = await requireEventPrincipal(ctx, request, eventId, { csrf: true });
+    return checkIn(ctx, principal, eventId, checkInSchema.parse(request.body));
+  });
+
+  // removeFromWaitlist (API #43): owner only, confirmed; never promotes (TX-W01, PD-62).
+  app.post('/api/events/:eventId/registrations/:registrationId/waitlist-removal', async (request) => {
+    const principal = await requireOrganizer(ctx, request, { csrf: true });
+    const { eventId, registrationId } = z
+      .object({ eventId: z.string(), registrationId: z.string() })
+      .parse(request.params);
+    const input = waitlistRemovalSchema.parse(request.body ?? {});
+    return removeFromWaitlist(ctx, principal, eventId, registrationId, input, request.id);
+  });
+
+  // undoCheckIn (API #44): owner only; staff get 403 from requireOrganizer (AC-26, PD-56). TX-C02.
+  app.post('/api/events/:eventId/check-ins/:checkInId/undo', async (request) => {
+    const principal = await requireOrganizer(ctx, request, { csrf: true });
+    const { eventId, checkInId } = z
+      .object({ eventId: z.string(), checkInId: z.string() })
+      .parse(request.params);
+    return undoCheckIn(ctx, principal, eventId, checkInId, undoCheckInSchema.parse(request.body ?? {}));
   });
 }

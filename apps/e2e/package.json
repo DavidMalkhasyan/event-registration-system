@@ -9,6 +9,8 @@
   "devDependencies": {
     "@playwright/test": "^1.64.0",
     "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
+    "pg": "^8.23.1",
     "tsx": "^4.23.15",
     "typescript": "6.0.3"
   }

@@ -78,6 +78,7 @@ export interface RegistrationsTable {
   confirmed_at: Timestamp | null;
   ended_at: Timestamp | null;
   end_reason: string | null;
+  removal_reason: string | null;
   updated_at: Timestamp;
 }
 
@@ -130,6 +131,7 @@ export interface AccessTokensTable {
   hash_alg: Generated<number>;
   registration_id: string | null;
   sign_in_request_id: string | null;
+  staff_invitation_id: Generated<string | null>;
   event_id: string | null;
   issued_at: Timestamp;
   issued_via: 'page' | 'email';
@@ -262,6 +264,54 @@ export interface ReminderSlotsTable {
   created_at: Timestamp;
 }
 
+export interface StaffInvitationsTable {
+  id: Generated<string>;
+  event_id: string;
+  invited_email: string;
+  status: Generated<'pending' | 'accepted' | 'revoked' | 'replaced'>;
+  created_at: Timestamp;
+  expires_at: Timestamp;
+  accepted_at: Timestamp | null;
+  ended_at: Timestamp | null;
+}
+
+export interface StaffSessionsTable {
+  id: Generated<string>;
+  event_id: string;
+  invitation_id: string;
+  session_hash: Buffer;
+  hash_alg: Generated<number>;
+  created_at: Timestamp;
+  last_seen_at: Timestamp;
+  absolute_expires_at: Timestamp;
+  revoked_at: Timestamp | null;
+  revoke_reason: 'owner_revoked' | null;
+}
+
+export interface RotationRequestsTable {
+  id: Generated<string>;
+  registration_id: string;
+  event_id: string;
+  request_id: string;
+  link_type: 'management' | 'share';
+  authorizing_token_id: string;
+  new_token_id: string;
+  decided_at: Timestamp;
+  outbox_message_id: string | null;
+}
+
+export interface DeletionMarkersTable {
+  event_id: string;
+  owner_account_id: string;
+  scheduled_start: Timestamp;
+  time_zone: string;
+  deleted_at: Timestamp;
+  deleted_by_account_id: string;
+  registrations_deleted: number;
+  failed_required_notices: number;
+  unconfirmed_required_notices: number;
+}
+
 export interface ScheduledTasksTable {
   id: Generated<string>;
   kind: 'reminder_fanout' | 'cutoff_processing';
@@ -296,4 +346,8 @@ export interface DB {
   'app.schema_migrations': SchemaMigrationsTable;
   'app.reminder_slots': ReminderSlotsTable;
   'app.scheduled_tasks': ScheduledTasksTable;
+  'app.deletion_markers': DeletionMarkersTable;
+  'app.rotation_requests': RotationRequestsTable;
+  'app.staff_invitations': StaffInvitationsTable;
+  'app.staff_sessions': StaffSessionsTable;
 }
