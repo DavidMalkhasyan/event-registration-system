@@ -1437,32 +1437,33 @@ svg {
 .featured-card .event-art {
   min-height: 300px;
 }
-.event-art > img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
 .event-art::after {
   content: '';
   position: absolute;
   inset: 0;
   background: linear-gradient(180deg, #ffffff10 0%, transparent 60%, #2523260f);
 }
-/* CSS posters for events without a photograph (PD-70); v0 named them but shipped no styles. */
+
+/* Original CSS posters (PD-79), one of six per event: geometric shapes in the EventFlow palette and
+   editorial type. No images, gradients only, so they fit the pages' strict content security policy. */
 .poster {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   padding: 18px 18px 16px;
+  isolation: isolate;
 }
 .card-art-wrap .poster {
   padding-top: 58px;
 }
+.poster-shape {
+  position: absolute;
+  pointer-events: none;
+}
 .poster-type {
   position: relative;
   z-index: 1;
+  max-width: 68%;
   font-size: 30px;
   font-weight: 700;
   line-height: 0.95;
@@ -1478,38 +1479,234 @@ svg {
   font-weight: 600;
   letter-spacing: 0.18em;
 }
-.poster-orbit {
-  position: absolute;
-  width: 220px;
-  height: 220px;
-  right: -60px;
-  bottom: -90px;
-  border-radius: 50%;
-  border: 1px solid currentColor;
-  opacity: 0.35;
-  box-shadow:
-    0 0 0 26px transparent,
-    0 0 0 27px currentColor;
+.event-cover .poster-foot {
+  display: none; /* the cover shows the date in its own caption */
 }
-.poster-lavender {
+
+/* 1. Orbit: lavender rings around a coral planet */
+.poster-orbit {
   background: linear-gradient(135deg, #ece5fa, #dcd1f2);
   color: #4a3c66;
 }
-.poster-peach {
-  background: linear-gradient(135deg, #fde6da, #f7c7b2);
+.poster-orbit .s1 {
+  right: -70px;
+  bottom: -110px;
+  width: 240px;
+  height: 240px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  opacity: 0.4;
+  box-shadow:
+    0 0 0 28px transparent,
+    0 0 0 29px currentColor;
+}
+.poster-orbit .s2 {
+  right: 118px;
+  bottom: 96px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 6px 16px #ef79594d;
+}
+.poster-orbit .s3 {
+  right: 26px;
+  top: 22px;
+  width: 64px;
+  height: 64px;
+  border: 1px dashed currentColor;
+  border-radius: 50%;
+  opacity: 0.35;
+}
+
+/* 2. Sunrise: a striped coral sun on warm cream */
+.poster-sunrise {
+  background: #fbeee3;
   color: #6f3524;
 }
-.poster-sage {
-  background: linear-gradient(135deg, #e7efe1, #c9dbc2);
-  color: #33502f;
+.poster-sunrise .s1 {
+  right: -36px;
+  bottom: -150px;
+  width: 270px;
+  height: 270px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #f6b49b, var(--primary) 70%);
 }
-.poster-peach .poster-type {
+.poster-sunrise .s2 {
+  right: -36px;
+  bottom: 0;
+  width: 270px;
+  height: 92px;
+  background: repeating-linear-gradient(180deg, transparent 0 13px, #fbeee3 13px 19px);
+}
+.poster-sunrise .s3 {
+  right: 34px;
+  top: 26px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #c9b8ea;
+}
+.poster-sunrise .poster-type {
   font-style: italic;
   font-weight: 600;
   text-transform: lowercase;
 }
-.poster-sage .poster-type {
+
+/* 3. Bauhaus: quarter circles and a coral disc on sage */
+.poster-bauhaus {
+  background: var(--sage);
+  color: #33502f;
+}
+.poster-bauhaus::before,
+.poster-bauhaus .s1,
+.poster-bauhaus .s2,
+.poster-bauhaus .s3 {
+  width: 62px;
+  height: 62px;
+}
+.poster-bauhaus::before {
+  content: '';
+  position: absolute;
+  right: 84px;
+  bottom: 82px;
+  border-radius: 0 0 62px 0;
+  background: var(--sage-strong);
+}
+.poster-bauhaus .s1 {
+  right: 84px;
+  bottom: 16px;
+  border-radius: 62px 0 0 0;
+  background: #252326;
+}
+.poster-bauhaus .s2 {
+  right: 18px;
+  bottom: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+.poster-bauhaus .s3 {
+  right: 18px;
+  bottom: 82px;
+  height: 31px;
+  border-radius: 62px 62px 0 0;
+  background: #fffdf8;
+}
+.poster-bauhaus .poster-type {
+  max-width: 58%;
+  font-size: 26px;
   text-transform: uppercase;
+  letter-spacing: -0.03em;
+}
+.featured-card .poster-bauhaus .poster-type {
+  font-size: 46px;
+}
+
+/* 4. Night: cream type on charcoal, a coral moon and a lavender ring */
+.poster-night {
+  background-color: #29262a;
+  background-image: radial-gradient(#fffdf824 1.2px, transparent 1.7px);
+  background-size: 16px 16px;
+  color: #fffdf8;
+}
+.poster-night .poster-foot {
+  color: #fffdf8b3;
+}
+.poster-night .s1 {
+  right: 30px;
+  bottom: -46px;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+.poster-night .s2 {
+  right: 86px;
+  bottom: 4px;
+  width: 150px;
+  height: 150px;
+  border: 2px solid #c9b8ea;
+  border-radius: 50%;
+}
+.poster-night .s3 {
+  right: 28px;
+  top: 24px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #a9c3a0;
+}
+
+/* 5. Arches: nested arches in coral, cream and lavender on peach */
+.poster-arches {
+  background: linear-gradient(135deg, #fde6da, #f7c7b2);
+  color: #6f3524;
+}
+.poster-arches .s1,
+.poster-arches .s2,
+.poster-arches .s3 {
+  bottom: -4px;
+}
+.poster-arches .s1 {
+  right: 24px;
+  width: 168px;
+  height: 196px;
+  border-radius: 84px 84px 0 0;
+  background: var(--primary);
+}
+.poster-arches .s2 {
+  right: 50px;
+  width: 116px;
+  height: 144px;
+  border-radius: 58px 58px 0 0;
+  background: #fbeee3;
+}
+.poster-arches .s3 {
+  right: 76px;
+  width: 64px;
+  height: 92px;
+  border-radius: 32px 32px 0 0;
+  background: #c9b8ea;
+}
+
+/* 6. Ribbon: rounded lavender, sage and coral strokes rising on cream */
+.poster-ribbon {
+  background: #f6f1e8;
+  color: var(--foreground);
+}
+.poster-ribbon .s1,
+.poster-ribbon .s2,
+.poster-ribbon .s3 {
+  border-radius: 999px;
+  transform: rotate(-28deg);
+}
+.poster-ribbon .s1 {
+  right: -46px;
+  bottom: 34px;
+  width: 250px;
+  height: 30px;
+  background: #c9b8ea;
+}
+.poster-ribbon .s2 {
+  right: -30px;
+  bottom: 74px;
+  width: 200px;
+  height: 18px;
+  background: #a9c3a0;
+}
+.poster-ribbon .s3 {
+  right: -12px;
+  bottom: 108px;
+  width: 150px;
+  height: 9px;
+  background: var(--primary);
+}
+.poster-ribbon .poster-type {
+  font-size: 36px;
+  letter-spacing: -0.07em;
+}
+.featured-card .poster-ribbon .poster-type {
+  font-size: 60px;
 }
 
 /* ------------------------------------------------------------------ events gallery tools */
@@ -2165,6 +2362,12 @@ svg {
   inset: 0;
   background: linear-gradient(90deg, #f6f1fbf2 0%, #f6f1fbcc 45%, transparent 90%);
 }
+/* The hero's title sits on the artwork, so the dark poster appears in its light version here. */
+.public-art > .poster-night {
+  background-color: #ebe6f2;
+  background-image: radial-gradient(#4a3c6633 1.2px, transparent 1.7px);
+  color: #4a3c66;
+}
 .public-art > div:last-child {
   position: relative;
   z-index: 1;
@@ -2707,6 +2910,15 @@ svg {
   }
   .featured-card .poster-type {
     font-size: 40px;
+  }
+  .featured-card .poster-ribbon .poster-type {
+    font-size: 48px;
+  }
+  .featured-card .poster-bauhaus .poster-type {
+    font-size: 34px;
+  }
+  .event-cover .poster-type {
+    font-size: 28px;
   }
   .manual-entry form {
     flex-direction: column;
