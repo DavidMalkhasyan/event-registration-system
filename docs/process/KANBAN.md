@@ -56,6 +56,7 @@
 
 | Card | Milestone | Awaiting |
 |---|---|---|
+| K-507 UI redesign to the approved v0 design, with the K-504 remainder (dedicated staff entry) | M5 | Part 1 merged: [PR #12](https://github.com/DavidMalkhasyan/event-registration-system/pull/12), CI run 38228535365 passed (131/131, 11/11, 19/19), merge `1172ec0`. Part 2 (participant and link pages, `67764a9`, `fbe2a33`) on `feature/ui-redesign-participant`. **Awaiting:** part 2 pull request, CI and merge; Done is recorded with the next branch. |
 | K-001 Apply R60; synchronize the documents | M0 | Stakeholder check (commit `3fe9cb7`) |
 | K-004 Process documentation | M0 | Stakeholder review |
 
@@ -63,7 +64,6 @@
 
 | Card | Milestone | State |
 |---|---|---|
-| K-507 UI redesign to the approved v0 design ([eventflow-v0-design](https://github.com/DavidMalkhasyan/eventflow-v0-design)), with the K-504 remainder (dedicated staff entry) | M5 | S-13: design system, organizer area (global overview, All events, creation, event workspace), shared check-in and the dedicated staff entry done on `feature/ui-redesign` (first pull request); participant and link pages next. Decisions PD-65 to PD-71 |
 | K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Updated in S-07 |
 
 ## To Do

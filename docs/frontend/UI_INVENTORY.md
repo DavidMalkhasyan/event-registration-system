@@ -2,6 +2,8 @@
 
 **Purpose:** a factual map of the current React client, written before a visual redesign (Kanban K-506). It is an inventory, not a plan: it records what exists, what the redesign must preserve, and where the code would have to change. Recorded on `dev` at `d219576` (2026-10-12), schema version 7.
 
+> **Status (K-507, 2026-10-12):** the redesign is implemented. §2, §3, §6 and §7 describe the client **before** it; the modules now live in `apps/client/src/organizer/` (app shell, overview, events, event workspace), `src/public/` (link pages), `src/checkin/` (shared check-in) and `staff.html` with `src/staff/`. §1, §4 and §5 still apply.
+
 ## 1. What a redesign must preserve
 
 | Area | Rule | Where it is enforced today |
