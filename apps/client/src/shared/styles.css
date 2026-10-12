@@ -740,6 +740,36 @@ svg {
   gap: 5px;
   color: var(--success);
 }
+/* Organizer refresh (K-704) */
+.refresh-control {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.refresh-status {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.refresh-status:empty {
+  display: none;
+}
+.refresh-error {
+  color: var(--destructive);
+}
+.tab-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 0 0;
+}
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .action-note {
   display: inline-block;
   max-width: 230px;

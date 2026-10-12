@@ -16,6 +16,8 @@ export interface RequestOptions {
   body?: unknown;
   csrf?: string;
   linkToken?: string | null;
+  /** Aborts the request, for example when the view that asked for it goes away. */
+  signal?: AbortSignal;
 }
 
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -29,6 +31,7 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
       method: options.method ?? 'GET',
       headers,
       credentials: 'same-origin',
+      ...(options.signal ? { signal: options.signal } : {}),
       ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
     });
   } catch {

@@ -11,12 +11,22 @@ import {
   formatTime,
 } from '../../shared/ui';
 import { Link } from '../router';
+import { RefreshControl } from '../RefreshControl';
 import type { EventListItem } from '../types';
+import type { AutoRefresh } from '../use-auto-refresh';
 import { EventCard } from './EventCard';
 import { FILTER_LABEL, matchesFilter, phaseOf, type EventFilter } from './event-status';
 
 /** All events of the organizer: search, filter by real phase (PD-66), sort, grid or list. */
-export function EventsList({ events, error }: { events: EventListItem[] | undefined; error?: string }) {
+export function EventsList({
+  events,
+  error,
+  refresh,
+}: {
+  events: EventListItem[] | undefined;
+  error?: string;
+  refresh: AutoRefresh;
+}) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<EventFilter>('all');
   const [sort, setSort] = useState<'soonest' | 'latest'>('soonest');
@@ -37,10 +47,13 @@ export function EventsList({ events, error }: { events: EventListItem[] | undefi
         title="Made for bringing people together."
         description="Big conferences. Small gatherings. Every event has a home here."
         actions={
-          <Link to="/organizer/events/new" className={buttonClass('primary', 'lg')}>
-            <Plus aria-hidden="true" />
-            Create event
-          </Link>
+          <>
+            <RefreshControl state={refresh} label="Refresh events" />
+            <Link to="/organizer/events/new" className={buttonClass('primary', 'lg')}>
+              <Plus aria-hidden="true" />
+              Create event
+            </Link>
+          </>
         }
       />
       {!events ? (

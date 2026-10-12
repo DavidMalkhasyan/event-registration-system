@@ -27,6 +27,7 @@ import { CheckInTab } from './CheckInTab';
 import { ParticipantsTab } from './ParticipantsTab';
 import { SettingsTab } from './SettingsTab';
 import { StaffTab } from './StaffTab';
+import { RefreshControl } from '../RefreshControl';
 import { useEventData } from './use-event-data';
 
 const TABS: { key: EventTab; label: string }[] = [
@@ -149,7 +150,11 @@ export function EventWorkspace({
   /** Tell the shell that the event list (global figures) may have changed. */
   onChanged: () => void;
 }) {
-  const { event, counts, participants, error, live, reload } = useEventData(eventId);
+  const participantsShown = tab === 'participants' || tab === 'waiting-list' || tab === 'check-in';
+  const { event, counts, participants, error, live, reload, refresher } = useEventData(
+    eventId,
+    participantsShown,
+  );
   // A result message belongs to the section where the action happened.
   const [tagged, setTagged] = useState<{ tab: EventTab; notice: Notice }>();
   const notice = tagged?.tab === tab ? tagged.notice : undefined;
@@ -258,6 +263,11 @@ export function EventWorkspace({
             </Link>
           ))}
         </nav>
+        {tab !== 'staff' && (
+          <div className="tab-toolbar">
+            <RefreshControl state={refresher} label="Refresh event data" />
+          </div>
+        )}
         <div className="tab-panel">
           {tab === 'overview' && <OverviewTab event={event} counts={counts} />}
           {(tab === 'participants' || tab === 'waiting-list') &&
