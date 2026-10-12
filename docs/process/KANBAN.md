@@ -4,7 +4,7 @@
 |---|---|
 | **Columns** | Backlog → To Do → In Progress → Review → Done, plus **Deferred** for extended scope that was intentionally not built |
 | **Work-in-progress limits** | In Progress ≤ 2, Review ≤ 3 |
-| **Last updated** | 2026-10-12, session S-11 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
+| **Last updated** | 2026-10-12, session S-15 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
 | **Scope** | Re-planned in S-02 by the final delivery strategy (PD-15): P0 is mandatory, then P1, with P2 deferred. Requirement-level status is in [ASSIGNMENT_SCOPE.md](../../ASSIGNMENT_SCOPE.md). |
 
 ## Rules
@@ -51,38 +51,40 @@
 | K-305b Waiting-list removal by the owner (FR-WL-10 to FR-WL-14, FR-NTF-14, BR-23, BR-24, BR-27, TX-W01, API #43; AC-76 to AC-79, AC-90 to AC-92) | M3 | `9b59de4`, `a38a313`, `4e7ccc8`, `3065378`; [PR #10](https://github.com/DavidMalkhasyan/event-registration-system/pull/10) into `dev`; CI run [38215349977](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38215349977) passed (7 migrations; 130/130, 6/6, 17/17); merged 2026-10-12 11:03:50 as `d219576`. Not in `main`. |
 | K-506 UI implementation inventory before a redesign (no visual change) | M5 | `b457bfa`, `16a4800`; [PR #11](https://github.com/DavidMalkhasyan/event-registration-system/pull/11) into `dev`; CI run [38215945495](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38215945495) passed (7 migrations; 130/130, 6/6, 17/17); merged 2026-10-12 11:10:21 as `dd23b93`. Documentation only. |
 | K-507 UI redesign to the approved v0 design, with the K-504 remainder (dedicated staff entry) | M5 | [PR #12](https://github.com/DavidMalkhasyan/event-registration-system/pull/12): CI run [38228535365](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38228535365) passed (131/131, 11/11, 19/19), merged 2026-10-12 13:18:42 as `1172ec0`; [PR #13](https://github.com/DavidMalkhasyan/event-registration-system/pull/13): CI run [38237911736](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38237911736) passed (131/131, 11/11, 20/20), merged 14:46:02 as `82b1c1c`. Not in `main`. |
-| K-505 Playwright suites, **reduced scope** | M5 | `b7a164f`: 4 tests, including two simultaneous clients. 4/4 passed in 3 runs; a mutation check proved the live-count test fails when the feature breaks. |
+| K-505 Playwright suites, **reduced scope** | M5 | `b7a164f`: 4 tests, including two simultaneous clients. 4/4 passed in 3 runs; a mutation check proved the live-count test fails when the feature breaks. Grown with each feature since: 22 tests in 14 specs on `dev` `cf35cbd` (CI run [38244890522](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38244890522)). |
+| K-304 Event lifecycle | M3 | Create and reschedule (P0, `2a4f722`); capacity, details, cancellation and deletion: K-304a to K-304d (PRs #2, #3, #5, #6). Nothing remains. |
+| K-404 Jobs | M4 | Reminder fan-out (P0 #13, `2a4f722`); cutoff job K-404b (PR #1). Nothing remains. |
+| K-504 Scanner and live count | M5 | Owner check-in with live count (P0); dedicated staff entry `staff.html` with the shared check-in panel (K-507, PRs #12 and #13). Camera scanning: automated tests with simulated camera and `BarcodeDetector` APIs (K-605); **not verified on a physical device**. |
+| K-001 Apply R60; synchronize the documents | M0 | Commit `3fe9cb7` (S-01): R60 applied to REQUIREMENTS.md v1.7 and 11 design documents. **Approved by the stakeholder on 2026-10-12 (S-15)** for the R60 synchronization only; the approval does not settle the specification's open items (OQ-8 and others). |
+| K-605 Release hardening: token bootstrap order (PD-71), FR-LNK-8 headers (PD-72), camera scanning (PD-74), K-105 scanning (PD-75) | M6 | `e5dfbdc`, `8f0586a`, `9a52edd`, `47977c4`, `c2c38e7`, `7d8439b`, `25e9ffc`; [PR #14](https://github.com/DavidMalkhasyan/event-registration-system/pull/14) into `dev`; CI run [38244890522](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38244890522) passed (secret scan, dependency audit, 7 migrations and idempotency; 135/135, 11/11, 22/22); merged 2026-10-12 15:51:48 as `cf35cbd`. **Approved by the stakeholder (S-15).** Not in `main`. |
+| K-105 Dependency and secret scanning in CI | M1 | `47977c4` (part of K-605): `pnpm check:secrets`, `pnpm check:deps` and a migration idempotency step run in CI (run 38244890522). |
 
 ## Review
 
 | Card | Milestone | Awaiting |
 |---|---|---|
-| K-605 Release hardening: token bootstrap order (PD-71), FR-LNK-8 headers (PD-72), camera scanning (PD-74), K-105 scanning (PD-75) | M6 | On `feature/security-hardening`; **awaiting:** pull request, CI and merge |
-| K-001 Apply R60; synchronize the documents | M0 | Stakeholder check (commit `3fe9cb7`) |
-| K-004 Process documentation | M0 | Stakeholder review |
+| K-004 Process documentation | M0 | Stakeholder review. Not approved in S-15 pending a final accuracy pass; the pass was made in S-15 (SUBMISSION_CHECKLIST, ASSIGNMENT_SCOPE, README, MILESTONES, AI_USAGE and a cross-document audit). |
+| K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Final pass in S-15 on `feature/final-docs-audit`: current figures (135/11/22, 7 migrations, 39 API routes), v0 and image attribution, ChatGPT disclosure as stated by the stakeholder. **Awaiting:** pull request, CI, merge and stakeholder review. |
 
 ## In Progress
 
 | Card | Milestone | State |
 |---|---|---|
-| K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Updated in S-14: README, scope, milestones, journal and AI usage describe the state of `dev` on 2026-10-12 |
+| — | | Nothing in progress |
 
 ## To Do
 
 | Card | Milestone | Notes |
 |---|---|---|
-| K-604 Release tag and submission | M6 | The secret scan was done in S-03. Tagging and submitting are the owner's actions. |
+| K-604 Release tag and submission | M6 | **Not done.** Needs the stakeholder's authorization for a release pull request `dev` → `main`, then the tag and the submission (SUBMISSION_CHECKLIST §4). |
 
 ## Partly done (remaining parts are in Backlog or Deferred)
 
 | Card | Done | Remaining |
 |---|---|---|
-| K-304 Event lifecycle | Create, reschedule (P0); capacity (K-304a), details (K-304b), cancellation (K-304c), deletion (K-304d), all done in `dev` | — |
 | K-401 Messaging | Outbox claim, fenced send, reaper, sweeps, pre-claim counter | Budget, pause, render-time re-check |
 | K-403 Notifications | 15 of 17 message types (checked against `HANDLERS` in `notifications/handlers.ts` on 2026-10-12) | `email_change_confirmation` and `email_change_notice`, which belong to the deferred email change (FR-ORG-6) |
-| K-404 Jobs | Reminder fan-out (P0 #13); cutoff job (K-404b, done in `dev`) | — |
 | K-408 Email providers | Fake provider | Resend adapter (P2) |
-| K-504 Scanner and live count | Owner check-in with live count; dedicated staff entry `staff.html` at `/staff` with the shared check-in panel (K-507, PD-69) | — (closed with the K-507 merge) |
 
 ## Backlog
 
