@@ -653,3 +653,11 @@
 | `a38a313` | 10:45:33 | feat(waitlist): owner removal of a waiting-list entry with a required notice (K-305b) |
 | `4e7ccc8` | 10:53:17 | feat(client): owner removes a waiting-list entry with confirmation (K-305b) |
 | *(closing commit)* | after 10:58 | docs: record K-305b. Pushed with the pull request. |
+
+**S-12, continued: K-305b merged; K-506 UI inventory**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 11:00:04–11:03:35 (UTC 07:00–07:03) | [PR #10](https://github.com/DavidMalkhasyan/event-registration-system/pull/10), `dev` ← `feature/waitlist-removal`; diff reviewed (14 files, no secrets) | CI [run 38215349977](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38215349977) **passed**: 7 migrations on a fresh database; 130/130, 6/6, 17/17 |
+| 11:03:50 | `gh pr merge 10 --merge` | `d219576` on `dev`; tree equals the tested head; `main` unchanged |
+| 11:04–11:06 | `feature/ui-inventory` from `origin/dev`. Read the client files, both HTML entries, the Vite and server entry routing, the API calls of every screen, the styles, and every locator in the 11 E2E specs and their helpers | `docs/frontend/UI_INVENTORY.md` (K-506, PD-64). Three first-draft statements were corrected against the code before commit: the navigation helper's size, the locator count (about 200 lines, not 220), and the offline check-in wording. No application code changed; the redesign was not started. |
