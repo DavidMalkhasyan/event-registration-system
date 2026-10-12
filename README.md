@@ -145,7 +145,7 @@ Open http://localhost:3000/organizer. The worker needs the same `PUBLIC_ORIGIN` 
 
 **CI:** [.github/workflows/ci.yml](.github/workflows/ci.yml) runs every command above on GitHub Actions against a `postgres:18` service. [Results on GitHub Actions](https://github.com/DavidMalkhasyan/event-registration-system/actions).
 
-**Clean-clone verification (2026-10-11):** the published repository was cloned into a new directory and these instructions were followed against a newly initialized PostgreSQL 18.6 cluster. Install, migrations, the three development processes, the full §4 walkthrough in a browser, all commands in the table above, and the production-like run all succeeded. Details are in [DEVELOPMENT_JOURNAL.md](docs/process/DEVELOPMENT_JOURNAL.md) S-03.
+**Clean-clone verification:** first on 2026-10-11 (S-03, the P0 release): the published repository was cloned into a new directory and these instructions were followed against a newly initialized PostgreSQL 18.6 cluster. Install, migrations, the three development processes, the full §4 walkthrough in a browser, all commands in the table above, and the production-like run all succeeded. **Repeated on 2026-10-12 (S-14)** on the current code: a fresh clone and a new PostgreSQL 18 cluster; install, provisioning, 7 migrations and a repeat run ("schema is up to date"), the secret scan, format, lint, typecheck, 135/135 and 11/11 tests, the build, the production-like run with its security headers checked, and 22/22 browser tests (Microsoft Edge). Details are in [DEVELOPMENT_JOURNAL.md](docs/process/DEVELOPMENT_JOURNAL.md) S-03 and S-14.
 
 ## 6. Architecture in brief
 
@@ -190,17 +190,22 @@ Errors use RFC 9457 Problem Details (`application/problem+json`) with a stable `
 - **Email:** the fake provider is the only one. There is no Resend integration, no delivery webhooks and no bounce handling.
 - **Participant self-service:** view, cancel, ticket resend, share links and link rotation are implemented; changing the registration's email address is not.
 - **Language:** English only.
-- **Camera scanning:** QR scanning uses the browser's `BarcodeDetector` where it exists. It is not covered by automated tests; manual code entry is.
+- **Camera scanning:** QR scanning uses the browser's `BarcodeDetector` where it exists (desktop Chromium on Windows and Linux has none), so the scan button appears only there; manual code entry always works. The browser test `camera-scan` covers scanning with **simulated** camera and `BarcodeDetector` APIs; everything after detection is real. It has **not been tried on a physical phone or camera**.
 - **Test environment:** tests use a local PostgreSQL database instead of Testcontainers (no container runtime on the development machine).
-- **Verified on one platform only:** the setup was verified from a clean clone on Windows (Git Bash) and in CI on Ubuntu; macOS has not been tried.
+- **Verified on one platform only:** the setup was verified from a clean clone on Windows (Git Bash) in S-03 and again in S-14, and in CI on Ubuntu; macOS and Linux desktops have not been tried.
 - **CI warnings:** GitHub reports that the v4 actions target the deprecated Node.js 20 runtime (they run on Node.js 24). Updating the action versions is pending.
 - **Upgrading an existing setup:** after pulling, run `pnpm migrate` (migrations `0003` to `0007`) and add `PREVIEW_SECRET` to `.env`; the processes refuse to start with an outdated schema or a missing variable.
-- **Not production-ready:** no deployment configuration, TLS termination, backups or load testing.
+- **Development server headers:** the Vite development server does not send the production page headers (content security policy and others) and injects its own client script. The production-like run (§3) is the tested path.
+- **Bundled images:** the three event photographs come from the v0 design and are AI-generated according to their embedded metadata ("Made with Google AI"). No licence for them is recorded, so their reuse rights are not established ([AI_USAGE.md](docs/process/AI_USAGE.md) §7).
+- **Release state:** the published `main` branch still holds the first release (the P0 scope, 2026-10-11). Everything else described here is on the `dev` branch until the release pull request into `main` is approved and merged.
+- **Not production-ready:** no deployment exists, and there is no deployment configuration, TLS termination, backups or load testing.
 
 ## 9. Future improvements
 
 1. **Real email:** a Resend provider behind configuration, with delivery webhooks and a delivery-problem view.
 2. **Test infrastructure:** Testcontainers once a container runtime is available, and a load test of the last-seat path.
+3. **Camera check on real devices:** scan tickets with a phone and a laptop camera, and record which browsers offer `BarcodeDetector`.
+4. **Images:** confirm the licence of the three bundled photographs, or replace them with CSS posters like the three the artwork set already has.
 
 ## 10. How this was built
 
@@ -210,4 +215,4 @@ The project was developed with **Claude Code** (model Claude Opus 5.5, `claude-o
 - **Sessions with real timestamps, commands and results:** [docs/process/DEVELOPMENT_JOURNAL.md](docs/process/DEVELOPMENT_JOURNAL.md)
 - **Process decisions:** [docs/process/DECISION_LOG.md](docs/process/DECISION_LOG.md)
 - **Work tracking:** [docs/process/KANBAN.md](docs/process/KANBAN.md)
-- **Client inventory before a UI redesign:** [docs/frontend/UI_INVENTORY.md](docs/frontend/UI_INVENTORY.md). The redesign follows the approved v0 design ([eventflow-v0-design](https://github.com/DavidMalkhasyan/eventflow-v0-design)); see PD-65 to PD-71.
+- **Client inventory before a UI redesign:** [docs/frontend/UI_INVENTORY.md](docs/frontend/UI_INVENTORY.md). The redesign adapts the approved design made with Vercel v0 ([eventflow-v0-design](https://github.com/DavidMalkhasyan/eventflow-v0-design)): its visual components and styles were ported onto this project's own backend and security architecture; see PD-65 to PD-71 and [AI_USAGE.md](docs/process/AI_USAGE.md) §7.

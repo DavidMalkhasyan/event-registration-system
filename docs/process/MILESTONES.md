@@ -15,13 +15,13 @@
 
 | Milestone | Base estimate | Depends on | Status |
 |---|---:|---|---|
-| M0 Documentation alignment, Git initialization, process tracking | 6 h | — | **Done** except the stakeholder review of K-001 and K-004; published in S-03 |
+| M0 Documentation alignment, Git initialization, process tracking | 6 h | — | **Done** except the stakeholder review of K-004 (K-001 approved in S-15 for the R60 synchronization); published in S-03 |
 | M1 Project foundation and CI | 16 h | M0; decisions PD-Q2 to PD-Q5 | **Done**: CI on GitHub Actions since S-03; secret scan, dependency audit and a migration idempotency check since S-14 (K-105) |
 | M2 PostgreSQL migrations and database tests | 28 h | M1; container runtime; Proposed ADR-018 | **Done with reduced scope**: 7 migrations, 20 tables (S-02 to S-12); local PostgreSQL instead of Testcontainers |
 | M3 Core backend functionality | 56 h | M2; Proposed ADR-003, ADR-016 | **P0 and the planned P1 done**: event edit, capacity, cancellation, deletion (S-05 to S-09), check-in undo and waiting-list removal (S-12) |
 | M4 Remaining backend functionality and integrations | 48 h | M3; Proposed ADR-005 to ADR-009, ADR-014, ADR-015 | **P0 and P1 done**: cutoff job, re-authentication, participant self-service, staff (S-04 to S-11); P2 (Resend, webhooks, budget) deferred |
 | M5 Frontend and end-to-end integration | 44 h | M3, M4 (APIs); OQ-8 for user-facing text | **Done**: redesign to the approved v0 design with a dedicated staff entry (S-13, K-507); 22 E2E tests (S-14) |
-| M6 Testing, documentation and final submission | 20 h | M1 to M5 | **Done** (S-03): published, CI green, clean-clone verified; submission is the owner's action |
+| M6 Testing, documentation and final submission | 20 h | M1 to M5 | **In progress.** Done: the P0 release in `main` (S-03: published, CI green, clean-clone verified); release hardening K-605 merged into `dev` (PR #14, CI green, clean clone repeated in S-14); final documentation pass (S-15). **Not done:** release pull request `dev` → `main` (needs the stakeholder's authorization), release tag, submission; manual camera check on a physical device; licence of the bundled images. No production deployment exists. |
 | **Base total** | **218 h** | | |
 | **Contingency (25% of base)** | **55 h** | Not assigned to any milestone; drawn down only through a journal entry that names the cause | Unused |
 | **Planned total** | **273 h** | | |
