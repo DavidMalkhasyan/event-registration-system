@@ -722,3 +722,34 @@
 | 15:06:24–15:11:30 | Full suite | **lint failed** (Node globals for `scripts/*.mjs`) and **E2E 21/22**: the last spec got "Too many requests" because 22 tests exceeded the real per-IP registration limit. The limit was kept; a fixture clears the counters in the test database before each test (PD-73). Then 22/22. Commit `7d8439b`. |
 | 15:17–15:45 | Clean setup from the README: a fresh clone and a new PostgreSQL 18 cluster on port 54399 (the development database untouched) | First run: the script stopped at a `grep -c` returning 1 for zero placeholders, and its output was held by the throwaway server inheriting the pipe; second run: pnpm could not write its task state in the long scratch path (a Windows path-length limit of the test location). Third run in a short directory: install, provisioning, 7 migrations, "schema is up to date", secret scan, format, lint, typecheck, **135/135 and 11/11**, build, the production-like run with the FR-LNK-8 headers, and **E2E 22/22**. The work directory and cluster were removed. |
 | 15:40 | Development mode: a real verification link through the Vite dev server | Works; the fragment is removed; no errors |
+| 15:46:41 | Records commit `25e9ffc`: K-507 Done, PD-71 resolved, PD-72 to PD-75, K-605, milestones, scope and this entry | — |
+| 15:47:06 | [PR #14](https://github.com/DavidMalkhasyan/event-registration-system/pull/14), `dev` ← `feature/security-hardening` | CI [run 38244890522](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38244890522), 15:47:09–15:51:28, **passed**: secret scan (179 files), dependency audit (no known vulnerabilities), format, lint, typecheck, 7 migrations and an idempotent repeat, 135/135, 11/11, build, 22/22 |
+| 15:51:48 | `gh pr merge 14 --merge` | `cf35cbd` on `dev`; its tree equals the tested head `25e9ffc`; `main` unchanged |
+
+The last three rows were added in S-15 from GitHub's records of the pull request and the CI run; S-14's own entry was committed before them.
+
+---
+
+## S-15: Final documentation audit and release preparation (K-603)
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-12 16:49:26 +04:00 (prompt 20: "FINAL DOCUMENTATION AUDIT AND RELEASE PREPARATION") |
+| **Stakeholder decisions** | K-001 approved for the R60 synchronization only; K-605 approved as complete; K-004 not yet approved (a final accuracy pass first); K-603 to be completed before the release; no merge into `main`, no tag, no submission (PD-76) |
+| **Cards** | K-001 and K-605 (Review → Done); K-105, K-304, K-404 and K-504 closed as Done (their remaining parts were finished in earlier sessions); K-603 (In Progress → Review); K-004 stays in Review; K-604 stays in To Do |
+| **Tools and model** | Claude Code 2.1.296, model `claude-opus-5-5`; GitHub CLI; the S-02 toolchain; Playwright with Edge |
+
+**Activity:**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 16:49:46 | `feature/final-docs-audit` from `dev` (`cf35cbd`). Read SUBMISSION_CHECKLIST, ASSIGNMENT_SCOPE, README, MILESTONES, KANBAN, AI_USAGE and the decision log against the code | Stale: test counts (23/3/4), 2 migrations, "camera unverified", unmerged-branch rows, M6 "Done", the checklist's S-03 state; a corrupted §1 table header in ASSIGNMENT_SCOPE |
+| 16:50:18–16:50:44 | Counted from the code: API route registrations, tables per migration, tests per file, E2E specs | 39 API routes plus `/healthz` and `/dev/mailbox`; 7 migrations, 20 tables; 135 server tests in 15 files, 11 client tests, 22 browser tests in 14 specs |
+| 16:50:57–16:51:27 | Image provenance: the v0 PNGs carry XMP (IPTC `trainedAlgorithmicMedia`, credit "Made with Google AI"); the bundled JPEGs had lost it in the S-13 compression. The design repository has no licence, README or credits file | Re-encoded with the metadata kept (93, 199 and 69 KiB); licence reported as **not established** (PD-77). Commit `37d5812` (16:52:22) |
+| 16:51:37–16:52:22 | KANBAN: K-001 and K-605 Done with the approval's exact scope; completed parent cards closed | Commit `18cd457` |
+| 16:52:30–16:53:07 | SUBMISSION_CHECKLIST rewritten; `git grep` for local paths; pull-request count and the `.env.example` commit checked | No local user-profile path in tracked files; 14 merged pull requests |
+| 16:53:55–16:54:45 | ASSIGNMENT_SCOPE: current release state, CI run 38244890522, per-file test counts, new paths, camera as simulated-API tested, a verification-levels table and known limitations; S-03 history kept | Commit `c34ca36` |
+| 16:54:50–16:59:36 | README (clean clone repeated in S-14, camera tests, platform, limitations, future improvements, v0 attribution) and MILESTONES (K-001 approved; M6 **In progress**) | Commit `32847ac`. One edit command waited 2 minutes on a stray `cat` reading standard input (16:56:51–16:58:57); it was stopped, the README was confirmed unchanged and the edit was rerun from a script file |
+| 16:59:40–17:01:02 | AI_USAGE (v0 design and images, `lucide-react`, ChatGPT as the stakeholder stated it, prompt 20) and SUBMISSION_CHECKLIST (current state; release PR, tag and submission open) | Commit `7d8f152`. ChatGPT: no repository file, commit or transcript content shows its output; recorded as the stakeholder's statement (PD-78) |
+| 17:01:09–17:02:33 | Cross-document audit: decision ranges, session ranges, pull-request count (14 merged, all into `dev`), PR #14's times from GitHub (added to S-14), K-202 and K-501 growth notes, PD-Q4 resolved by PD-75, PD-76 to PD-78 and two open decisions (PD-Q7 image rights, PD-Q8 release) | `REQUIREMENTS.md` unchanged (`git diff cf35cbd` empty) |
+| 17:02:53–17:08:35 | Full gates on the working tree (all S-15 changes) | `check:secrets` ("No secrets found in 179 tracked files"), `check:deps` ("No known vulnerabilities found"), `format:check`, `lint`, `typecheck`, `test` (server **135/135**, client **11/11**), `build` and `e2e` (**22/22**, Edge) exit 0. No application code changed in S-15; the images changed only in metadata and encoding |
