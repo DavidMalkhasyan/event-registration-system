@@ -740,6 +740,12 @@ svg {
   gap: 5px;
   color: var(--success);
 }
+.action-note {
+  display: inline-block;
+  max-width: 230px;
+  font-size: 12px;
+  line-height: 1.45;
+}
 .row-actions {
   display: flex;
   flex-wrap: wrap;

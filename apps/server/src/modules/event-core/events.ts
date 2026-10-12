@@ -290,12 +290,13 @@ export async function listParticipants(ctx: AppContext, principal: OrganizerPrin
     id: string;
     email: string;
     state: string;
+    end_reason: string | null;
     waitlist_seq: number | null;
     position: number | null;
     checked_in_at: Date | null;
     check_in_id: string | null;
   }>`
-    SELECT r.id, r.email, r.state, r.waitlist_seq,
+    SELECT r.id, r.email, r.state, r.end_reason, r.waitlist_seq,
       CASE WHEN r.state = 'WAITLISTED' THEN
         (SELECT count(*) FROM app.registrations w
           WHERE w.event_id = r.event_id AND w.state = 'WAITLISTED' AND w.waitlist_seq <= r.waitlist_seq)::int END AS position,
@@ -317,6 +318,8 @@ export async function listParticipants(ctx: AppContext, principal: OrganizerPrin
       registrationId: r.id,
       email: r.email,
       state: r.state,
+      // Why an ended registration ended (K-703): kept in the list, so cancelled people stay visible.
+      ...(r.end_reason ? { endReason: r.end_reason } : {}),
       ...(r.position ? { position: r.position } : {}),
       ...(r.checked_in_at ? { checkedInAt: r.checked_in_at.toISOString(), checkInId: r.check_in_id } : {}),
       emailIssues: issues

@@ -86,8 +86,8 @@ Created in S-17. Work goes through feature branches and pull requests into `dev`
 | Card | Source | State |
 |---|---|---|
 | K-701 Live public event availability: free seats, waiting list, closed and cancelled states on the public page, refreshed without a reload (PD-81) | Stakeholder requirement, prompt 25 (S-17) | **Done**: [PR #20](https://github.com/DavidMalkhasyan/event-registration-system/pull/20) into `dev`, CI [run 38281030527](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38281030527) passed (143/143, 14/14, 23/23); merged 2026-10-12 21:03:14 as `a52c3e5`. Not in `main` |
-| K-702 Organizer settings: the date field prefilled in the event time zone with a confirmed reschedule; no standing sign-in block (contextual re-authentication); one prominent Cancel event, deletion under More actions (PD-82) | Stakeholder requirement, prompt 27 (S-18), PR A | **Review**: implemented and tested on `feature/settings-ux`; pull request into `dev` |
-| K-703 Organizer cancellation of one confirmed registration, with a dedicated notice, FIFO promotion and audit | Prompt 27, PR B | **To Do** |
+| K-702 Organizer settings: the date field prefilled in the event time zone with a confirmed reschedule; no standing sign-in block (contextual re-authentication); one prominent Cancel event, deletion under More actions (PD-82) | Stakeholder requirement, prompt 27 (S-18), PR A | **Done**: [PR #21](https://github.com/DavidMalkhasyan/event-registration-system/pull/21) into `dev`, CI [run 38285842187](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38285842187) passed (147/147, 19/19, 25/25); merged 2026-10-12 21:46:04 as `022dff0`. Not in `main` |
+| K-703 Organizer cancellation of one confirmed registration, with a dedicated notice, FIFO promotion and audit (PD-83; proposed amendment A-1) | Prompt 27, PR B | **Review**: implemented and tested on `feature/organizer-cancellation` (migration `0008`); pull request into `dev` |
 | K-704 Organizer refresh: manual Refresh controls and automatic updates while visible | Prompt 27, PR C | **To Do** |
 | K-705 Event images and galleries, event addresses and maps | Earlier product requests, named in prompt 27 to be tracked, not built | **Backlog**: not designed or approved for implementation yet |
 
@@ -97,7 +97,7 @@ Created in S-17. Work goes through feature branches and pull requests into `dev`
 |---|---|---|
 | K-604 Release tag and submission | Release merge: [PR #17](https://github.com/DavidMalkhasyan/event-registration-system/pull/17) `dev` → `main`, CI [run 38257707045](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38257707045) passed; merged 2026-10-12 18:38:40 +04:00 as `cf804e2` with the stakeholder's authorization (PD-80); CI on `cf804e2` [run 38264425015](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38264425015) passed (135/135, 11/11, 22/22) | The optional `v1.0.0` tag and the submission: the owner's decisions, not done |
 | K-401 Messaging | Outbox claim, fenced send, reaper, sweeps, pre-claim counter | Budget, pause, render-time re-check |
-| K-403 Notifications | 15 of 17 message types (checked against `HANDLERS` in `notifications/handlers.ts` on 2026-10-12) | `email_change_confirmation` and `email_change_notice`, which belong to the deferred email change (FR-ORG-6) |
+| K-403 Notifications | 16 of 18 message types (checked against `HANDLERS` in `notifications/handlers.ts` on 2026-10-12; `organizer_cancellation` added by K-703) | `email_change_confirmation` and `email_change_notice`, which belong to the deferred email change (FR-ORG-6) |
 | K-408 Email providers | Fake provider | Resend adapter (P2) |
 
 ## Backlog

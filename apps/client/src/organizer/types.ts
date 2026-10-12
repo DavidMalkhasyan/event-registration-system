@@ -40,6 +40,8 @@ export interface Participant {
   registrationId: string;
   email: string;
   state: string;
+  /** Why an ended registration ended (participant_cancelled, cancelled_by_organizer, …). */
+  endReason?: string;
   position?: number;
   checkedInAt?: string;
   checkInId?: string;

@@ -15,6 +15,7 @@ export const MESSAGE_POLICY = {
   event_cancellation: { regenClass: 'B', lane: 'bulk', required: false },
   registration_cancelled: { regenClass: 'B', lane: 'bulk', required: true },
   waitlist_removed: { regenClass: 'B', lane: 'bulk', required: true },
+  organizer_cancellation: { regenClass: 'B', lane: 'bulk', required: true }, // K-703, migration 0008
   email_change_notice: { regenClass: 'B', lane: 'bulk', required: false },
   waitlist_confirmation: { regenClass: 'C', lane: 'bulk', required: false },
   reminder: { regenClass: 'C', lane: 'bulk', required: false },

@@ -23,6 +23,7 @@ import {
   eventDetailsSchema,
   managementView,
   removeFromWaitlist,
+  cancelRegistrationByOrganizer,
   rescheduleEvent,
   rescheduleSchema,
   setCapacity,
@@ -161,6 +162,16 @@ export function registerEventCoreRoutes(app: FastifyInstance, ctx: AppContext): 
       .parse(request.params);
     const input = waitlistRemovalSchema.parse(request.body ?? {});
     return removeFromWaitlist(ctx, principal, eventId, registrationId, input, request.id);
+  });
+
+  // K-703 (PD-83): owner only, explicitly confirmed; cancels one CONFIRMED registration and promotes FIFO.
+  app.post('/api/events/:eventId/registrations/:registrationId/organizer-cancellation', async (request) => {
+    const principal = await requireOrganizer(ctx, request, { csrf: true });
+    const { eventId, registrationId } = z
+      .object({ eventId: z.string(), registrationId: z.string() })
+      .parse(request.params);
+    confirmedActionSchema.parse(request.body ?? {});
+    return cancelRegistrationByOrganizer(ctx, principal, eventId, registrationId, request.id);
   });
 
   // undoCheckIn (API #44): owner only; staff get 403 from requireOrganizer (AC-26, PD-56). TX-C02.
