@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ArrowRight, ArrowUpRight, Plus } from 'lucide-react';
 import { Alert, Empty, PageHeader, PageSkeleton, buttonClass } from '../../shared/ui';
 import { EventCard } from '../events/EventCard';
-import { SWATCHES, artworkIndex } from '../events/EventArtwork';
+import { SWATCHES, artworkIndex } from '../../shared/artwork';
 import { isCancelled, isPast, isUpcoming } from '../events/event-status';
 import { Link } from '../router';
 import type { EventListItem } from '../types';
@@ -177,7 +177,7 @@ export function Overview({
                 <Link key={e.id} to={`/organizer/events/${e.id}`} className="across-row">
                   <span
                     className="event-swatch"
-                    style={{ background: SWATCHES[artworkIndex(e.id)] }}
+                    style={{ background: SWATCHES[artworkIndex(e.publicId)] }}
                     aria-hidden="true"
                   />
                   <span>

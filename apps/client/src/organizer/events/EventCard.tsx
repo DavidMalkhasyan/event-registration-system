@@ -2,7 +2,7 @@ import { ArrowRight, ArrowUpRight, CalendarDays, Users } from 'lucide-react';
 import { Status, cx, formatDay, formatTime } from '../../shared/ui';
 import { Link } from '../router';
 import type { EventListItem } from '../types';
-import { EventArtwork } from './EventArtwork';
+import { EventArtwork } from '../../shared/artwork';
 import { fillPercent, phaseOf } from './event-status';
 
 /** An event in the gallery (v0 editorial card); every number is the server's (PD-67). */
@@ -16,7 +16,7 @@ export function EventCard({ event, featured = false }: { event: EventListItem; f
       aria-label={`${event.title}, ${phase.label}, ${event.confirmedCount} of ${event.capacity} registered`}
     >
       <div className="card-art-wrap">
-        <EventArtwork eventId={event.id} caption={new Date(event.startsAt).getFullYear().toString()} />
+        <EventArtwork artKey={event.publicId} caption={new Date(event.startsAt).getFullYear().toString()} />
         <span className="card-pill">{formatDay(event.startsAt, event.timeZone)}</span>
         <span className="card-open" aria-hidden="true">
           <ArrowUpRight size={18} />

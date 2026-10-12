@@ -233,35 +233,6 @@ export function ConfirmDialog({
   );
 }
 
-export function Card({ children, title }: { children: ReactNode; title?: string }) {
-  return (
-    <section className="card">
-      {title && <h2>{title}</h2>}
-      {children}
-    </section>
-  );
-}
-
-export function Page({
-  title,
-  children,
-  actions,
-}: {
-  title: string;
-  children: ReactNode;
-  actions?: ReactNode;
-}) {
-  return (
-    <main className="page">
-      <header className="page-header">
-        <h1>{title}</h1>
-        {actions}
-      </header>
-      {children}
-    </main>
-  );
-}
-
 const ALERT_ICON = { error: AlertCircle, info: Info, success: CircleCheck, warning: AlertCircle } as const;
 
 export function Alert({
@@ -342,16 +313,5 @@ export function DevMailboxHint() {
       </a>
       , not to real inboxes.
     </p>
-  );
-}
-
-export function InvalidLink() {
-  return (
-    <Page title="Link not valid">
-      <Card>
-        <p>This link is not valid or has expired.</p>
-        <p className="muted">If you were trying to register, please start again from the event page.</p>
-      </Card>
-    </Page>
   );
 }

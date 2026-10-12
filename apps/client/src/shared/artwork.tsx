@@ -1,9 +1,10 @@
-import communityTable from '../../assets/art/community-table.jpg';
-import creativeGathering from '../../assets/art/creative-gathering.jpg';
-import designSummit from '../../assets/art/design-summit.jpg';
+import communityTable from '../assets/art/community-table.jpg';
+import creativeGathering from '../assets/art/creative-gathering.jpg';
+import designSummit from '../assets/art/design-summit.jpg';
 
-// Deterministic local artwork (PD-70): events have no image field, so the event ID picks one of the
-// v0 photographs (bundled, compressed) or a CSS poster. Same event, same artwork, on every device.
+// Deterministic local artwork (PD-70): events have no image field, so the event's public ID picks one of
+// the v0 photographs (bundled, compressed) or a CSS poster. The organizer and the public page use the
+// same key, so an event looks the same everywhere.
 
 type Art =
   | { kind: 'photo'; src: string; position: string }
@@ -20,14 +21,14 @@ const ARTWORK: Art[] = [
 
 export const SWATCHES = ['#c9b8ea', '#b9a6e3', '#f2b29b', '#f0a68a', '#c6d6bd', '#a9c3a0'];
 
-export function artworkIndex(eventId: string): number {
+export function artworkIndex(key: string): number {
   let hash = 0;
-  for (const ch of eventId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  for (const ch of key) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
   return hash % ARTWORK.length;
 }
 
-export function EventArtwork({ eventId, caption }: { eventId: string; caption?: string }) {
-  const art = ARTWORK[artworkIndex(eventId)]!;
+export function EventArtwork({ artKey, caption }: { artKey: string; caption?: string }) {
+  const art = ARTWORK[artworkIndex(artKey)]!;
   if (art.kind === 'photo')
     return (
       <div className="event-art" aria-hidden="true">
