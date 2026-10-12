@@ -32,6 +32,9 @@ export default defineConfig({
     },
   },
   build: {
+    // PD-71 (FR-LNK-10 b): no modulepreload polyfill. It would be emitted as a static import of the
+    // public entry and so run before the token bootstrap; every supported browser preloads natively.
+    modulePreload: { polyfill: false },
     rollupOptions: {
       input: {
         public: resolve(import.meta.dirname, 'public.html'),
