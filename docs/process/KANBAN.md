@@ -4,7 +4,7 @@
 |---|---|
 | **Columns** | Backlog → To Do → In Progress → Review → Done, plus **Deferred** for extended scope that was intentionally not built |
 | **Work-in-progress limits** | In Progress ≤ 2, Review ≤ 3 |
-| **Last updated** | 2026-10-12, session S-16 (after the release merge) (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
+| **Last updated** | 2026-10-12, session S-17 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
 | **Scope** | Re-planned in S-02 by the final delivery strategy (PD-15): P0 is mandatory, then P1, with P2 deferred. Requirement-level status is in [ASSIGNMENT_SCOPE.md](../../ASSIGNMENT_SCOPE.md). |
 
 ## Rules
@@ -78,6 +78,14 @@
 | Card | Milestone | Notes |
 |---|---|---|
 | — | | Nothing to do before the owner's tag and submission decisions |
+
+## Post-release improvement plan (after v1.0.0)
+
+Created in S-17. Work goes through feature branches and pull requests into `dev`; `main` changes only through a release pull request. No other post-release enhancement has been approved or recorded so far.
+
+| Card | Source | State |
+|---|---|---|
+| K-701 Live public event availability: free seats, waiting list, closed and cancelled states on the public page, refreshed without a reload (PD-81) | Stakeholder requirement, prompt 25 (S-17) | **Review**: implemented and tested on `feature/public-availability`; pull request into `dev` |
 
 ## Partly done (remaining parts are in Backlog or Deferred)
 
