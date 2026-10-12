@@ -1983,9 +1983,51 @@ svg {
   margin-top: 18px;
   border-top: 1px solid #f3e4e0;
 }
-.danger-item h4 {
+.danger-item h3 {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
+  color: #b05555;
+}
+.danger-zone > .danger-item:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+/* Secondary, rarely used actions (K-702): collapsed, below the one prominent destructive action. */
+.more-actions {
+  margin-top: 18px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+.more-actions > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+.more-actions > summary::-webkit-details-marker {
+  display: none;
+}
+.more-actions[open] > summary svg {
+  transform: rotate(180deg);
+}
+.more-actions .danger-item {
+  margin-top: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.more-actions .danger-item h3 {
+  color: var(--heading);
+}
+.dialog-list {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  line-height: 1.6;
 }
 .confirm-box {
   display: flex;

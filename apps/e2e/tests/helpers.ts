@@ -102,6 +102,17 @@ export async function createEvent(
   return { eventId, publicUrl };
 }
 
+/**
+ * Reschedules from the event's Settings (K-702): the field holds the current start in the event's time
+ * zone; a real change is confirmed in a dialog, because every confirmed and waiting participant is emailed.
+ */
+export async function reschedule(page: Page, localStart: string): Promise<void> {
+  await page.getByLabel(/Start date and time/).fill(localStart);
+  await page.getByRole('button', { name: 'Save new date' }).click();
+  await page.getByRole('button', { name: 'Yes, reschedule and notify' }).click();
+  await expect(page.getByText(/^Rescheduled to /)).toBeVisible();
+}
+
 /** The public page's registration button: its label follows availability (PD-81), the action does not. */
 export const REGISTER_BUTTON = { name: /^(Register for event|Join waiting list)$/ };
 

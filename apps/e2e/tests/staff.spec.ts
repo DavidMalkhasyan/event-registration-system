@@ -2,12 +2,13 @@ import { expect, test } from './fixtures.js';
 import {
   HOUR,
   address,
-  createEvent,
   checkInResult,
+  createEvent,
   linkIn,
   localIn,
   openSection,
   registerParticipant,
+  reschedule,
   signIn,
   stat,
   waitForMail,
@@ -24,9 +25,7 @@ test('owner invites staff; staff accept on their device, check tickets in, and l
   const { ticketCode } = await registerParticipant(browser, publicUrl, address('guest'));
   // Into the check-in window (opens 2 hours before the start).
   await openSection(page, 'Settings');
-  await page.getByLabel(/New date and time/).fill(localIn(1 * HOUR));
-  await page.getByRole('button', { name: 'Reschedule and notify' }).click();
-  await expect(page.getByText('Rescheduled.')).toBeVisible();
+  await reschedule(page, localIn(1 * HOUR));
 
   const helper = address('helper');
   await openSection(page, 'Staff');

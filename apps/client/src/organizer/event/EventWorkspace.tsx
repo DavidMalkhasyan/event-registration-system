@@ -213,7 +213,8 @@ export function EventWorkspace({
         <Alert kind="error">
           <strong>Status: CANCELLED.</strong> This event was cancelled
           {event.cancelledAt ? ` on ${formatLocal(event.cancelledAt, event.timeZone)}` : ''}. Registration,
-          check-in and changes are closed, and every confirmed and waiting participant was emailed.
+          check-in and changes are closed, and a cancellation email was queued for every confirmed and waiting
+          participant (delivery problems show on the Participants page).
         </Alert>
       )}
       {!focused && (
@@ -282,7 +283,9 @@ export function EventWorkspace({
             />
           )}
           {tab === 'staff' && <StaffTab session={session} event={event} />}
-          {tab === 'settings' && <SettingsTab session={session} event={event} onDone={changed} />}
+          {tab === 'settings' && (
+            <SettingsTab session={session} event={event} counts={counts} onDone={changed} />
+          )}
         </div>
       </section>
     </>

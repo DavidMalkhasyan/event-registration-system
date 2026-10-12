@@ -8,6 +8,7 @@ import {
   localIn,
   openSection,
   registerParticipant,
+  reschedule,
   signIn,
   stat,
   waitForMail,
@@ -33,9 +34,7 @@ test('staff camera scanning: denial falls back, a scan checks in, a re-presented
   const { eventId, publicUrl } = await createEvent(page, { title, capacity: 3, startsInMs: 72 * HOUR });
   const { ticketCode } = await registerParticipant(browser, publicUrl, address('guest'));
   await openSection(page, 'Settings');
-  await page.getByLabel(/New date and time/).fill(localIn(1 * HOUR));
-  await page.getByRole('button', { name: 'Reschedule and notify' }).click();
-  await expect(page.getByText('Rescheduled.')).toBeVisible();
+  await reschedule(page, localIn(1 * HOUR));
   await openSection(page, 'Staff');
   const helper = address('door');
   await page.getByLabel('Staff email address').fill(helper);

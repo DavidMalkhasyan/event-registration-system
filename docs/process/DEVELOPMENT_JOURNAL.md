@@ -816,3 +816,30 @@ By the stakeholder's decision (PD-80), this synchronization's own pull requests 
 | 20:48–20:50 | Mutation checks | `free >= 0` for the mode: 3 server tests fail; counts published in every phase: 2 fail; polling from hidden tabs: the hook test fails. All restored. `use-public-event.test.ts` (3 tests): a missing `cleanup()` let earlier hooks react to later events; fixed in the test |
 | 20:50:30–20:51:01 | Visual review on the development stack (real API data): seats, waiting list, closed (rescheduled into the last 2 hours) and cancelled at 1440, 768 and 390 px | Badges and buttons correct in every state; no horizontal overflow; no console errors; no external requests |
 | 20:51:23–20:56:56 | Full gates | `check:secrets`, `check:deps` ("No known vulnerabilities found"), `format:check`, `lint`, `typecheck`, `migrate` ("schema is up to date"; development data kept), `test` (server **143/143** in 16 files, client **14/14**), `build` and `e2e` (**23/23**, Edge) exit 0 |
+| 20:57:26–20:57:49 | Commits `8285b2e` (server), `8de5934` (client), `2dbc6a4` (browser tests), `216bba8` (records); pushed; [PR #20](https://github.com/DavidMalkhasyan/event-registration-system/pull/20) opened, `dev` ← `feature/public-availability` | CI [run 38281030527](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38281030527), 20:57:52–21:02:50, **passed** (secret scan of 181 files, dependency audit, 7 migrations and an idempotent repeat, 143/143, 14/14, build, 23/23) |
+| 21:03:05–21:03:14 | Diff reviewed (19 files; no migration, requirement, configuration or dependency change; no storage, external URL or `innerHTML` in the client change); `gh pr merge 20 --merge` | `a52c3e5` on `dev`; its tree equals the tested head `216bba8`; `main` unchanged |
+
+The last two rows were added in S-18 from GitHub's records.
+
+---
+
+## S-18: Restarting the stack; organizer settings (K-702)
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-12 21:06:26 +04:00 (prompt 26: "interapt and run again"); prompt 27 at 21:24:01 ("EVENTFLOW — ORGANIZER UX FIXES AND REGISTRATION CANCELLATION") |
+| **Cards** | K-701 → Done (PR #20); K-702 (new) → Review; K-703, K-704 (new) To Do; K-705 (new) Backlog |
+| **Tools and model** | Claude Code 2.1.296, model `claude-opus-5-5`; the S-02 toolchain; Playwright with Edge |
+
+**Activity:**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 21:06:31–21:07:14 | Prompt 26: stopped the web and worker tasks; their child processes (and Vite) were still listening, so the project's five node processes were stopped by ID; web, worker and Vite started again | `/healthz` schema 7, database ok; `/organizer` and `/staff` 200; worker started |
+| 21:24:10–21:25:49 | Prompt 27: read `SettingsTab`, `Reauth`, the workspace data hook, participants and staff tabs, TX-E04, TX-E05, TX-R03, TX-W01, `promoteFifo`, the registration and outbox CHECK constraints, the email handlers, the check-in validity rule and the race-test pattern | The reschedule form started empty; an unchanged start already sends nothing; the out-of-scope list in REQUIREMENTS.md excludes organizer cancellation of a confirmed participant (to be recorded as a proposed amendment with K-703); `end_reason` and `message_type` are CHECK-constrained (K-703 needs migration `0008`) |
+| 21:25:54 | `feature/settings-ux` from `dev` (`a52c3e5`) | — |
+| 21:26–21:27 | `schedule.ts` (UTC → event-zone datetime-local, offsets) and 5 unit tests | First run 4/5: `Intl` puts a comma after the weekday; built from parts instead: 5/5 |
+| 21:29–21:31 | `SettingsTab` rewritten (drafts, confirmed reschedule with the offset choice, one Cancel event, More actions with deletion), `RecentSignIn` removed, styles; workspace texts say emails are queued | Typecheck and lint pass |
+| 21:31–21:33 | Browser tests: a shared `reschedule()` helper for four specs; Cancel event label; More actions before deletion; `reauth.spec` now starts the re-authentication from the protected action; new `settings.spec.ts` (Asia/Tokyo event, browser in Europe/Berlin) | settings, reauth, cancellation and deletion specs: 8/8 on the first run |
+| 21:33–21:34 | `reschedule.test.ts` (4): unchanged start, real change to confirmed and waiting only, stale version, DST gap and repeat in Europe/Berlin | 4/4 |
+| 21:34:31–21:40:18 | Full gates | `check:secrets`, `check:deps`, `format:check`, `lint`, `typecheck`, `migrate` ("schema is up to date"), `test` (server **147/147** in 17 files, client **19/19**), `build` and `e2e` (**25/25**, Edge) exit 0 |
