@@ -63,7 +63,7 @@
 
 | Card | Milestone | State |
 |---|---|---|
-| K-507 UI redesign to the approved v0 design ([eventflow-v0-design](https://github.com/DavidMalkhasyan/eventflow-v0-design)), with the K-504 remainder (dedicated staff entry) | M5 | Started in S-13 on `feature/ui-redesign`; decisions PD-65 to PD-70 |
+| K-507 UI redesign to the approved v0 design ([eventflow-v0-design](https://github.com/DavidMalkhasyan/eventflow-v0-design)), with the K-504 remainder (dedicated staff entry) | M5 | S-13: design system, organizer area (global overview, All events, creation, event workspace), shared check-in and the dedicated staff entry done on `feature/ui-redesign` (first pull request); participant and link pages next. Decisions PD-65 to PD-71 |
 | K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Updated in S-07 |
 
 ## To Do
@@ -81,7 +81,7 @@
 | K-403 Notifications | 15 of 17 message types (checked against `HANDLERS` in `notifications/handlers.ts` on 2026-10-12) | `email_change_confirmation` and `email_change_notice`, which belong to the deferred email change (FR-ORG-6) |
 | K-404 Jobs | Reminder fan-out (P0 #13); cutoff job (K-404b, done in `dev`) | — |
 | K-408 Email providers | Fake provider | Resend adapter (P2) |
-| K-504 Scanner and live count | Owner check-in screen with live count; minimal staff check-in screen at `/staff` (K-406, PD-57) | A dedicated staff entry and scanner polish (UI work) |
+| K-504 Scanner and live count | Owner check-in with live count; dedicated staff entry `staff.html` at `/staff` with the shared check-in panel (K-507, PD-69) | — (closed with the K-507 merge) |
 
 ## Backlog
 

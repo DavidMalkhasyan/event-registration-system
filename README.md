@@ -164,7 +164,7 @@ Open http://localhost:3000/organizer. The worker needs the same `PUBLIC_ORIGIN` 
 
 ```
 apps/server   web + worker (src/platform: infrastructure; src/modules: features), migrations, integration tests
-apps/client   React pages: public.html (event and link pages), organizer.html (organizer area)
+apps/client   React pages: public.html (event and link pages), organizer.html (organizer area), staff.html (staff check-in)
 apps/e2e      Playwright tests and the launcher that starts the real stack
 scripts/      database provisioning
 docs/         requirements-phase design, process records (Kanban, journal, decision log, AI usage)
@@ -209,4 +209,4 @@ The project was developed with **Claude Code** (model Claude Opus 5.5, `claude-o
 - **Sessions with real timestamps, commands and results:** [docs/process/DEVELOPMENT_JOURNAL.md](docs/process/DEVELOPMENT_JOURNAL.md)
 - **Process decisions:** [docs/process/DECISION_LOG.md](docs/process/DECISION_LOG.md)
 - **Work tracking:** [docs/process/KANBAN.md](docs/process/KANBAN.md)
-- **Client inventory before a UI redesign:** [docs/frontend/UI_INVENTORY.md](docs/frontend/UI_INVENTORY.md)
+- **Client inventory before a UI redesign:** [docs/frontend/UI_INVENTORY.md](docs/frontend/UI_INVENTORY.md). The redesign follows the approved v0 design ([eventflow-v0-design](https://github.com/DavidMalkhasyan/eventflow-v0-design)); see PD-65 to PD-71.
