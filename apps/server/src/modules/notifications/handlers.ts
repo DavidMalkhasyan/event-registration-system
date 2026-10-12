@@ -473,6 +473,24 @@ const registrationCancelled: MessageHandler = {
   },
 };
 
+const waitlistRemoved: MessageHandler = {
+  // FR-NTF-14: a required notice (BR-23, CK-69): no freshness check, never dropped, also after a
+  // later event cancellation. No management or share link, no ticket wording.
+  async freshness() {
+    return { fresh: true };
+  },
+  async issueTokens() {
+    return {};
+  },
+  async render(db, msg) {
+    const event = (await eventOf(db, msg.event_id!))!;
+    return email(`Removed from the waiting list: ${event.title}`, [
+      `The organizer of "${event.title}" on ${localTime(event.starts_at, event.time_zone)} has removed you from the waiting list.`,
+      'You are no longer on the waiting list for this event, and you will not be offered a place.',
+    ]);
+  },
+};
+
 export const HANDLERS: Record<string, MessageHandler> = {
   sign_in: signIn,
   verification,
@@ -484,6 +502,7 @@ export const HANDLERS: Record<string, MessageHandler> = {
   event_change: eventChange,
   waitlist_closed: waitlistClosed,
   registration_cancelled: registrationCancelled,
+  waitlist_removed: waitlistRemoved,
   event_cancellation: eventCancellation,
   ticket_resend: ticketResend,
   staff_invitation: staffInvitation,

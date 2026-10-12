@@ -316,6 +316,78 @@ interface Participant {
 }
 
 /**
+ * Owner-only removal of one waiting-list entry (FR-WL-10 to FR-WL-13, PD-62): an explicit confirmation
+ * step and an optional reason. It never promotes anyone; the participant is emailed a removal notice.
+ */
+function RemoveFromWaitlist({
+  session,
+  eventId,
+  participant,
+  onDone,
+}: {
+  session: Session;
+  eventId: string;
+  participant: Participant;
+  onDone: (message: { kind: 'success' | 'error'; text: string }) => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  if (participant.state !== 'WAITLISTED') return null;
+  if (!confirming)
+    return (
+      <button className="secondary" onClick={() => setConfirming(true)}>
+        Remove from waiting list
+      </button>
+    );
+  const submit = async () => {
+    setBusy(true);
+    try {
+      await api(`/api/events/${eventId}/registrations/${participant.registrationId}/waitlist-removal`, {
+        method: 'POST',
+        csrf: session.csrfToken,
+        body: { confirmed: true, ...(reason.trim() ? { reason: reason.trim() } : {}) },
+      });
+      onDone({
+        kind: 'success',
+        text: `${participant.email} was removed from the waiting list and has been emailed.`,
+      });
+    } catch (err) {
+      onDone({
+        kind: 'error',
+        text:
+          err instanceof ApiError && err.code === 'not_waitlisted'
+            ? `${participant.email} is no longer on the waiting list (already removed, promoted or cancelled). Nothing was changed.`
+            : errorMessage(err),
+      });
+    }
+    setBusy(false);
+    setConfirming(false);
+    setReason('');
+  };
+  return (
+    <div className="stack">
+      <p className="muted">
+        Remove {participant.email} (position {participant.position}) from the waiting list? Nobody is
+        promoted, and they will be emailed that you removed them.
+      </p>
+      <label>
+        Reason (optional, not sent to the participant)
+        <input value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} />
+      </label>
+      <div className="row">
+        <button className="danger" disabled={busy} onClick={submit}>
+          {busy ? 'Removing…' : 'Yes, remove'}
+        </button>
+        <button className="secondary" disabled={busy} onClick={() => setConfirming(false)}>
+          Keep on the list
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Owner-only undo of a check-in (FR-CHK-8, PD-59, PD-60), with an explicit confirmation step and an
  * optional reason. The staff screen never shows this; the server refuses staff anyway (AC-26).
  */
@@ -382,7 +454,7 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
   const [counts, setCounts] = useState<{ confirmed: number; waitlisted: number; checkedIn: number }>();
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [error, setError] = useState<string>();
-  const [undoMessage, setUndoMessage] = useState<{ kind: 'success' | 'error'; text: string }>();
+  const [rowMessage, setRowMessage] = useState<{ kind: 'success' | 'error'; text: string }>();
   const live = useLiveCount(eventId);
 
   const load = useCallback(() => {
@@ -454,7 +526,7 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
       <DeleteEvent session={session} event={event} />
       <StaffCard session={session} event={event} />
       <Card title={`Participants (${participants.length})`}>
-        {undoMessage && <Alert kind={undoMessage.kind}>{undoMessage.text}</Alert>}
+        {rowMessage && <Alert kind={rowMessage.kind}>{rowMessage.text}</Alert>}
         <table>
           <thead>
             <tr>
@@ -472,6 +544,17 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
                   <span className="badge">
                     {p.state === 'WAITLISTED' ? `WAITLISTED #${p.position}` : p.state.replace('_', ' ')}
                   </span>
+                  {event.status === 'SCHEDULED' && (
+                    <RemoveFromWaitlist
+                      session={session}
+                      eventId={event.id}
+                      participant={p}
+                      onDone={(message) => {
+                        setRowMessage(message);
+                        load();
+                      }}
+                    />
+                  )}
                 </td>
                 <td>
                   {p.checkedInAt ? new Date(p.checkedInAt).toLocaleTimeString() : ''}
@@ -480,7 +563,7 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
                     eventId={event.id}
                     participant={p}
                     onDone={(message) => {
-                      setUndoMessage(message);
+                      setRowMessage(message);
                       load();
                     }}
                   />

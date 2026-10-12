@@ -355,6 +355,82 @@ export async function cancelByManagementLink(
   return outcome;
 }
 
+// ---------------------------------------------------------------- waiting-list removal (FR-WL-10 to FR-WL-14)
+
+export const waitlistRemovalSchema = z
+  .object({ confirmed: z.literal(true), reason: z.string().trim().min(1).max(500).optional() })
+  .strict();
+
+/**
+ * TX-W01 (FR-WL-10 to FR-WL-14, BR-24, BR-27, PD-62, PD-63): the owner removes one WAITLISTED
+ * registration. Under the exclusive event lock, so it is serialized with verification, promotion,
+ * participant cancellation and event cancellation, and decided by commit order. The state is
+ * re-checked here, so a promoted, confirmed or cancelled registration is never touched. No seat is
+ * freed, so nobody is promoted; positions are derived from waitlist_seq, so everyone behind moves up.
+ * The required removal notice and the audit record are written in the same transaction.
+ */
+export async function removeFromWaitlist(
+  ctx: AppContext,
+  principal: OrganizerPrincipal,
+  eventId: string,
+  registrationId: string,
+  input: z.infer<typeof waitlistRemovalSchema>,
+  correlationId: string,
+): Promise<{ result: 'removed' }> {
+  if (!z.uuid().safeParse(eventId).success || !z.uuid().safeParse(registrationId).success)
+    throw new AppError(404, 'not_found');
+  const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
+    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
+    const reg = await trx
+      .selectFrom('app.registrations')
+      .select(['id', 'email', 'state', 'waitlist_seq'])
+      .where('id', '=', registrationId)
+      .where('event_id', '=', eventId)
+      .executeTakeFirst();
+    if (!reg) return 'not_found' as const;
+    if (event.status !== 'SCHEDULED') return 'not_scheduled' as const;
+    if (reg.state !== 'WAITLISTED' || reg.waitlist_seq === null) return 'not_waitlisted' as const;
+    const position = await positionOf(trx, eventId, reg.waitlist_seq);
+    await trx
+      .updateTable('app.registrations')
+      .set({
+        state: 'CANCELLED',
+        ended_at: now,
+        end_reason: 'removed_by_organizer',
+        removal_reason: input.reason ?? null,
+        updated_at: now,
+      })
+      .where('id', '=', reg.id)
+      .execute();
+    await enqueue(trx, {
+      type: 'waitlist_removed',
+      logicalKey: `waitlist_removed:${reg.id}`,
+      recipientEmail: reg.email,
+      now,
+      eventId,
+      registrationId: reg.id,
+      correlationId,
+    });
+    await recordAudit(trx, {
+      now,
+      action: 'waitlist_remove',
+      actorKind: 'owner',
+      actorAccountId: principal.accountId,
+      eventId,
+      registrationId: reg.id,
+      outcome: 'removed',
+      details: { reasonGiven: input.reason !== undefined, position },
+    });
+    return 'removed' as const;
+  });
+  if (result === null || result === 'not_found') throw new AppError(404, 'not_found');
+  if (result === 'unauthenticated') throw new AppError(401, 'unauthenticated');
+  if (result === 'not_scheduled') throw new AppError(409, 'event_not_scheduled');
+  if (result === 'not_waitlisted') throw new AppError(409, 'not_waitlisted');
+  return { result: 'removed' };
+}
+
 // ---------------------------------------------------------------- event cancellation (FR-EVT-9, BR-16)
 
 /** ConfirmedAction: the explicit confirmation every destructive operation requires. */

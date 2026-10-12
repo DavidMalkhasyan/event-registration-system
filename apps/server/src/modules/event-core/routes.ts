@@ -22,11 +22,13 @@ import {
   confirmedActionSchema,
   eventDetailsSchema,
   managementView,
+  removeFromWaitlist,
   rescheduleEvent,
   rescheduleSchema,
   setCapacity,
   shareView,
   updateEventDetails,
+  waitlistRemovalSchema,
 } from './lifecycle.js';
 import { deleteEvent, deleteEventSchema, getDeletionPreview } from './deletion.js';
 import { confirmVerification, resolveVerification, submitRegistration } from './registrations.js';
@@ -149,6 +151,16 @@ export function registerEventCoreRoutes(app: FastifyInstance, ctx: AppContext): 
     const eventId = params.parse(request.params).eventId;
     const principal = await requireEventPrincipal(ctx, request, eventId, { csrf: true });
     return checkIn(ctx, principal, eventId, checkInSchema.parse(request.body));
+  });
+
+  // removeFromWaitlist (API #43): owner only, confirmed; never promotes (TX-W01, PD-62).
+  app.post('/api/events/:eventId/registrations/:registrationId/waitlist-removal', async (request) => {
+    const principal = await requireOrganizer(ctx, request, { csrf: true });
+    const { eventId, registrationId } = z
+      .object({ eventId: z.string(), registrationId: z.string() })
+      .parse(request.params);
+    const input = waitlistRemovalSchema.parse(request.body ?? {});
+    return removeFromWaitlist(ctx, principal, eventId, registrationId, input, request.id);
   });
 
   // undoCheckIn (API #44): owner only; staff get 403 from requireOrganizer (AC-26, PD-56). TX-C02.
