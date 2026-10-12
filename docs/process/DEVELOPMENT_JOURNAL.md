@@ -623,3 +623,33 @@
 | `f5d4b34` | 09:29:02 | feat(checkin): owner undo of a check-in with audit record (K-306) |
 | `4a598ac` | 10:20:50 | feat(client): owner undo of a check-in with confirmation (K-306) |
 | *(closing commit)* | after 10:24 | docs: record K-306. Pushed with the pull request; the CI result and the merge are recorded at the start of the next branch. |
+
+**S-12, continued: K-306 merged; K-305b Waiting-list removal**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 10:25:37–10:28:41 (UTC 06:25–06:28) | [PR #9](https://github.com/DavidMalkhasyan/event-registration-system/pull/9), `dev` ← `feature/k-306-checkin-undo`; diff reviewed (12 files, no secrets) | CI [run 38212459702](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38212459702) **passed**: 6 migrations on a fresh database; 119/119, 6/6, 16/16 |
+| 10:29:00 | `gh pr merge 9 --merge` | `2efd8f1` on `dev`; tree equals the tested head; `main` unchanged |
+| 10:29–10:30 | `feature/waitlist-removal` from `origin/dev`. Read: FR-WL-10 to FR-WL-14, FR-NTF-14, BR-23, BR-24, BR-27, AC-76 to AC-79, AC-90 to AC-92, TX-W01, API #43 with `WaitlistRemovalInput`, the `waitlist_removed` policy (required, class B) | No Kanban card existed (PD-61). The design has no column for the optional removal reason, and the audit table may not hold free text (PD-63). |
+| 10:30:36 | Commit | `9b59de4` docs(process): K-306 Done; PD-61 to PD-63 |
+| 10:31–10:33 | Migration `0007`, `removeFromWaitlist` (TX-W01), the route, the `not_waitlisted` problem code, the `waitlist_removed` handler | Typecheck passes |
+| 10:33:53 | `waitlist-removal.test.ts` (10 tests) | **9 passed, 1 failed:** the AC-91 loop got `429` from event cancellation after five runs, because cancellation is limited to 5 per 15 minutes per account (D3). This is correct behaviour; the test now moves the clock on 16 minutes and signs in again every 4 runs, so it obeys the limit and the recent-sign-in rule. Its lock helper now always releases, because the failure had left the held lock open until the hook timed out. Then **10/10**. A test for two simultaneous removals was added: **11/11**. |
+| before 10:42 | Mutation checks, each restored | No `WAITLISTED` re-check → 4 tests fail; no event-status check → 2; no owner check → 1; another event's registration → 1; shared lock → 1 (two simultaneous removals); no notice → 7; the notice not treated as required → 3 |
+| 10:42–10:45 | Server suite **130/130**; lint; `pnpm migrate` on `ers_dev` ("applied 0007_removal_reason.sql"); web and worker restarted; `/healthz` reports schema version 7 | `a38a313` feat(waitlist): owner removal of a waiting-list entry with a required notice |
+| 10:45–10:47 | UI "Remove from waiting list" with confirmation and optional reason; E2E `waitlist-removal.spec.ts` | 1/1 on the first run |
+| 10:47:53–10:53:07 | Full suite | `format:check`, `lint`, `typecheck`, `test` (130/130, 6/6), `build` and `e2e` (**17/17**) exit 0 |
+| 10:53:17 | Commit | `4e7ccc8` feat(client): owner removes a waiting-list entry with confirmation |
+| 10:53–10:58 | E2E twice more | 17/17 both times |
+
+**Note on AC-91:** the test runs 100 times with both requests waiting on the event lock, plus each order forced once. Which request takes the lock first is up to PostgreSQL, so the split between the two outcomes across the 100 runs is not fixed. The two forced runs guarantee that each outcome is checked.
+
+**Commits in S-12 (continued):**
+
+| Hash | Time (+04:00) | Message |
+|---|---|---|
+| `9e83ed1` | 10:25:12 | docs: record K-306 … (closing commit of PR #9) |
+| `2efd8f1` | 10:29:00 (GitHub) | Merge K-306: owner undo of a check-in (#9) |
+| `9b59de4` | 10:30:36 | docs(process): K-306 Done; K-305b waiting-list removal started with decisions PD-61 to PD-63 |
+| `a38a313` | 10:45:33 | feat(waitlist): owner removal of a waiting-list entry with a required notice (K-305b) |
+| `4e7ccc8` | 10:53:17 | feat(client): owner removes a waiting-list entry with confirmation (K-305b) |
+| *(closing commit)* | after 10:58 | docs: record K-305b. Pushed with the pull request. |

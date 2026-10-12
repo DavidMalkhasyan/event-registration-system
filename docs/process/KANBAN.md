@@ -54,6 +54,7 @@
 
 | Card | Milestone | Awaiting |
 |---|---|---|
+| K-305b Waiting-list removal by the owner (FR-WL-10 to FR-WL-14, FR-NTF-14, BR-23, BR-24, BR-27, TX-W01, API #43; AC-76 to AC-79, AC-90 to AC-92) | M3 | Done on `feature/waitlist-removal` (`a38a313` server, migration `0007` and tests, `4e7ccc8` UI and E2E): 11 integration tests (AC-78 and FR-WL-14 c forced orders and lock-held races; AC-91 with 100 lock-held runs plus both forced orders; AC-90 forced failure), 1 E2E test, seven mutation checks. **Awaiting:** pull request, CI and merge; Done is recorded after the merge. |
 | K-001 Apply R60; synchronize the documents | M0 | Stakeholder check (commit `3fe9cb7`) |
 | K-004 Process documentation | M0 | Stakeholder review |
 
@@ -61,7 +62,6 @@
 
 | Card | Milestone | State |
 |---|---|---|
-| K-305b Waiting-list removal by the owner (FR-WL-10 to FR-WL-14, FR-NTF-14, BR-23, BR-24, BR-27, TX-W01, API #43; AC-76 to AC-79, AC-90 to AC-92) | M3 | Started in S-12 on `feature/waitlist-removal`; decisions PD-61 to PD-63 |
 | K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Updated in S-07 |
 
 ## To Do
