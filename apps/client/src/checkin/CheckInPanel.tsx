@@ -129,12 +129,14 @@ export function CheckInPanel({
         const video = videoRef.current!;
         video.srcObject = s;
         await video.play();
+        // A code is submitted once while it stays in view; when it leaves the frame and is shown
+        // again, it is checked again (so a second use is still reported by the server).
+        let inView: string | null = null;
         while (!stop) {
           const codes = await detector.detect(video).catch(() => []);
-          if (codes[0]?.rawValue) {
-            await submit(codes[0].rawValue);
-            await new Promise((r) => setTimeout(r, 2000));
-          }
+          const value = codes[0]?.rawValue ?? null;
+          if (value && value !== inView && !stop) await submit(value);
+          inView = value;
           await new Promise((r) => setTimeout(r, 300));
         }
       })
