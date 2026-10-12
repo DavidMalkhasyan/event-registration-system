@@ -197,7 +197,7 @@ Errors use RFC 9457 Problem Details (`application/problem+json`) with a stable `
 - **Upgrading an existing setup:** after pulling, run `pnpm migrate` (migrations `0003` to `0007`) and add `PREVIEW_SECRET` to `.env`; the processes refuse to start with an outdated schema or a missing variable.
 - **Development server headers:** the Vite development server does not send the production page headers (content security policy and others) and injects its own client script. The production-like run (§3) is the tested path.
 - **Event artwork:** events have no uploaded image; each gets one of six original CSS posters (geometric shapes and type in the EventFlow palette, chosen per event from its public ID; no image files). The v0 design's three AI-generated photographs were removed before the release because their reuse rights were not established; they remain in earlier commits, since the history is not rewritten ([AI_USAGE.md](docs/process/AI_USAGE.md) §7).
-- **Release state:** the published `main` branch still holds the first release (the P0 scope, 2026-10-11). Everything else described here is on the `dev` branch until the release pull request into `main` is merged, which needs the stakeholder's authorization.
+- **Release state:** `main` holds the v1.0.0 release ([PR #17](https://github.com/DavidMalkhasyan/event-registration-system/pull/17), merged 2026-10-12; CI passed on the merge commit). No release tag has been created yet.
 - **Not production-ready:** no deployment exists, and there is no deployment configuration, TLS termination, backups or load testing.
 
 ## 9. Future improvements
