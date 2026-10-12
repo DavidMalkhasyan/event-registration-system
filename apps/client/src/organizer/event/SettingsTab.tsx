@@ -1,35 +1,59 @@
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { ApiError, api, errorMessage } from '../../shared/api';
-import { Alert, Button, ConfirmDialog, Field } from '../../shared/ui';
-import { RecentSignIn, ReauthPrompt } from '../auth/Reauth';
-import type { EventItem, Notice, Session } from '../types';
+import { Alert, Button, ConfirmDialog, Field, formatLocal } from '../../shared/ui';
+import { ReauthPrompt } from '../auth/Reauth';
+import type { Counts, EventItem, Notice, Session } from '../types';
+import { describeLocalInput, toZonedLocalInput } from './schedule';
+
+// Settings of one event (PD-68, K-702). Each form keeps the organizer's unsaved edit as a draft: the
+// field shows the server's current value until it is edited, and a background refresh never
+// overwrites an edit. Save is disabled while nothing differs from the current value.
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** Confirmed and waiting participants: the people an event-wide email goes to. */
+function audience(counts?: Counts): string {
+  if (!counts) return 'every confirmed and waiting participant';
+  const n = counts.confirmed + counts.waitlisted;
+  return n === 0
+    ? 'nobody (no confirmed or waiting participants yet)'
+    : plural(n, 'participant', 'participants');
+}
+
+type OnSaved = (updated: EventItem) => void;
 
 function DetailsEditor({
   session,
   event,
-  onDone,
+  onSaved,
 }: {
   session: Session;
   event: EventItem;
-  onDone: () => void;
+  onSaved: OnSaved;
 }) {
-  const [title, setTitle] = useState(event.title);
-  const [description, setDescription] = useState(event.description ?? '');
+  const [titleDraft, setTitleDraft] = useState<string>();
+  const [descriptionDraft, setDescriptionDraft] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<Notice>();
+  const title = titleDraft ?? event.title;
+  const description = descriptionDraft ?? event.description ?? '';
+  const dirty = title !== event.title || description !== (event.description ?? '');
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setMessage(undefined);
     try {
       // FR-EVT-5: title and description only; participants are not emailed (AC-105).
-      await api<EventItem>(`/api/events/${event.id}`, {
+      const updated = await api<EventItem>(`/api/events/${event.id}`, {
         method: 'PATCH',
         csrf: session.csrfToken,
         body: { title, description: description || null },
       });
       setMessage({ kind: 'success', text: 'Details saved. Participants are not emailed about this change.' });
-      onDone();
+      setTitleDraft(undefined);
+      setDescriptionDraft(undefined);
+      onSaved(updated);
     } catch (err) {
       setMessage({ kind: 'error', text: errorMessage(err) });
     } finally {
@@ -46,7 +70,7 @@ function DetailsEditor({
             required
             maxLength={200}
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => setTitleDraft(e.target.value)}
           />
         )}
       </Field>
@@ -58,12 +82,12 @@ function DetailsEditor({
             maxLength={5000}
             rows={4}
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(e) => setDescriptionDraft(e.target.value)}
           />
         )}
       </Field>
       <div>
-        <Button type="submit" disabled={busy}>
+        <Button type="submit" disabled={busy || !dirty}>
           {busy ? 'Saving…' : 'Save details'}
         </Button>
       </div>
@@ -75,15 +99,17 @@ function DetailsEditor({
 function CapacityEditor({
   session,
   event,
-  onDone,
+  onSaved,
 }: {
   session: Session;
   event: EventItem;
-  onDone: () => void;
+  onSaved: OnSaved;
 }) {
-  const [capacity, setCapacity] = useState(String(event.capacity));
+  const [draft, setDraft] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<Notice>();
+  const capacity = draft ?? String(event.capacity);
+  const dirty = capacity !== String(event.capacity);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
@@ -98,9 +124,10 @@ function CapacityEditor({
       const promotes = updated.capacity > event.capacity && event.phase === 'registration_open';
       setMessage({
         kind: 'success',
-        text: `Capacity is now ${updated.capacity}.${promotes ? ' Free seats were offered to the waiting list in order, and promoted participants are emailed their tickets.' : ''}`,
+        text: `Capacity is now ${updated.capacity}.${promotes ? ' Free seats were offered to the waiting list in order; ticket emails for promoted participants are queued.' : ''}`,
       });
-      onDone();
+      setDraft(undefined);
+      onSaved(updated);
     } catch (err) {
       const minimum =
         err instanceof ApiError && err.code === 'capacity_below_confirmed'
@@ -130,11 +157,11 @@ function CapacityEditor({
               max={100000}
               required
               value={capacity}
-              onChange={(e) => setCapacity(e.target.value)}
+              onChange={(e) => setDraft(e.target.value)}
             />
           )}
         </Field>
-        <Button type="submit" disabled={busy}>
+        <Button type="submit" disabled={busy || !dirty}>
           {busy ? 'Saving…' : 'Update capacity'}
         </Button>
       </form>
@@ -143,51 +170,158 @@ function CapacityEditor({
   );
 }
 
-function Reschedule({ session, event, onDone }: { session: Session; event: EventItem; onDone: () => void }) {
-  const [localStart, setLocalStart] = useState('');
-  const [busy, setBusy] = useState(false);
+/**
+ * Reschedule (FR-EVT-6, TX-E04). The field starts with the current start in the event's own time zone.
+ * A real change asks for confirmation first, because every confirmed and waiting participant is emailed;
+ * an unchanged value can't be submitted (and the server would send nothing for it). The schedule
+ * version guards against a concurrent change; a repeated daylight-saving hour asks for the offset.
+ */
+function Reschedule({
+  session,
+  event,
+  counts,
+  onSaved,
+  onDone,
+}: {
+  session: Session;
+  event: EventItem;
+  counts?: Counts;
+  onSaved: OnSaved;
+  onDone: () => void;
+}) {
+  const current = toZonedLocalInput(event.startsAt, event.timeZone);
+  const [draft, setDraft] = useState<string>();
+  const [offsets, setOffsets] = useState<string[]>([]);
+  const [utcOffset, setUtcOffset] = useState('');
+  const [step, setStep] = useState<'idle' | 'confirming' | 'sending'>('idle');
   const [message, setMessage] = useState<Notice>();
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
+  const value = draft ?? current;
+  const dirty = value !== current;
+  const needsOffset = offsets.length > 0 && !utcOffset;
+
+  const edit = (next: string) => {
+    setDraft(next);
+    setOffsets([]);
+    setUtcOffset('');
+    setMessage(undefined);
+  };
+  const send = async () => {
+    setStep('sending');
     try {
-      await api(`/api/events/${event.id}/reschedule`, {
+      const updated = await api<EventItem>(`/api/events/${event.id}/reschedule`, {
         method: 'POST',
         csrf: session.csrfToken,
-        body: { localStart, expectedScheduleVersion: event.scheduleVersion },
+        body: {
+          localStart: value,
+          expectedScheduleVersion: event.scheduleVersion,
+          ...(utcOffset ? { utcOffset } : {}),
+        },
       });
-      setMessage({
-        kind: 'success',
-        text: 'Rescheduled. Every confirmed and waiting participant is being notified by email.',
-      });
-      setLocalStart('');
-      onDone();
+      if (updated.scheduleVersion === event.scheduleVersion) {
+        setMessage({ kind: 'success', text: 'The date and time did not change, so nobody was emailed.' });
+      } else {
+        setMessage({
+          kind: 'success',
+          text: `Rescheduled to ${formatLocal(updated.startsAt, updated.timeZone)}. Change emails are queued for ${audience(counts)}.`,
+        });
+      }
+      setDraft(undefined); // the field now shows the server's new start
+      setOffsets([]);
+      setUtcOffset('');
+      onSaved(updated);
     } catch (err) {
-      setMessage({ kind: 'error', text: errorMessage(err) });
+      if (err instanceof ApiError && err.code === 'ambiguous_local_time') {
+        setOffsets((err.body.offsets as string[]) ?? []);
+        setMessage({
+          kind: 'error',
+          text: `${describeLocalInput(value)} happens twice in ${event.timeZone} because the clocks go back. Choose which one you mean.`,
+        });
+      } else if (err instanceof ApiError && err.code === 'nonexistent_local_time') {
+        setMessage({
+          kind: 'error',
+          text: `${describeLocalInput(value)} does not exist in ${event.timeZone} because the clocks go forward. Choose another time.`,
+        });
+      } else if (err instanceof ApiError && err.code === 'schedule_version_mismatch') {
+        setDraft(undefined);
+        setMessage({
+          kind: 'error',
+          text: 'The date was changed elsewhere in the meantime. The form now shows the current date; nothing was changed.',
+        });
+        onDone();
+      } else if (err instanceof ApiError && err.code === 'start_not_in_future') {
+        setMessage({ kind: 'error', text: 'The new start must be in the future.' });
+      } else {
+        setMessage({ kind: 'error', text: errorMessage(err) });
+      }
     } finally {
-      setBusy(false);
+      setStep('idle');
     }
   };
   return (
     <>
-      <form className="inline-form" onSubmit={submit}>
-        <Field label={`New date and time (${event.timeZone})`}>
+      <form
+        className="inline-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (dirty && !needsOffset) setStep('confirming');
+        }}
+      >
+        <Field label={`Start date and time (${event.timeZone})`}>
           {(id) => (
             <input
               id={id}
               className="input"
               type="datetime-local"
               required
-              value={localStart}
-              onChange={(e) => setLocalStart(e.target.value)}
+              value={value}
+              onChange={(e) => edit(e.target.value)}
             />
           )}
         </Field>
-        <Button type="submit" disabled={busy}>
-          {busy ? 'Rescheduling…' : 'Reschedule and notify'}
+        <Button type="submit" disabled={!dirty || needsOffset || step !== 'idle'}>
+          {step === 'sending' ? 'Rescheduling…' : 'Save new date'}
         </Button>
       </form>
+      {offsets.length > 0 && (
+        <Field label="This time occurs twice because of a daylight-saving change. Choose the UTC offset">
+          {(id) => (
+            <select
+              id={id}
+              className="select"
+              value={utcOffset}
+              onChange={(e) => setUtcOffset(e.target.value)}
+            >
+              <option value="">Choose…</option>
+              {offsets.map((o) => (
+                <option key={o}>{o}</option>
+              ))}
+            </select>
+          )}
+        </Field>
+      )}
       {message && <Alert kind={message.kind}>{message.text}</Alert>}
+      <ConfirmDialog
+        open={step === 'confirming' || step === 'sending'}
+        title="Change the date and time?"
+        confirmLabel={step === 'sending' ? 'Rescheduling…' : 'Yes, reschedule and notify'}
+        cancelLabel="Keep the current date"
+        busy={step === 'sending'}
+        onConfirm={send}
+        onClose={() => setStep('idle')}
+      >
+        <p>
+          Move “{event.title}” from {formatLocal(event.startsAt, event.timeZone)} to{' '}
+          <strong>
+            {describeLocalInput(value)}
+            {utcOffset ? ` (UTC${utcOffset})` : ''}
+          </strong>{' '}
+          ({event.timeZone})?
+        </p>
+        <p>
+          A change email is queued for {audience(counts)}: every confirmed and waiting participant is told the
+          new date. Registration closes 2 hours before the new start.
+        </p>
+      </ConfirmDialog>
     </>
   );
 }
@@ -197,18 +331,28 @@ function DangerItem({ title, children }: { title: string; children: ReactNode })
   const id = useId();
   return (
     <section className="danger-item" aria-labelledby={id}>
-      <h4 id={id}>{title}</h4>
+      <h3 id={id}>{title}</h3>
       {children}
     </section>
   );
 }
 
 /**
- * Event cancellation (FR-EVT-9, BR-16): a destructive action with an explicit confirmation step.
- * If the sign-in is not recent, the server answers reauthentication_required (FR-ORG-5): the
- * organizer confirms it's them by email and then has to confirm the cancellation again.
+ * Event cancellation (FR-EVT-9, BR-16), the one prominent destructive action. If the sign-in is not
+ * recent, the server answers reauthentication_required (FR-ORG-5): only then does the organizer confirm
+ * it's them by email, and afterwards they must confirm the cancellation again; nothing runs on its own.
  */
-function CancelEvent({ session, event, onDone }: { session: Session; event: EventItem; onDone: () => void }) {
+function CancelEvent({
+  session,
+  event,
+  counts,
+  onDone,
+}: {
+  session: Session;
+  event: EventItem;
+  counts?: Counts;
+  onDone: () => void;
+}) {
   const [step, setStep] = useState<'idle' | 'confirming' | 'sending' | 'reauth'>('idle');
   const [error, setError] = useState<string>();
   const cancel = async () => {
@@ -234,24 +378,24 @@ function CancelEvent({ session, event, onDone }: { session: Session; event: Even
   return (
     <DangerItem title="Cancel event">
       <p className="muted">
-        Cancelling is permanent. Every ticket stops working, the waiting list is closed, and each confirmed
-        and waiting participant is emailed. Checked-in records are kept.
+        Cancelling is permanent. Every ticket stops working, registration and the waiting list close, and a
+        cancellation email is queued for each confirmed and waiting participant. Check-in records are kept.
       </p>
       {step === 'reauth' ? (
         <ReauthPrompt
           session={session}
-          intro="For your security, cancelling needs a sign-in from the last 15 minutes. Confirm it’s you by email; the event is not cancelled until you confirm the cancellation again."
+          intro="For your security, cancelling needs a recent sign-in. Confirm it’s you by email; the event is not cancelled until you confirm the cancellation again."
         />
       ) : (
         <div>
           <Button variant="destructive" onClick={() => setStep('confirming')}>
-            Cancel this event…
+            Cancel event
           </Button>
         </div>
       )}
       <ConfirmDialog
         open={step === 'confirming' || step === 'sending'}
-        title="Cancel this event?"
+        title={`Cancel “${event.title}”?`}
         confirmLabel={step === 'sending' ? 'Cancelling…' : 'Yes, cancel the event permanently'}
         cancelLabel="Keep the event"
         destructive
@@ -260,9 +404,14 @@ function CancelEvent({ session, event, onDone }: { session: Session; event: Even
         onClose={() => setStep('idle')}
       >
         <p>
-          Cancel “{event.title}” permanently? This cannot be undone. Every confirmed and waiting participant
-          is emailed, and tickets stop working.
+          <strong>{event.title}</strong> on {formatLocal(event.startsAt, event.timeZone)} will be cancelled
+          permanently. This cannot be undone.
         </p>
+        <ul className="dialog-list">
+          <li>A cancellation email is queued for {audience(counts)}.</li>
+          <li>Every ticket stops being valid, and nobody can register or join the waiting list.</li>
+          <li>The event, its participants and check-in records stay visible here.</li>
+        </ul>
       </ConfirmDialog>
       {error && <Alert>{error}</Alert>}
     </DangerItem>
@@ -290,9 +439,9 @@ const NOTICE_TEXT: Record<string, string> = {
 };
 
 /**
- * Event deletion (FR-EVT-10, FR-EVT-14): the preview shows what will be deleted and why it may be
- * blocked; the confirmation sends the preview token, so the server deletes only that state. Needs a
- * recent sign-in (FR-ORG-5). Not offered for cancelled events (FR-EVT-11).
+ * Event deletion (FR-EVT-10, FR-EVT-14), a different operation from cancellation: the preview shows
+ * what will be deleted and why it may be blocked; the confirmation sends the preview token, so the
+ * server deletes only that state. Needs a recent sign-in (FR-ORG-5). Not offered for cancelled events.
  */
 function DeleteEvent({ session, event }: { session: Session; event: EventItem }) {
   const [step, setStep] = useState<'idle' | 'loading' | 'preview' | 'deleting' | 'reauth'>('idle');
@@ -338,18 +487,18 @@ function DeleteEvent({ session, event }: { session: Session; event: EventItem })
   return (
     <DangerItem title="Delete event">
       <p className="muted">
-        Deleting removes the event and its unconfirmed registrations permanently. It is only possible while
-        nobody is confirmed or waiting.
+        Deleting is not cancelling: it removes the event and its unconfirmed registrations permanently, and is
+        only possible while nobody is confirmed or waiting. To call off an event with participants, cancel it.
       </p>
       {step === 'reauth' && (
         <ReauthPrompt
           session={session}
-          intro="For your security, deleting needs a sign-in from the last 15 minutes. Confirm it’s you by email; nothing is deleted until you confirm the deletion again."
+          intro="For your security, deleting needs a recent sign-in. Confirm it’s you by email; nothing is deleted until you confirm the deletion again."
         />
       )}
       {(step === 'idle' || step === 'loading') && (
         <div>
-          <Button variant="destructive" onClick={() => loadPreview()} disabled={step === 'loading'}>
+          <Button variant="outline" onClick={() => loadPreview()} disabled={step === 'loading'}>
             {step === 'loading' ? 'Checking…' : 'Delete this event…'}
           </Button>
         </div>
@@ -395,14 +544,16 @@ function DeleteEvent({ session, event }: { session: Session; event: EventItem })
   );
 }
 
-/** Settings of one event: each change is its own operation with its own effect (PD-68). */
+/** Settings of one event: each change is its own operation with its own effect (PD-68, K-702). */
 export function SettingsTab({
   session,
   event,
+  counts,
   onDone,
 }: {
   session: Session;
   event: EventItem;
+  counts?: Counts;
   onDone: () => void;
 }) {
   if (event.status !== 'SCHEDULED')
@@ -412,6 +563,27 @@ export function SettingsTab({
         deleted. Its records are kept.
       </Alert>
     );
+  return <SettingsSections session={session} event={event} counts={counts} onDone={onDone} />;
+}
+
+function SettingsSections({
+  session,
+  event: loaded,
+  counts,
+  onDone,
+}: {
+  session: Session;
+  event: EventItem;
+  counts?: Counts;
+  onDone: () => void;
+}) {
+  // The response of a save is shown at once; the next reload of the workspace replaces it (a new object).
+  const [saved, setSaved] = useState<{ base: EventItem; value: EventItem }>();
+  const event = saved?.base === loaded ? saved.value : loaded;
+  const onSaved = (value: EventItem) => {
+    setSaved({ base: loaded, value });
+    onDone();
+  };
   const started = event.phase === 'started';
   return (
     <div className="settings-sections">
@@ -420,37 +592,37 @@ export function SettingsTab({
           <h3>Event details</h3>
           <p>Title and description on the registration page. Participants are not emailed.</p>
         </div>
-        <DetailsEditor session={session} event={event} onDone={onDone} />
+        <DetailsEditor session={session} event={event} onSaved={onSaved} />
       </div>
       <div className="settings-section">
         <div>
           <h3>Capacity</h3>
           <p>Raising it offers free seats to the waiting list in order, until registration closes.</p>
         </div>
-        <CapacityEditor session={session} event={event} onDone={onDone} />
+        <CapacityEditor session={session} event={event} onSaved={onSaved} />
       </div>
       {!started && (
         <div className="settings-section">
           <div>
             <h3>Date and time</h3>
-            <p>Every confirmed and waiting participant is emailed the new date.</p>
+            <p>
+              Shown in the event’s time zone. Every confirmed and waiting participant is emailed the new date.
+            </p>
           </div>
-          <Reschedule session={session} event={event} onDone={onDone} />
+          <Reschedule session={session} event={event} counts={counts} onSaved={onSaved} onDone={onDone} />
         </div>
       )}
-      <div className="settings-section">
-        <div>
-          <h3>Recent sign-in</h3>
-          <p>Required for protected actions below.</p>
+      {!started && (
+        <div className="danger-zone">
+          <CancelEvent session={session} event={event} counts={counts} onDone={onDone} />
         </div>
-        <RecentSignIn session={session} />
-      </div>
-      <div className="danger-zone">
-        <h3>Careful changes</h3>
-        <p>These actions are permanent and ask for a confirmation first.</p>
-        {!started && <CancelEvent session={session} event={event} onDone={onDone} />}
+      )}
+      <details className="more-actions">
+        <summary>
+          More actions <ChevronDown size={16} aria-hidden="true" />
+        </summary>
         <DeleteEvent session={session} event={event} />
-      </div>
+      </details>
     </div>
   );
 }
