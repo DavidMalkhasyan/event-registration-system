@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures.js';
 import { ageOrganizerSessions } from './db.js';
 import {
   HOUR,

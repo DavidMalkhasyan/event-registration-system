@@ -1,4 +1,4 @@
-import { expect, type Browser, type Page } from '@playwright/test';
+import { expect, type Browser, type Page, type BrowserContext } from '@playwright/test';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { E2E_MAILBOX, ORIGIN } from './env.js';
@@ -151,6 +151,26 @@ export async function openSection(page: Page, name: string): Promise<void> {
 /** The heading of the latest check-in result ("Checked in", "Already checked in", …). */
 export function checkInResult(page: Page) {
   return page.getByRole('status', { name: 'Check-in result' }).getByRole('heading');
+}
+
+/**
+ * Records Content-Security-Policy violations of every page in the context (FR-LNK-8): the browser's
+ * securitypolicyviolation events and its console reports. A strict policy must not break the UI.
+ */
+export async function watchCsp(context: BrowserContext): Promise<string[]> {
+  const violations: string[] = [];
+  await context.exposeFunction('__reportCsp', (v: string) => violations.push(v));
+  await context.addInitScript(() => {
+    document.addEventListener('securitypolicyviolation', (e) => {
+      void (window as unknown as { __reportCsp: (v: string) => void }).__reportCsp(
+        `${e.violatedDirective} ${e.blockedURI}`,
+      );
+    });
+  });
+  context.on('console', (m) => {
+    if (/Content Security Policy|Refused to/i.test(m.text())) violations.push(m.text());
+  });
+  return violations;
 }
 
 /** The number shown on a dashboard statistic tile. */

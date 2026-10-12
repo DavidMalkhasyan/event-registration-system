@@ -50,13 +50,14 @@
 | K-306 Check-in undo (FR-CHK-8, BR-7, TX-C02, API #44; AC-26, AC-27, AC-54) | M4 | `710b9bd`, `f5d4b34`, `4a598ac`, `9e83ed1`; [PR #9](https://github.com/DavidMalkhasyan/event-registration-system/pull/9) into `dev`; CI run [38212459702](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38212459702) passed (6 migrations; 119/119, 6/6, 16/16); merged 2026-10-12 10:29:00 as `2efd8f1`. Not in `main`. |
 | K-305b Waiting-list removal by the owner (FR-WL-10 to FR-WL-14, FR-NTF-14, BR-23, BR-24, BR-27, TX-W01, API #43; AC-76 to AC-79, AC-90 to AC-92) | M3 | `9b59de4`, `a38a313`, `4e7ccc8`, `3065378`; [PR #10](https://github.com/DavidMalkhasyan/event-registration-system/pull/10) into `dev`; CI run [38215349977](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38215349977) passed (7 migrations; 130/130, 6/6, 17/17); merged 2026-10-12 11:03:50 as `d219576`. Not in `main`. |
 | K-506 UI implementation inventory before a redesign (no visual change) | M5 | `b457bfa`, `16a4800`; [PR #11](https://github.com/DavidMalkhasyan/event-registration-system/pull/11) into `dev`; CI run [38215945495](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38215945495) passed (7 migrations; 130/130, 6/6, 17/17); merged 2026-10-12 11:10:21 as `dd23b93`. Documentation only. |
+| K-507 UI redesign to the approved v0 design, with the K-504 remainder (dedicated staff entry) | M5 | [PR #12](https://github.com/DavidMalkhasyan/event-registration-system/pull/12): CI run [38228535365](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38228535365) passed (131/131, 11/11, 19/19), merged 2026-10-12 13:18:42 as `1172ec0`; [PR #13](https://github.com/DavidMalkhasyan/event-registration-system/pull/13): CI run [38237911736](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38237911736) passed (131/131, 11/11, 20/20), merged 14:46:02 as `82b1c1c`. Not in `main`. |
 | K-505 Playwright suites, **reduced scope** | M5 | `b7a164f`: 4 tests, including two simultaneous clients. 4/4 passed in 3 runs; a mutation check proved the live-count test fails when the feature breaks. |
 
 ## Review
 
 | Card | Milestone | Awaiting |
 |---|---|---|
-| K-507 UI redesign to the approved v0 design, with the K-504 remainder (dedicated staff entry) | M5 | Part 1 merged: [PR #12](https://github.com/DavidMalkhasyan/event-registration-system/pull/12), CI run 38228535365 passed (131/131, 11/11, 19/19), merge `1172ec0`. Part 2 (participant and link pages, `67764a9`, `fbe2a33`) on `feature/ui-redesign-participant`. **Awaiting:** part 2 pull request, CI and merge; Done is recorded with the next branch. |
+| K-605 Release hardening: token bootstrap order (PD-71), FR-LNK-8 headers (PD-72), camera scanning (PD-74), K-105 scanning (PD-75) | M6 | On `feature/security-hardening`; **awaiting:** pull request, CI and merge |
 | K-001 Apply R60; synchronize the documents | M0 | Stakeholder check (commit `3fe9cb7`) |
 | K-004 Process documentation | M0 | Stakeholder review |
 
@@ -64,7 +65,7 @@
 
 | Card | Milestone | State |
 |---|---|---|
-| K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Updated in S-07 |
+| K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Updated in S-14: README, scope, milestones, journal and AI usage describe the state of `dev` on 2026-10-12 |
 
 ## To Do
 
@@ -88,7 +89,6 @@
 | Card | Milestone |
 |---|---|
 | K-104 Version the documentation checks and run them in CI | M1 |
-| K-105 Dependency and secret scanning in CI | M1 |
 | K-204 Constraint and trigger violation tests (every CK, U, FK, TR) | M2 |
 | K-206 Kysely type generation with a drift check | M2 |
 | K-602 AC-169 pipeline test; AC-135 (b) stress test | M6 |

@@ -33,3 +33,18 @@ export async function ageOrganizerSessions(email: string, minutes: number): Prom
     await client.end();
   }
 }
+
+/**
+ * Isolation between browser tests: every test starts with empty rate-limit counters in the TEST
+ * database. The limits themselves are unchanged and are tested by the server integration tests; this
+ * only stops one test's registrations from counting against the next (they all come from 127.0.0.1).
+ */
+export async function resetRateLimitCounters(): Promise<void> {
+  const client = new pg.Client({ connectionString: testDatabaseUrl() });
+  await client.connect();
+  try {
+    await client.query('DELETE FROM app.rate_limit_counters');
+  } finally {
+    await client.end();
+  }
+}

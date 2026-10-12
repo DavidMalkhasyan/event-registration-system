@@ -1,6 +1,5 @@
-// Must stay the first import (FR-LNK-10 b): it moves the link token from the address bar into memory
-// before any other application module runs. Pages read it through linkToken().
-import './bootstrap-token';
+// Loaded by boot.ts through a dynamic import, after the token bootstrap has run (FR-LNK-10 b, PD-71).
+// Pages read the token through linkToken() from bootstrap-token.
 import { createRoot } from 'react-dom/client';
 import { EventPage } from './EventPage';
 import { InvitePage, SignInPage, TicketPage, VerifyPage } from './LinkPages';

@@ -1,4 +1,4 @@
-// FR-LNK-10 (b), ADR-011: this module is imported first by the public entry and has no imports.
+// FR-LNK-10 (b), ADR-011, PD-71: the only static import of the public entry (boot.ts); it has no imports.
 // It reads the link token from the URL fragment, keeps it only in memory, and removes the
 // fragment from the address bar and the current history entry before any other module runs.
 

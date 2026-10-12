@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Page } from './fixtures.js';
 import { HOUR, address, createEvent, linkIn, registerParticipant, signIn, waitForMail } from './helpers.js';
 
 // K-405 in the browser: FR-SELF-4, FR-SHR-1, FR-ROT-1 to FR-ROT-11, FR-LNK-10.
