@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures.js';
 import { ageOrganizerSessions } from './db.js';
 import { HOUR, address, createEvent, linkIn, openSection, signIn, stat, waitForMail } from './helpers.js';
 

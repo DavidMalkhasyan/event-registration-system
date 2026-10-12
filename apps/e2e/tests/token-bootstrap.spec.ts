@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Page } from './fixtures.js';
 import { HOUR, address, createEvent, linkIn, openSection, signIn, waitForMail } from './helpers.js';
 
 // PD-71, FR-LNK-10 (b), ADR-011 — against the PRODUCTION build served by the real web server.

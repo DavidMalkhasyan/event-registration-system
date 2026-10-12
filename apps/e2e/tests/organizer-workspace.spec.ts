@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures.js';
 import { HOUR, address, createEvent, registerParticipant, signIn, stat, watchCsp } from './helpers.js';
 
 // K-507: one organizer manages several events. The overview sums all of them (PD-67); each event's
