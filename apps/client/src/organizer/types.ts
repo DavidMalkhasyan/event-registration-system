@@ -8,6 +8,7 @@ export interface Session {
 
 export interface EventItem {
   id: string;
+  publicId: string;
   publicUrl: string;
   title: string;
   description: string | null;

@@ -19,7 +19,7 @@ import {
   formatDay,
   formatLocal,
 } from '../../shared/ui';
-import { EventArtwork } from '../events/EventArtwork';
+import { EventArtwork } from '../../shared/artwork';
 import { fillPercent, phaseOf } from '../events/event-status';
 import { Link, eventPath, type EventTab } from '../router';
 import type { Counts, EventItem, Notice, Session } from '../types';
@@ -186,7 +186,7 @@ export function EventWorkspace({
       </Link>
       {!focused && (
         <div className="event-cover">
-          <EventArtwork eventId={event.id} caption={formatDay(event.startsAt, event.timeZone)} />
+          <EventArtwork artKey={event.publicId} caption={formatDay(event.startsAt, event.timeZone)} />
           <span className="cover-caption">{formatDay(event.startsAt, event.timeZone)}</span>
         </div>
       )}

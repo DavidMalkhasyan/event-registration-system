@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CalendarDays, ChevronRight, LayoutDashboard, LogOut, Menu, Sparkles, X } from 'lucide-react';
 import { api } from '../../shared/api';
 import { Button, Logo } from '../../shared/ui';
-import { SWATCHES, artworkIndex } from '../events/EventArtwork';
+import { SWATCHES, artworkIndex } from '../../shared/artwork';
 import { isUpcoming } from '../events/event-status';
 import { Link } from '../router';
 import type { EventListItem, Session } from '../types';
@@ -108,7 +108,7 @@ export function AppShell({
                 >
                   <span
                     className="event-swatch"
-                    style={{ background: SWATCHES[artworkIndex(e.id)] }}
+                    style={{ background: SWATCHES[artworkIndex(e.publicId)] }}
                     aria-hidden="true"
                   />
                   <span>{e.title}</span>
