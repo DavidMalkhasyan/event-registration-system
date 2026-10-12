@@ -19,7 +19,9 @@
     "dev:client": "pnpm --filter @ers/client dev",
     "start:web": "node --env-file-if-exists=.env apps/server/dist/entrypoints/web.js",
     "start:worker": "node --env-file-if-exists=.env apps/server/dist/entrypoints/worker.js",
-    "e2e": "pnpm --filter @ers/e2e e2e"
+    "e2e": "pnpm --filter @ers/e2e e2e",
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "check:deps": "pnpm audit --audit-level=high"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
