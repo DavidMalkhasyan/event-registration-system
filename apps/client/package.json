@@ -9,6 +9,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "lucide-react": "1.17.0",
     "qrcode": "^1.5.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
