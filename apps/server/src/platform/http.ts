@@ -35,13 +35,47 @@ function isInfrastructure(error: unknown): boolean {
   return /^(08|57P|53)/.test(code) || code === 'ECONNREFUSED' || code === 'ETIMEDOUT' || code === '57014';
 }
 
+/**
+ * FR-LNK-8, AC-51: the pages allow scripts, styles, fonts and connections only from our own origin,
+ * images also as data: URLs (QR codes, the inline icon), and no framing. No 'unsafe-inline', no eval.
+ */
+export const PAGE_CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self'",
+  "img-src 'self' data:",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "media-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join('; ');
+
+/** API responses are data, never documents: nothing may load or frame them. */
+export const API_CSP = "default-src 'none'; frame-ancestors 'none'";
+
 export function registerHttpPlumbing(app: FastifyInstance, publicOrigin: string): void {
-  // Security headers on every response (FR-LNK-8 for link responses; ADR-013: no CORS headers).
+  // Security headers on every response (FR-LNK-8, AC-51; ADR-013: no CORS headers).
   app.addHook('onSend', async (request, reply, payload) => {
     reply.header('x-content-type-options', 'nosniff');
     reply.header('referrer-policy', 'no-referrer');
     if (request.url.startsWith('/api/') || request.url.startsWith('/dev/'))
       reply.header('cache-control', 'no-store');
+    if (request.url.startsWith('/api/')) {
+      reply.header('content-security-policy', API_CSP);
+      reply.header('x-robots-tag', 'noindex, nofollow');
+    } else if (
+      String(reply.getHeader('content-type') ?? '').startsWith('text/html') &&
+      !request.url.startsWith('/dev/') // the development-only mailbox page is not a link page
+    ) {
+      // Every HTML entry (link pages, organizer, staff): never cached, never indexed, never framed.
+      reply.header('content-security-policy', PAGE_CSP);
+      reply.header('cache-control', 'no-store');
+      reply.header('x-robots-tag', 'noindex, nofollow');
+      reply.header('x-frame-options', 'DENY');
+    }
     if (!isLinkRoute(request.url)) reply.header('x-correlation-id', request.id);
     return payload;
   });

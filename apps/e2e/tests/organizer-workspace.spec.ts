@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { HOUR, address, createEvent, registerParticipant, signIn, stat } from './helpers.js';
+import { HOUR, address, createEvent, registerParticipant, signIn, stat, watchCsp } from './helpers.js';
 
 // K-507: one organizer manages several events. The overview sums all of them (PD-67); each event's
 // workspace shows only its own figures; the sidebar and the All events page move between events.
@@ -15,6 +15,7 @@ test('several events: overview totals versus each event’s own figures, and nav
   page,
   browser,
 }) => {
+  const violations = await watchCsp(page.context());
   await signIn(page, address('organizer'));
   const stamp = Date.now();
   const first = `Morning talk ${stamp}`;
@@ -65,6 +66,7 @@ test('several events: overview totals versus each event’s own figures, and nav
   await page.getByRole('button', { name: 'List view' }).click();
   await gallery.getByRole('link', { name: second }).click();
   await expect(page).toHaveURL(new RegExp(`/organizer/events/${two.eventId}$`));
+  expect(violations).toEqual([]); // the organizer area works under the strict policy
 });
 
 test('mobile: the navigation drawer opens, traps Escape, and navigates', async ({ browser }) => {

@@ -1,5 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
-import { HOUR, address, createEvent, linkIn, openVerification, signIn, waitForMail } from './helpers.js';
+import {
+  HOUR,
+  address,
+  createEvent,
+  linkIn,
+  openVerification,
+  signIn,
+  waitForMail,
+  watchCsp,
+} from './helpers.js';
 
 // K-507 security guard for the redesigned participant pages (UI_INVENTORY §4, ADR-011): link pages load
 // nothing from other origins, remove the token from the address bar, and keep it out of browser storage.
@@ -33,6 +42,7 @@ test('event, verification, management and ticket pages stay same-origin and keep
   const guest = address('guest');
 
   const context = await browser.newContext();
+  const violations = await watchCsp(context);
   const participant = await context.newPage();
   const foreign = watchRequests(participant, origin);
   await openVerification(participant, publicUrl, guest);
@@ -55,5 +65,16 @@ test('event, verification, management and ticket pages stay same-origin and keep
   await noTokenLeft(participant);
 
   expect(foreign).toEqual([]);
+  expect(violations).toEqual([]); // the strict policy does not break any link page
+
+  // The production pages carry the FR-LNK-8 headers.
+  for (const path of ['/verify', '/manage', '/ticket', `/e/${new URL(publicUrl).pathname.split('/e/')[1]}`]) {
+    const headers = (await participant.request.get(`${origin}${path}`)).headers();
+    expect(headers['content-security-policy'], path).toContain("script-src 'self'");
+    expect(headers['content-security-policy'], path).toContain("frame-ancestors 'none'");
+    expect(headers['cache-control'], path).toBe('no-store');
+    expect(headers['referrer-policy'], path).toBe('no-referrer');
+    expect(headers['x-robots-tag'], path).toContain('noindex');
+  }
   await context.close();
 });
