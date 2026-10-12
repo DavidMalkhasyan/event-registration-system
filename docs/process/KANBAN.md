@@ -25,7 +25,7 @@
 | K-101 Toolchain decisions | M1 | PD-10 to PD-14 (S-02) |
 | K-102 Project initialization | M1 | `e9545fa`, `9b40caf`. Strict TypeScript; ESLint and Prettier; the layering rule was proven with a temporary violating file; fail-fast configuration (AC-143 checked: the variable is named and the process exits 1); `.env.example` (`d6fec3a`). **Difference from the plan:** it was delivered together with M2 and M3 work, not as an isolated card. |
 | K-201 Migration runner | M2 | `f458591`. Checksums, advisory lock, schema-version check. |
-| K-202 Migrations, **reduced scope** | M2 | `f458591`, `2a4f722`: `0001_core` and `0002_reminders`, 16 tables. The other tables are deferred (ASSIGNMENT_SCOPE §4). |
+| K-202 Migrations, **reduced scope** | M2 | `f458591`, `2a4f722`: `0001_core` and `0002_reminders`, 16 tables. The other tables are deferred (ASSIGNMENT_SCOPE §4). Grown with the P1 features since: 7 migrations and 20 tables on `dev` (`0003` to `0007`: K-404b, K-304d, K-405, K-406, K-305b). |
 | K-203 Database test harness, **with deviation** | M2 | `34c98ec`: real PostgreSQL 18.6 test database instead of Testcontainers (PD-12) |
 | K-301 Platform layer | M3 | `2a4f722`. Configuration, transactions and event locks with retries, decision time, Problem Details errors, HTTP plumbing, rate limiting. |
 | K-302 Identity, **reduced scope** | M3 | `2a4f722`: passwordless sign-in, sessions, CSRF, pre-session. Re-authentication: K-302b. Email change (FR-ORG-6) stays deferred. |
@@ -33,7 +33,7 @@
 | K-305 Registration, verification, waiting list, promotion, participant cancellation | M3 | `2a4f722`, `34c98ec`: `registration` and `lifecycle` tests (P0 #2 to #6) |
 | K-307 Concurrency suites | M3 | `34c98ec`: 12-way last-seat race, double confirm, two simultaneous cancellations, 10 parallel scans, parallel reminder runs |
 | K-407 Reporting: dashboard, participants, SSE | M4 | `2a4f722`, `34c98ec`: `live` test with two SSE clients; dashboard test |
-| K-501 Client workspace, **reduced scope** | M5 | `cc5bcbc`: two HTML entries (public and organizer; no staff entry), fragment bootstrap with 3 unit tests, security headers |
+| K-501 Client workspace, **reduced scope** | M5 | `cc5bcbc`: two HTML entries (public and organizer; no staff entry), fragment bootstrap with 3 unit tests, security headers. Since then: a third entry `staff.html` (K-507) and the bootstrap-order proof on the production build (K-605). |
 | K-502 Public and link pages | M5 | `cc5bcbc`; E2E `participant-flow` (`b7a164f`) |
 | K-503 Organizer area, **reduced scope** | M5 | `cc5bcbc`: sign-in, events, creation, dashboard, reschedule. E2E `b7a164f`. |
 | K-005 Create the GitHub repository; add the remote; push `main` after a final secret scan | M0 | S-03: full-history scan clean; pushed 17:03:42 to https://github.com/DavidMalkhasyan/event-registration-system (`c45ecaf`) |
