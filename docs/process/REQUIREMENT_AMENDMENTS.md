@@ -1,11 +1,11 @@
-# Proposed Requirement Amendments
+# Requirement Amendments
 
-[REQUIREMENTS.md](../../REQUIREMENTS.md) v1.7 is the approved baseline and is not edited by the development process. When the stakeholder approves work that conflicts with it, the conflict and the proposed wording are recorded here, with the decision that governs the implementation, until the stakeholder amends the baseline.
+[REQUIREMENTS.md](../../REQUIREMENTS.md) v1.7 is the approved baseline and is not edited by the development process. When the stakeholder approves work that conflicts with it, the conflict and the wording are recorded here, first as proposed and then as approved, with the decision that governs the implementation. The history of each amendment stays visible.
 
 | ID | Status |
 |---|---|
 | A-1 | **Approved** by the stakeholder on 2026-10-13 (prompt 29, S-19); proposed in S-18. Implemented in `dev` under PD-83 (K-703, PR #22). REQUIREMENTS.md itself is unchanged; this record is the amendment. |
-| A-2 | **Approved** (prompt 29, S-19): capacity can only be increased. To be implemented by K-707. |
+| A-2 | **Approved** (prompt 29, S-19): capacity can only be increased. Implemented by K-707 (PD-87) on `feature/capacity-increase-only`. |
 | A-3 | **Approved** (prompt 29, S-19): organizations, organizer accounts with passwords, Super Admin approval. To be implemented by K-708 to K-710. |
 | A-4 | **Approved** (prompt 29, S-19): event photographs and a gallery. To be implemented by K-712 and K-713. |
 | A-5 | **Approved** (prompt 29, S-19): event location and venue-change notices. To be implemented by K-711. |

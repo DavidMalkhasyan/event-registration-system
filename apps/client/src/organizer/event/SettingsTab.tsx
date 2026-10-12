@@ -1,6 +1,7 @@
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { ApiError, api, errorMessage } from '../../shared/api';
+import { CAPACITY_MAX, normalizeCapacity, type CapacityCheck } from '../../shared/capacity';
 import { Alert, Button, ConfirmDialog, Field, formatLocal } from '../../shared/ui';
 import { ReauthPrompt } from '../auth/Reauth';
 import type { Counts, EventItem, Notice, Session } from '../types';
@@ -96,6 +97,12 @@ function DetailsEditor({
   );
 }
 
+/**
+ * Capacity (FR-EVT-7, amendment A-2, K-707): it can only be increased, up to 100 000. The field starts
+ * with the current capacity; a lower or out-of-range value is corrected when the field is left or the
+ * form is submitted (a corrected value is shown first, not sent); fractions are refused. The server
+ * enforces the same rule under the event lock.
+ */
 function CapacityEditor({
   session,
   event,
@@ -106,16 +113,24 @@ function CapacityEditor({
   onSaved: OnSaved;
 }) {
   const [draft, setDraft] = useState<string>();
+  const [check, setCheck] = useState<CapacityCheck>();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<Notice>();
   const capacity = draft ?? String(event.capacity);
   const dirty = capacity !== String(event.capacity);
+  const commit = () => {
+    const next = normalizeCapacity(capacity, event.capacity);
+    setCheck(next.note || next.error ? next : undefined);
+    if (next.value !== capacity) setDraft(next.value);
+    return !next.error && next.value === capacity;
+  };
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!commit()) return;
     setBusy(true);
     setMessage(undefined);
     try {
-      // Absolute value (FR-EVT-7, FR-EVT-8): repeating the same request changes nothing.
+      // Absolute value: repeating the same request changes nothing.
       const updated = await api<EventItem>(`/api/events/${event.id}/capacity`, {
         method: 'PUT',
         csrf: session.csrfToken,
@@ -129,15 +144,15 @@ function CapacityEditor({
       setDraft(undefined);
       onSaved(updated);
     } catch (err) {
-      const minimum =
-        err instanceof ApiError && err.code === 'capacity_below_confirmed'
-          ? err.body.minimumCapacity
+      const current =
+        err instanceof ApiError && err.code === 'capacity_decrease_not_allowed'
+          ? err.body.currentCapacity
           : undefined;
       setMessage({
         kind: 'error',
         text:
-          typeof minimum === 'number'
-            ? `Capacity can't be lower than the ${minimum} confirmed participants. The minimum allowed capacity is ${minimum}.`
+          typeof current === 'number'
+            ? `Capacity can only be increased. The current capacity is ${current}; nothing was changed.`
             : errorMessage(err),
       });
     } finally {
@@ -147,24 +162,39 @@ function CapacityEditor({
   return (
     <>
       <form className="inline-form" onSubmit={submit}>
-        <Field label="Number of seats">
+        <Field
+          label="Number of seats"
+          hint={`From the current ${event.capacity} up to ${CAPACITY_MAX.toLocaleString('en-GB')}.`}
+        >
           {(id) => (
             <input
               id={id}
               className="input"
               type="number"
-              min={1}
-              max={100000}
+              inputMode="numeric"
+              min={event.capacity}
+              max={CAPACITY_MAX}
+              step={1}
               required
+              aria-invalid={check?.error ? true : undefined}
               value={capacity}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                setCheck(undefined);
+              }}
+              onBlur={commit}
             />
           )}
         </Field>
-        <Button type="submit" disabled={busy || !dirty}>
+        <Button type="submit" disabled={busy || !dirty || !!check?.error}>
           {busy ? 'Saving…' : 'Update capacity'}
         </Button>
       </form>
+      {check && (
+        <p className={check.error ? 'field-error' : 'field-note'} role="status">
+          {check.error ?? check.note}
+        </p>
+      )}
       {message && <Alert kind={message.kind}>{message.text}</Alert>}
     </>
   );
@@ -597,7 +627,10 @@ function SettingsSections({
       <div className="settings-section">
         <div>
           <h3>Capacity</h3>
-          <p>Raising it offers free seats to the waiting list in order, until registration closes.</p>
+          <p>
+            Capacity can only be increased. Raising it offers the new seats to the waiting list in order,
+            until registration closes.
+          </p>
         </div>
         <CapacityEditor session={session} event={event} onSaved={onSaved} />
       </div>

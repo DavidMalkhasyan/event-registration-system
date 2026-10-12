@@ -673,17 +673,18 @@ export async function updateEventDetails(
   if (result === 'not_scheduled') throw new AppError(409, 'event_not_scheduled');
 }
 
-// ---------------------------------------------------------------- capacity (FR-EVT-7, FR-EVT-8, BR-1, BR-5, BR-11)
+// ---------------------------------------------------------------- capacity (FR-EVT-7, BR-1, BR-5, BR-11; amendment A-2)
 
 export const capacitySchema = z.object({ capacity: z.number().int().min(1).max(100_000) }).strict();
 
 /**
- * TX-E03: sets an absolute capacity under the exclusive event lock, so it is serialized with
- * verification, cancellation, promotion, reschedule and the cutoff task (AC-14). A decrease is
- * never below the confirmed count (the error names the minimum). An increase writes the new
- * capacity first, then promotes FIFO into the new seats before the cutoff, in the same
- * transaction (AC-15, BR-5). Absolute values make retries idempotent: repeating a request
- * changes nothing and promotes no one again.
+ * TX-E03 with amendment A-2 (K-707, PD-87): capacity can only be increased. The absolute value is
+ * compared, under the exclusive event lock, with the authoritative capacity read there, so it is
+ * serialized with verification, cancellation, promotion, reschedule, the cutoff task and other
+ * capacity changes (AC-14). A lower value is refused with the current capacity; the same value
+ * changes nothing; a higher one is written first, then the new seats are filled FIFO before the
+ * cutoff in the same transaction (AC-15, BR-5). Absolute values keep retries idempotent. Values
+ * outside 1 to 100 000 never get here (capacitySchema: 422 validation_failed).
  */
 export async function setCapacity(
   ctx: AppContext,
@@ -697,7 +698,7 @@ export async function setCapacity(
     if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
     if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
     if (event.status !== 'SCHEDULED') return 'not_scheduled' as const;
-    if (input.capacity < event.confirmed_count) return { minimumCapacity: event.confirmed_count };
+    if (input.capacity < event.capacity) return { currentCapacity: event.capacity };
     if (input.capacity === event.capacity) return 'unchanged' as const;
 
     await trx
@@ -706,8 +707,7 @@ export async function setCapacity(
       .where('id', '=', eventId)
       .execute();
     // promoteFifo reads the new capacity and does nothing from the cutoff onward (BR-9).
-    const promoted =
-      input.capacity > event.capacity ? await promoteFifo(trx, eventId, now, correlationId) : [];
+    const promoted = await promoteFifo(trx, eventId, now, correlationId);
     await recordAudit(trx, {
       now,
       action: 'capacity_change',
@@ -722,7 +722,7 @@ export async function setCapacity(
   if (result === null || result === 'not_found') throw new AppError(404, 'not_found');
   if (result === 'unauthenticated') throw new AppError(401, 'unauthenticated');
   if (result === 'not_scheduled') throw new AppError(409, 'event_not_scheduled');
-  if (typeof result === 'object') throw new AppError(409, 'capacity_below_confirmed', result);
+  if (typeof result === 'object') throw new AppError(409, 'capacity_decrease_not_allowed', result);
 }
 
 // ---------------------------------------------------------------- reschedule (FR-EVT-6, BR-12 to BR-15)
