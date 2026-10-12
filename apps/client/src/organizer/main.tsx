@@ -311,7 +311,70 @@ interface Participant {
   state: string;
   position?: number;
   checkedInAt?: string;
+  checkInId?: string;
   emailIssues: { messageType: string; label: string }[];
+}
+
+/**
+ * Owner-only undo of a check-in (FR-CHK-8, PD-59, PD-60), with an explicit confirmation step and an
+ * optional reason. The staff screen never shows this; the server refuses staff anyway (AC-26).
+ */
+function UndoCheckIn({
+  session,
+  eventId,
+  participant,
+  onDone,
+}: {
+  session: Session;
+  eventId: string;
+  participant: Participant;
+  onDone: (message: { kind: 'success' | 'error'; text: string }) => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  if (!participant.checkInId) return null;
+  if (!confirming)
+    return (
+      <button className="secondary" onClick={() => setConfirming(true)}>
+        Undo check-in
+      </button>
+    );
+  const submit = async () => {
+    setBusy(true);
+    try {
+      await api(`/api/events/${eventId}/check-ins/${participant.checkInId}/undo`, {
+        method: 'POST',
+        csrf: session.csrfToken,
+        body: reason.trim() ? { reason: reason.trim() } : {},
+      });
+      onDone({
+        kind: 'success',
+        text: `Check-in undone for ${participant.email}. The ticket can be checked in again.`,
+      });
+    } catch (err) {
+      onDone({ kind: 'error', text: errorMessage(err) });
+    }
+    setBusy(false);
+    setConfirming(false);
+    setReason('');
+  };
+  return (
+    <div className="stack">
+      <label>
+        Reason (optional)
+        <input value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} />
+      </label>
+      <div className="row">
+        <button className="danger" disabled={busy} onClick={submit}>
+          {busy ? 'Undoing…' : 'Confirm undo'}
+        </button>
+        <button className="secondary" disabled={busy} onClick={() => setConfirming(false)}>
+          Keep check-in
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function EventDetail({ session, eventId }: { session: Session; eventId: string }) {
@@ -319,6 +382,7 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
   const [counts, setCounts] = useState<{ confirmed: number; waitlisted: number; checkedIn: number }>();
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [error, setError] = useState<string>();
+  const [undoMessage, setUndoMessage] = useState<{ kind: 'success' | 'error'; text: string }>();
   const live = useLiveCount(eventId);
 
   const load = useCallback(() => {
@@ -390,6 +454,7 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
       <DeleteEvent session={session} event={event} />
       <StaffCard session={session} event={event} />
       <Card title={`Participants (${participants.length})`}>
+        {undoMessage && <Alert kind={undoMessage.kind}>{undoMessage.text}</Alert>}
         <table>
           <thead>
             <tr>
@@ -408,7 +473,18 @@ function EventDetail({ session, eventId }: { session: Session; eventId: string }
                     {p.state === 'WAITLISTED' ? `WAITLISTED #${p.position}` : p.state.replace('_', ' ')}
                   </span>
                 </td>
-                <td>{p.checkedInAt ? new Date(p.checkedInAt).toLocaleTimeString() : ''}</td>
+                <td>
+                  {p.checkedInAt ? new Date(p.checkedInAt).toLocaleTimeString() : ''}
+                  <UndoCheckIn
+                    session={session}
+                    eventId={event.id}
+                    participant={p}
+                    onDone={(message) => {
+                      setUndoMessage(message);
+                      load();
+                    }}
+                  />
+                </td>
                 <td>{p.emailIssues.map((i) => `${i.messageType}: ${i.label}`).join(', ')}</td>
               </tr>
             ))}
