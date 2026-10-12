@@ -792,3 +792,27 @@ The last two rows were added in S-16 from GitHub's records; S-15's own entry was
 | 18:51:24 | Prompt 23: documentation-only synchronization after the release | `feature/post-release-docs` from `dev` (`35ed4bf`) at 18:51:36; release statements updated in README, ASSIGNMENT_SCOPE, SUBMISSION_CHECKLIST, MILESTONES, KANBAN (K-604 release merge done; tag and submission remain), DECISION_LOG (PD-80, PD-Q8), AI_USAGE (prompts 22 and 23) |
 
 By the stakeholder's decision (PD-80), this synchronization's own pull requests (into `dev`, then into `main`), their CI runs and merges are not recorded here; they are documented in the pull requests themselves. The `v1.0.0` tag and the submission are not done.
+
+---
+
+## S-17: Running the project; live public event availability (K-701)
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-12 19:18:40 +04:00 (prompt 24: "run project"); prompt 25 at 20:33:13 ("ADDITIONAL REQUIREMENT — LIVE PUBLIC EVENT AVAILABILITY") |
+| **Cards** | K-701 (new, post-release plan) → Review |
+| **Tools and model** | Claude Code 2.1.296, model `claude-opus-5-5`; the S-02 toolchain; Playwright with Edge |
+
+**Activity:**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 19:18:46–19:19:23 | Prompt 24: checked the development stack and the local branches | Web (:3000, schema 7), worker and Vite (:5173) were already running. `git checkout main` put the working tree on the **stale local `main` (`8c1247d`)** for 10 s, and the watching processes restarted on that code; fast-forwarded to `origin/main` (`8e7f6c1`) at 19:19:06, both restarted cleanly. No migration ran; the database was not touched. Smoke test: `/organizer`, `/staff`, `/e/…`, `/dev/mailbox` 200, `/api/auth/session` 401 (not signed in) |
+| 20:33:26 | `feature/public-availability` from `dev` (`37cc9f5`) | — |
+| 20:33–20:35 | Read `GET /api/public/events/:publicId`, TX-R01 and TX-R02, the phase and cutoff rules, `promoteFifo`, the capacity rule, the SSE module and its `NOTIFY` triggers, the indexes, FR-REG-2, FR-REG-8 and NFR-SEC-2 | The seat is decided at confirmation (confirmed < capacity); pending verifications hold none; `confirmed_count ≤ capacity` is a database constraint; `registrations_ix07 (event_id, state)` serves the waiting count; the SSE stream is session-authorized and check-in-only. Decision: polling (PD-81) |
+| 20:35–20:37 | Server: `availability` in `getPublicEvent`; `public-availability.test.ts` (8 tests) | First run 7/8: the test registered visitors in parallel through a helper that drains the outbox; made sequential (confirmations stay concurrent): 8/8 |
+| 20:37–20:40 | Client: `use-public-event.ts` (polling hook), `Availability.tsx`, the registration card; styles | Typecheck and lint pass. Existing browser tests used the old "Register" label: a shared `REGISTER_BUTTON` locator matches both new labels |
+| 20:41–20:48 | `public-availability.spec.ts`: one open visitor page; other participants and the organizer act; Playwright's clock advances the 15 s timer | Fixed in the test: duplicate text matches (the visible badge and the screen-reader announcement), an exact text match inside a nested element, and the focus refresh needed the fake clock past the 2 s guard. `cancellation.spec` expected no email field on a cancelled event; the requirement now disables the form, so it checks a disabled field and button (the server's 409 is still checked). Then 1/1 |
+| 20:48–20:50 | Mutation checks | `free >= 0` for the mode: 3 server tests fail; counts published in every phase: 2 fail; polling from hidden tabs: the hook test fails. All restored. `use-public-event.test.ts` (3 tests): a missing `cleanup()` let earlier hooks react to later events; fixed in the test |
+| 20:50:30–20:51:01 | Visual review on the development stack (real API data): seats, waiting list, closed (rescheduled into the last 2 hours) and cancelled at 1440, 768 and 390 px | Badges and buttons correct in every state; no horizontal overflow; no console errors; no external requests |
+| 20:51:23–20:56:56 | Full gates | `check:secrets`, `check:deps` ("No known vulnerabilities found"), `format:check`, `lint`, `typecheck`, `migrate` ("schema is up to date"; development data kept), `test` (server **143/143** in 16 files, client **14/14**), `build` and `e2e` (**23/23**, Edge) exit 0 |

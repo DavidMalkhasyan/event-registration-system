@@ -102,11 +102,14 @@ export async function createEvent(
   return { eventId, publicUrl };
 }
 
+/** The public page's registration button: its label follows availability (PD-81), the action does not. */
+export const REGISTER_BUTTON = { name: /^(Register for event|Join waiting list)$/ };
+
 /** Registers on the public page and opens the emailed verification link, up to the confirm button. */
 export async function openVerification(page: Page, publicUrl: string, email: string): Promise<void> {
   await page.goto(publicUrl);
   await page.getByLabel('Email address').fill(email);
-  await page.getByRole('button', { name: 'Register' }).click();
+  await page.getByRole('button', REGISTER_BUTTON).click();
   await expect(page.getByText('Check your email.')).toBeVisible();
   const [mail] = await waitForMail(email, 'Confirm your registration');
   await page.goto(linkIn(mail!, 'verify'));

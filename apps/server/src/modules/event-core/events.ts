@@ -190,20 +190,70 @@ export async function getOwnedEvent(ctx: AppContext, principal: OrganizerPrincip
   return eventView(ctx, row, await decisionTime(ctx.db));
 }
 
+/**
+ * Public availability (PD-81): aggregate counts only, never identities. The counts describe committed
+ * state; the seat or waiting-list place is still decided by TX-R02 when the visitor confirms their email
+ * (FR-REG-2), so the free-seat figure is an estimate. Outside the open phase no counts are published.
+ */
+export type RegistrationMode = 'seats_available' | 'waiting_list' | 'closed';
+
+export interface PublicAvailability {
+  registrationMode: RegistrationMode;
+  capacity: number | null;
+  confirmedCount: number | null;
+  waitlistedCount: number | null;
+  estimatedAvailableSeats: number | null;
+}
+
 export async function getPublicEvent(ctx: AppContext, id: string) {
+  // One statement, so the counts come from one snapshot; registrations_ix07 serves the waiting-list count.
   const row = await ctx.db
-    .selectFrom('app.events')
-    .select(['title', 'description', 'starts_at', 'time_zone', 'status'])
-    .where('public_id', '=', id)
+    .selectFrom('app.events as e')
+    .select((eb) => [
+      'e.title',
+      'e.description',
+      'e.starts_at',
+      'e.time_zone',
+      'e.status',
+      'e.capacity',
+      'e.confirmed_count',
+      eb
+        .selectFrom('app.registrations as r')
+        .select((r) => r.fn.countAll<number>().as('n'))
+        .whereRef('r.event_id', '=', 'e.id')
+        .where('r.state', '=', 'WAITLISTED')
+        .as('waitlisted_count'),
+    ])
+    .where('e.public_id', '=', id)
     .executeTakeFirst();
   if (!row) throw new AppError(404, 'not_found');
   const now = await decisionTime(ctx.db);
+  const phase = eventPhase(row.status, row.starts_at, now);
+  const free = Math.max(0, row.capacity - row.confirmed_count);
+  // The same rule TX-R02 applies: a seat while confirmed < capacity, otherwise the waiting list.
+  const availability: PublicAvailability =
+    phase === 'registration_open'
+      ? {
+          registrationMode: free > 0 ? 'seats_available' : 'waiting_list',
+          capacity: row.capacity,
+          confirmedCount: row.confirmed_count,
+          waitlistedCount: Number(row.waitlisted_count ?? 0),
+          estimatedAvailableSeats: free,
+        }
+      : {
+          registrationMode: 'closed',
+          capacity: null,
+          confirmedCount: null,
+          waitlistedCount: null,
+          estimatedAvailableSeats: null,
+        };
   return {
     title: row.title,
     description: row.description,
     startsAt: row.starts_at.toISOString(),
     timeZone: row.time_zone,
-    phase: eventPhase(row.status, row.starts_at, now),
+    phase,
+    availability,
   };
 }
 

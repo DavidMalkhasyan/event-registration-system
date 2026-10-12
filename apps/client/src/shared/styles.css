@@ -2456,6 +2456,131 @@ svg {
   margin-top: 16px;
   font-size: 12px;
 }
+.registration-clarification {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-top: 16px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted-foreground);
+}
+.registration-clarification svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.registration-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.registration-fieldset:disabled .input {
+  background: var(--muted);
+  cursor: not-allowed;
+}
+.registration-fieldset:disabled .btn {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Live public availability (PD-81) */
+.availability {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  transition:
+    background-color 0.4s ease,
+    border-color 0.4s ease;
+}
+.availability-open {
+  border-color: #d7ecdf;
+  background: #f6fbf8;
+}
+.availability-waiting {
+  border-color: #f1e6d1;
+  background: #fffbf3;
+}
+.availability-cancelled {
+  border-color: #f4dcd8;
+  background: #fff8f6;
+}
+.availability-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.availability-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--success);
+}
+.availability-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.availability-live.is-stale {
+  color: var(--subtle);
+}
+.availability-figure {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.availability-figure strong {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  color: var(--heading);
+  font-variant-numeric: tabular-nums;
+}
+.availability-figure span {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.availability-figure small {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
+.availability-track {
+  height: 8px;
+  border-radius: 99px;
+  background: #eee7de;
+  overflow: hidden;
+}
+.availability-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--success);
+  transition: width 0.6s ease;
+}
+.availability-waiting .availability-track > span {
+  background: var(--primary);
+}
+.availability-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted-foreground);
+}
 .registration-result {
   display: flex;
   flex-direction: column;
