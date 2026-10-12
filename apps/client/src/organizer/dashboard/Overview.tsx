@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { ArrowRight, ArrowUpRight, Plus } from 'lucide-react';
 import { Alert, Empty, PageHeader, PageSkeleton, buttonClass } from '../../shared/ui';
+import { RefreshControl } from '../RefreshControl';
+import type { AutoRefresh } from '../use-auto-refresh';
 import { EventCard } from '../events/EventCard';
 import { SWATCHES, artworkIndex } from '../../shared/artwork';
 import { isCancelled, isPast, isUpcoming } from '../events/event-status';
@@ -21,10 +23,12 @@ const FILTERS: { key: OverviewFilter; label: string; test: (e: EventListItem) =>
 export function Overview({
   events,
   error,
+  refresh,
   deleted,
 }: {
   events: EventListItem[] | undefined;
   error?: string;
+  refresh: AutoRefresh;
   deleted: boolean;
 }) {
   const [filter, setFilter] = useState<OverviewFilter>('upcoming');
@@ -39,7 +43,12 @@ export function Overview({
       eyebrow="Your workspace, in good company"
       title="Good things happen together."
       description="Every event you organize, in one place. Pick one to manage it, or start something new."
-      actions={createLink}
+      actions={
+        <>
+          <RefreshControl state={refresh} label="Refresh overview" />
+          {createLink}
+        </>
+      }
     />
   );
   if (!events)
