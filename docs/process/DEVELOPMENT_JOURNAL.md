@@ -661,3 +661,22 @@
 | 11:00:04–11:03:35 (UTC 07:00–07:03) | [PR #10](https://github.com/DavidMalkhasyan/event-registration-system/pull/10), `dev` ← `feature/waitlist-removal`; diff reviewed (14 files, no secrets) | CI [run 38215349977](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38215349977) **passed**: 7 migrations on a fresh database; 130/130, 6/6, 17/17 |
 | 11:03:50 | `gh pr merge 10 --merge` | `d219576` on `dev`; tree equals the tested head; `main` unchanged |
 | 11:04–11:06 | `feature/ui-inventory` from `origin/dev`. Read the client files, both HTML entries, the Vite and server entry routing, the API calls of every screen, the styles, and every locator in the 11 E2E specs and their helpers | `docs/frontend/UI_INVENTORY.md` (K-506, PD-64). Three first-draft statements were corrected against the code before commit: the navigation helper's size, the locator count (about 200 lines, not 220), and the offline check-in wording. No application code changed; the redesign was not started. |
+
+---
+
+## S-13: UI redesign to the approved v0 design (K-507)
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-12 11:34 +04:00 (prompt 17: implement the approved v0 design in the existing application) |
+| **Cards** | K-506 (Review → Done), K-507 (In Progress), K-504 remainder |
+| **Tools and model** | Claude Code, model `claude-opus-5-5`; GitHub CLI; the S-02 toolchain; Playwright with Edge for screenshots |
+
+**Activity:**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 11:34 | `git clone https://git.v0.app/…/eventflow-v0-design.git` | **Blocked:** `401 Unauthorized`, `Www-Authenticate: Bearer realm="v0 managed git"`. The clone waited in Git Credential Manager; it was stopped and its empty directory (no objects) removed. Reported to the stakeholder; no credentials requested. |
+| 11:52 | The stakeholder published the design on GitHub; cloned to the sibling directory `../eventflow-v0-design` (`6a62aac`) | Read every source file: `src/App.tsx`, `components/*.tsx`, `demo-store.ts`, `app/globals.css` (3,029 lines), the shadcn primitives, `package.json`, Vite config, assets |
+| 11:54–11:58 | `pnpm install` in the design repository; preview on port 5190; screenshots of nine screens at 1440 and 390 px with Playwright (Edge) | The preview runs. Findings: a prototype on an in-memory demo store with hash routing; `next` and `@vercel/analytics` are declared but unused by the Vite entry; several classes the components use have **no CSS** (poster fallbacks for events without photos, the event cover caption, the overview's bottom sections), so those parts render unstyled in v0 itself |
+| 12:00–12:02 | Read `UI_INVENTORY.md`, both client entries in full, the E2E helpers and specs; confirmed 15 handlers in `HANDLERS`; reviewed PD-63 and migration `0007` (written only by TX-W01, constrained to `removed_by_organizer`, deleted with the registration) | No schema change needed. `feature/ui-redesign` from `origin/dev` (`dd23b93`). Decisions PD-65 to PD-70. |
