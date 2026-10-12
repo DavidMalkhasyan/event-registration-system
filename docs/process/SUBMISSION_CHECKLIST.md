@@ -8,16 +8,16 @@
 
 Nothing is marked Done without evidence. A planned action is not Done.
 
-**State described:** the integration branch `dev` at `bb6db50` (2026-10-12, PR #15), plus the S-16 release preparation (artwork replacement and final records). The published `main` is still `8c1247d`, the S-03 release of the P0 scope; everything built after it (P1 features, the UI redesign, the release hardening) is in `dev` only.
+**State described:** the v1.0.0 release in `main` (`cf804e2`, [PR #17](https://github.com/DavidMalkhasyan/event-registration-system/pull/17), merged 2026-10-12 18:38:40 +04:00), plus this post-release documentation synchronization, which goes into `dev` and then `main` so that both branches have the same content. The S-03 P0 release (`8c1247d`) is its first parent.
 
 ## 1. Assignment requirements
 
 | # | Requirement | Status | Evidence or next step |
 |---|---|---|---|
-| 1 | GitHub repository containing the **working** project | **Done** for `dev`; **not yet released to `main`** | https://github.com/DavidMalkhasyan/event-registration-system. Latest CI on `dev`'s content: [run 38253717986](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38253717986) (PR #15, merged as `bb6db50`), the same checks as for the last feature code in [run 38244890522](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38244890522) (PR #14, merged as `cf35cbd`): secret scan, dependency audit, format, lint, typecheck, 7 migrations on an empty database and a repeat run, **135/135** server integration tests, **11/11** client unit tests, build, **22/22** browser tests. `main` (`8c1247d`) last passed CI in [run 38142498731](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38142498731). |
+| 1 | GitHub repository containing the **working** project | **Done**: released to `main` | https://github.com/DavidMalkhasyan/event-registration-system. CI on the release commit `cf804e2` in `main`: [run 38264425015](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38264425015) (push) passed, with the same checks as the release pull request's run [38257707045](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38257707045). Earlier, on `dev`: [run 38253717986](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38253717986) (PR #15, merged as `bb6db50`), the same checks as for the last feature code in [run 38244890522](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38244890522) (PR #14, merged as `cf35cbd`): secret scan, dependency audit, format, lint, typecheck, 7 migrations on an empty database and a repeat run, **135/135** server integration tests, **11/11** client unit tests, build, **22/22** browser tests. Before the release, `main` (`8c1247d`) last passed CI in [run 38142498731](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38142498731). |
 | 2 | Exact AI model and development tools, with a short rationale | **Done** | [AI_USAGE.md](AI_USAGE.md) §1–3 |
 | 3 | Important prompts, decision logs, or a safely handled session export | **Done** | [AI_USAGE.md](AI_USAGE.md) §4 (prompts 1–21, the whole project); [DECISION_LOG.md](DECISION_LOG.md) (PD-1 to PD-79). The transcript is not exported (PD-7). |
-| 4 | Real incremental progress shown by Git commits and timestamped records | **Done** | Unrewritten history from `da80a85`; 15 merged pull requests into `dev`; journal sessions **S-01 to S-16** with times from Git and the session transcript |
+| 4 | Real incremental progress shown by Git commits and timestamped records | **Done** | Unrewritten history from `da80a85`; 16 merged pull requests into `dev` and the release pull request #17 into `main`; journal sessions **S-01 to S-16** with times from Git and the session transcript |
 | 5 | Clear setup and deployment instructions | **Done** | [README.md](../../README.md) §1–5. **Clean-clone verification repeated in S-14** (journal): a fresh clone and a newly initialized PostgreSQL 18 cluster; install, provisioning, 7 migrations and "schema is up to date", secret scan, format, lint, typecheck, 135/135 and 11/11, build, the production-like run (with the FR-LNK-8 headers checked) and 22/22 browser tests. The first clean clone was in S-03. No production deployment exists; it is out of scope (P2). |
 | 6 | Accurate description of the current state | **Done** | [ASSIGNMENT_SCOPE.md](../../ASSIGNMENT_SCOPE.md) (audited in S-15); README §8 |
 | 7 | Incomplete work and recommended next improvements | **Done** | README §8–9; ASSIGNMENT_SCOPE §3–5 |
@@ -41,22 +41,21 @@ Nothing is marked Done without evidence. A planned action is not Done.
 
 ## 4. Final submission (M6)
 
-- [x] Every row in §1 has evidence (row 1: for `dev`).
-- [x] CI is green on the latest merge into `dev` (run 38253717986, PR #15). The S-16 release-preparation pull request must pass too before it is merged.
+- [x] Every row in §1 has evidence.
+- [x] CI is green on the release-preparation pull request (#16, run 38257048688), the release pull request (#17, run 38257707045) and the release commit in `main` (run 38264425015).
 - [x] The setup passes from a clean clone of the current code (S-14).
 - [x] The README contains setup, run, a production-like run, current state, known limitations and incomplete work.
 - [x] The journal covers every development session (S-01 to S-16), with real timestamps and commit hashes.
-- [x] Secret scan and dependency audit are clean in CI run 38244890522 ("No secrets found in 179 tracked files"; "No known vulnerabilities found").
+- [x] Secret scan and dependency audit are clean in CI run 38264425015 on `main` ("No secrets found in 176 tracked files"; "No known vulnerabilities found").
 - [x] AI usage and attribution are up to date (S-16).
 - [x] **K-004** (process documentation) approved by the stakeholder (S-16).
 - [x] **AI-generated photographs with unestablished rights** removed from the application and the current tree; replaced by original CSS posters; the production build contains no image files (S-16, PD-79).
-- [ ] **Release pull request `dev` → `main`**: opening it is authorized (PD-79); CI must pass on it; merging needs the stakeholder's separate authorization.
-- [ ] **Release tag** (optional; the owner decides) — after the merge into `main`.
-- [ ] **Submission** of the assignment — the owner's action, after the release.
+- [x] **Release pull request `dev` → `main`**: [PR #17](https://github.com/DavidMalkhasyan/event-registration-system/pull/17) opened (PD-79), CI passed (run 38257707045), merged with the stakeholder's authorization on 2026-10-12 at 18:38:40 +04:00 as `cf804e2` (PD-80); CI passed on `cf804e2` ([run 38264425015](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38264425015)).
+- [ ] **Release tag `v1.0.0`** (optional; the owner decides): not created.
+- [ ] **Submission** of the assignment: the owner's action; not done.
 
 ## 5. Known limitations to state with the submission
 
-- **Release state:** `main` still contains only the S-03 P0 release until the release pull request is merged.
 - **Camera scanning:** tested with simulated camera and `BarcodeDetector` APIs (PD-74); never tried on a phone or with a real camera. The stakeholder accepted this as a documented limitation, not a release blocker (PD-79). Desktop Chromium on Windows and Linux has no `BarcodeDetector`, so the scan button appears only where the browser supports it; manual code entry always works.
 - **Artwork:** event artwork is six original CSS posters. The v0 design's three AI-generated photographs (no recorded licence) were removed in S-16; they remain in earlier commits, because the history is not rewritten.
 - **Email:** only the fake provider exists; no real email is sent (Resend, webhooks and bounce handling are P2, deferred).
