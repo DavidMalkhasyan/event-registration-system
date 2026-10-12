@@ -53,6 +53,7 @@
 
 | Card | Milestone | Awaiting |
 |---|---|---|
+| K-306 Check-in undo (FR-CHK-8, BR-7, TX-C02, API #44; AC-26, AC-27, AC-54). Check-in itself is done (P0 #9, #10). | M4 | Done on `feature/k-306-checkin-undo` (`f5d4b34` server and tests, `4a598ac` UI and E2E): 9 integration tests (simultaneous undos and undo vs. check-in while both wait on the lock, live count on a real server), 1 E2E test, six mutation checks. **Awaiting:** pull request, CI and merge; Done is recorded after the merge. |
 | K-001 Apply R60; synchronize the documents | M0 | Stakeholder check (commit `3fe9cb7`) |
 | K-004 Process documentation | M0 | Stakeholder review |
 
@@ -60,7 +61,6 @@
 
 | Card | Milestone | State |
 |---|---|---|
-| K-306 Check-in undo (FR-CHK-8, BR-7, TX-C02, API #44; AC-26, AC-27, AC-54). Check-in itself is done (P0 #9, #10). | M4 | Started in S-12 on `feature/k-306-checkin-undo`; decisions PD-59, PD-60 |
 | K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | Updated in S-07 |
 
 ## To Do
