@@ -209,3 +209,4 @@ The project was developed with **Claude Code** (model Claude Opus 5.5, `claude-o
 - **Sessions with real timestamps, commands and results:** [docs/process/DEVELOPMENT_JOURNAL.md](docs/process/DEVELOPMENT_JOURNAL.md)
 - **Process decisions:** [docs/process/DECISION_LOG.md](docs/process/DECISION_LOG.md)
 - **Work tracking:** [docs/process/KANBAN.md](docs/process/KANBAN.md)
+- **Client inventory before a UI redesign:** [docs/frontend/UI_INVENTORY.md](docs/frontend/UI_INVENTORY.md)
