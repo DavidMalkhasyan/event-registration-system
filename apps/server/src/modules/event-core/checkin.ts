@@ -6,7 +6,8 @@ import { RULES } from '../../platform/ratelimit.js';
 import type { CheckInOutcome } from '../../platform/schema.js';
 import { checkInWindow } from '../../platform/time.js';
 import { withEventLock } from '../../platform/tx.js';
-import { sessionStillValid } from '../identity/sessions.js';
+import { recordAudit } from '../audit/audit.js';
+import { sessionStillValid, type OrganizerPrincipal } from '../identity/sessions.js';
 import { staffStillValid, type EventPrincipal } from '../identity/staff-sessions.js';
 
 export const checkInSchema = z.object({ code: z.string().min(1).max(32), requestId: z.uuid() }).strict();
@@ -129,4 +130,61 @@ export async function checkIn(
       throw new AppError(429, 'rate_limited', { retryAfterSeconds: limit.retryAfterSeconds });
   }
   return result;
+}
+
+export const undoCheckInSchema = z.object({ reason: z.string().trim().min(1).max(500).optional() }).strict();
+
+/**
+ * TX-C02: the event's owner undoes an active check-in (FR-CHK-8, BR-7, PD-59, PD-60). The row keeps
+ * its history: only the undo columns are set, once (TR-06), and a later check-in inserts a new row
+ * (U-13). TR-07 notifies the live count on commit. Staff never reach this function (PD-56).
+ */
+export async function undoCheckIn(
+  ctx: AppContext,
+  principal: OrganizerPrincipal,
+  eventId: string,
+  checkInId: string,
+  input: z.infer<typeof undoCheckInSchema>,
+): Promise<{ result: 'undone' }> {
+  if (!z.uuid().safeParse(eventId).success || !z.uuid().safeParse(checkInId).success)
+    throw new AppError(404, 'not_found');
+  const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
+    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
+    const checkIn = await trx
+      .selectFrom('app.check_ins')
+      .select(['id', 'ticket_id', 'undone_at'])
+      .where('id', '=', checkInId)
+      .where('event_id', '=', eventId)
+      .executeTakeFirst();
+    if (!checkIn) return 'not_found' as const;
+    if (checkIn.undone_at) return 'already_undone' as const;
+    await trx
+      .updateTable('app.check_ins')
+      .set({ undone_at: now, undone_by_account_id: principal.accountId, undo_reason: input.reason ?? null })
+      .where('id', '=', checkInId)
+      .execute();
+    const ticket = await trx
+      .selectFrom('app.tickets')
+      .select('registration_id')
+      .where('id', '=', checkIn.ticket_id)
+      .executeTakeFirstOrThrow();
+    await recordAudit(trx, {
+      now,
+      action: 'checkin_undo',
+      actorKind: 'owner',
+      actorAccountId: principal.accountId,
+      eventId,
+      registrationId: ticket.registration_id,
+      ticketId: checkIn.ticket_id,
+      subjectId: checkInId,
+      outcome: 'undone',
+      details: { reasonGiven: input.reason !== undefined },
+    });
+    return 'undone' as const;
+  });
+  if (result === null || result === 'not_found') throw new AppError(404, 'not_found');
+  if (result === 'unauthenticated') throw new AppError(401, 'unauthenticated');
+  if (result === 'already_undone') throw new AppError(409, 'check_in_already_undone');
+  return { result: 'undone' };
 }

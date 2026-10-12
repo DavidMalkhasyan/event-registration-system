@@ -5,7 +5,7 @@ import { linkToken } from '../../platform/http.js';
 import { withLinkRateLimit } from '../access-tokens/link-guard.js';
 import { requireOrganizer } from '../identity/sessions.js';
 import { requireEventPrincipal } from '../identity/staff-sessions.js';
-import { checkIn, checkInSchema } from './checkin.js';
+import { checkIn, checkInSchema, undoCheckIn, undoCheckInSchema } from './checkin.js';
 import {
   createEvent,
   dashboard,
@@ -149,5 +149,14 @@ export function registerEventCoreRoutes(app: FastifyInstance, ctx: AppContext): 
     const eventId = params.parse(request.params).eventId;
     const principal = await requireEventPrincipal(ctx, request, eventId, { csrf: true });
     return checkIn(ctx, principal, eventId, checkInSchema.parse(request.body));
+  });
+
+  // undoCheckIn (API #44): owner only; staff get 403 from requireOrganizer (AC-26, PD-56). TX-C02.
+  app.post('/api/events/:eventId/check-ins/:checkInId/undo', async (request) => {
+    const principal = await requireOrganizer(ctx, request, { csrf: true });
+    const { eventId, checkInId } = z
+      .object({ eventId: z.string(), checkInId: z.string() })
+      .parse(request.params);
+    return undoCheckIn(ctx, principal, eventId, checkInId, undoCheckInSchema.parse(request.body ?? {}));
   });
 }
