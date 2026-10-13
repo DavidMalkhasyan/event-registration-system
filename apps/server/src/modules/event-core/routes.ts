@@ -33,6 +33,7 @@ import {
 } from './lifecycle.js';
 import { deleteEvent, deleteEventSchema, getDeletionPreview } from './deletion.js';
 import { confirmVerification, resolveVerification, submitRegistration } from './registrations.js';
+import { setLocation, setLocationSchema } from './location.js';
 
 const registrationSchema = z.object({ email: z.email().max(254) }).strict();
 const params = z.object({ eventId: z.string() });
@@ -140,6 +141,20 @@ export function registerEventCoreRoutes(app: FastifyInstance, ctx: AppContext): 
   });
 
   // setCapacity (API catalogue #34): absolute value; retries are idempotent.
+  // K-711 (PD-91): the venue; a change after people registered queues a notice to each of them.
+  app.put('/api/events/:eventId/location', async (request) => {
+    const principal = await requireOrganizer(ctx, request, { csrf: true });
+    const { eventId } = params.parse(request.params);
+    const result = await setLocation(
+      ctx,
+      principal,
+      eventId,
+      setLocationSchema.parse(request.body),
+      request.id,
+    );
+    return { ...result, event: await getOwnedEvent(ctx, principal, eventId) };
+  });
+
   app.put('/api/events/:eventId/capacity', async (request) => {
     const principal = await requireOrganizer(ctx, request, { csrf: true });
     const eventId = params.parse(request.params).eventId;

@@ -36,7 +36,8 @@ const AVAILABILITY_KEYS = [
   'registrationMode',
   'waitlistedCount',
 ];
-const EVENT_KEYS = ['availability', 'description', 'phase', 'startsAt', 'timeZone', 'title'];
+// K-711 added `location`: the organizer's venue (public, like the title), or null.
+const EVENT_KEYS = ['availability', 'description', 'location', 'phase', 'startsAt', 'timeZone', 'title'];
 
 async function publicEvent(publicId: string) {
   const response = await h.app.inject({ method: 'GET', url: `/api/public/events/${publicId}` });
@@ -218,6 +219,7 @@ describe('public availability (PD-81)', () => {
     const body = response.json();
     expect(Object.keys(body).sort()).toEqual(EVENT_KEYS);
     expect(Object.keys(body.availability).sort()).toEqual(AVAILABILITY_KEYS);
+    expect(body.location).toBeNull(); // this event has no venue; nothing else is put in its place
     const text = response.body;
     expect(text).not.toContain('@');
     expect(text).not.toContain('private.person');

@@ -34,6 +34,7 @@ export type ProblemCode =
   | 'not_waitlisted'
   | 'registration_not_confirmed'
   | 'schedule_version_mismatch'
+  | 'location_version_mismatch'
   | 'nonexistent_local_time'
   | 'ambiguous_local_time'
   | 'start_not_in_future'
@@ -79,6 +80,7 @@ const TITLES: Record<ProblemCode, string> = {
   not_waitlisted: 'This registration is no longer on the waiting list',
   registration_not_confirmed: 'This registration is no longer confirmed',
   schedule_version_mismatch: 'The event was changed by another request; reload and try again',
+  location_version_mismatch: 'The location was changed in the meantime; reload and try again',
   nonexistent_local_time: 'This local time does not exist in the time zone',
   ambiguous_local_time: 'This local time is ambiguous in the time zone',
   start_not_in_future: 'The start must be in the future',

@@ -120,6 +120,18 @@ export interface EventsTable {
   created_at: Timestamp;
   updated_at: Timestamp;
   cancelled_at: Timestamp | null;
+  /** Migration 0012 (K-711): the venue; all address fields are set together or not at all. */
+  venue_name: string | null;
+  street_address: string | null;
+  city: string | null;
+  region: string | null;
+  postal_code: string | null;
+  country: string | null;
+  arrival_instructions: string | null;
+  /** numeric: read as strings. */
+  latitude: string | null;
+  longitude: string | null;
+  location_version: Generated<number>;
 }
 
 export type RegistrationState = 'PENDING_VERIFICATION' | 'CONFIRMED' | 'WAITLISTED' | 'CANCELLED' | 'EXPIRED';
