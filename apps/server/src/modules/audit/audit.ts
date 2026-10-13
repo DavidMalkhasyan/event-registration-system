@@ -4,8 +4,9 @@ import type { Tx } from '../../platform/tx.js';
 export interface AuditInput {
   now: Date;
   action: string;
-  actorKind: 'owner' | 'staff' | 'participant_link' | 'system' | 'account';
+  actorKind: 'owner' | 'staff' | 'participant_link' | 'system' | 'account' | 'platform_admin';
   actorAccountId?: string | null;
+  actorAdminId?: string | null;
   actorStaffSessionId?: string | null;
   eventId?: string | null;
   registrationId?: string | null;
@@ -23,6 +24,7 @@ export async function recordAudit(trx: Tx, input: AuditInput): Promise<void> {
       action: input.action,
       actor_kind: input.actorKind,
       actor_account_id: input.actorAccountId ?? null,
+      actor_admin_id: input.actorAdminId ?? null,
       actor_staff_session_id: input.actorStaffSessionId ?? null,
       event_id: input.eventId ?? null,
       registration_id: input.registrationId ?? null,

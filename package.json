@@ -14,6 +14,8 @@
     "test": "pnpm -r test",
     "build": "pnpm -r build",
     "migrate": "pnpm --filter @ers/server migrate",
+    "admin:create": "pnpm --filter @ers/server admin create",
+    "admin:disable": "pnpm --filter @ers/server admin disable",
     "dev:web": "pnpm --filter @ers/server dev:web",
     "dev:worker": "pnpm --filter @ers/server dev:worker",
     "dev:client": "pnpm --filter @ers/client dev",

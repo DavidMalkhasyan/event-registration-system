@@ -35,6 +35,9 @@ export const RULES = {
   passwordSignInPerAddress: { scope: 'password_signin_email', limit: 10, windowSeconds: 900 },
   passwordSignInPerIp: { scope: 'password_signin_ip', limit: 30, windowSeconds: 900 },
   passwordResetPerAddress: { scope: 'password_reset_email', limit: 3, windowSeconds: 900 },
+  // K-710 (PD-90): Super Admin sign-in, stricter than organizers'.
+  adminSignInPerAddress: { scope: 'admin_signin_email', limit: 5, windowSeconds: 900 },
+  adminSignInPerIp: { scope: 'admin_signin_ip', limit: 20, windowSeconds: 900 },
 } satisfies Record<string, RateLimitRule>;
 
 export class RateLimiter {

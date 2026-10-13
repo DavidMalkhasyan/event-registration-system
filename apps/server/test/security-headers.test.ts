@@ -18,7 +18,7 @@ beforeAll(async () => {
   h = await createHarness();
   dist = mkdtempSync(join(tmpdir(), 'ers-dist-'));
   mkdirSync(join(dist, 'assets'));
-  for (const name of ['public', 'organizer', 'staff'])
+  for (const name of ['public', 'organizer', 'staff', 'admin'])
     writeFileSync(join(dist, `${name}.html`), `<!doctype html><title>${name}</title><div id="root"></div>`);
   writeFileSync(join(dist, 'assets', 'app.js'), 'export {};');
   app = await buildWebApp({ ...h.config, CLIENT_DIST_DIR: dist }, h.db, { logger: false });
@@ -50,7 +50,7 @@ describe('security headers (FR-LNK-8, AC-51)', () => {
     expect(PAGE_CSP).not.toMatch(/unsafe-inline|unsafe-eval|https?:|\*/);
   });
 
-  it('every link page, and the organizer and staff entries, carry the page headers', async () => {
+  it('every link page, and the organizer, staff and Super Admin entries, carry the page headers', async () => {
     const paths = [
       '/e/abcdefghijklmnopqrstuv',
       '/verify',
@@ -62,10 +62,15 @@ describe('security headers (FR-LNK-8, AC-51)', () => {
       '/organizer',
       '/organizer/events/new',
       '/staff',
+      '/verify-account',
+      '/reset-password',
+      '/admin',
+      '/admin/organizations',
       // The HTML files under their own names (served by the static plugin) are no way around it.
       '/public.html',
       '/organizer.html',
       '/staff.html',
+      '/admin.html',
     ];
     for (const url of paths) {
       const response = await app.inject({ method: 'GET', url });
