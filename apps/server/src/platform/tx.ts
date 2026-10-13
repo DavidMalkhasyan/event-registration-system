@@ -7,6 +7,7 @@ export type Tx = Transaction<DB>;
 export interface LockedEvent {
   id: string;
   owner_account_id: string;
+  organization_id: string;
   status: EventStatus;
   starts_at: Date;
   time_zone: string;
@@ -75,7 +76,7 @@ export async function withEventLock<T>(
       await setTimeouts(trx);
       const lockClause = mode === 'exclusive' ? sql`FOR UPDATE` : sql`FOR SHARE`;
       const locked = await sql<LockedEvent>`
-        SELECT id, owner_account_id, status, starts_at, time_zone, schedule_version, capacity,
+        SELECT id, owner_account_id, organization_id, status, starts_at, time_zone, schedule_version, capacity,
                confirmed_count, next_waitlist_seq, title
         FROM app.events WHERE id = ${eventId} ${lockClause}`.execute(trx);
       const event = locked.rows[0];

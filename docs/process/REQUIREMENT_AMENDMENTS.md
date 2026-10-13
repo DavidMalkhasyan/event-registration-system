@@ -6,7 +6,7 @@
 |---|---|
 | A-1 | **Approved** by the stakeholder on 2026-10-13 (prompt 29, S-19); proposed in S-18. Implemented in `dev` under PD-83 (K-703, PR #22). REQUIREMENTS.md itself is unchanged; this record is the amendment. |
 | A-2 | **Approved** (prompt 29, S-19): capacity can only be increased. Implemented by K-707 (PD-87) on `feature/capacity-increase-only`. |
-| A-3 | **Approved** (prompt 29, S-19): organizations, organizer accounts with passwords, Super Admin approval. To be implemented by K-708 to K-710. |
+| A-3 | **Approved** (prompt 29, S-19): organizations, organizer accounts with passwords, Super Admin approval. K-708 (data model, authorization, migration; PD-88) implemented; K-709 and K-710 to follow. |
 | A-4 | **Approved** (prompt 29, S-19): event photographs and a gallery. To be implemented by K-712 and K-713. |
 | A-5 | **Approved** (prompt 29, S-19): event location and venue-change notices. To be implemented by K-711. |
 | A-6 | **Approved in principle** (prompt 29, S-19): a real map for confirmed participants; the map data provider awaits the stakeholder's choice (POST_RELEASE_PLAN.md). K-714. |

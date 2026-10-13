@@ -6,6 +6,7 @@ import { linkToken } from '../../platform/http.js';
 import { withLinkRateLimit } from '../access-tokens/link-guard.js';
 import { ORG_COOKIE, PRESESSION_COOKIE, RECENT_AUTH_MS, csrfTokenFor, requireOrganizer } from './sessions.js';
 import { confirmSignIn, requestReauthentication, requestSignIn, resolveSignInLink } from './sign-in.js';
+import { membershipsOf } from '../organizations/access.js';
 
 const emailSchema = z.object({ email: z.email().max(254) }).strict();
 
@@ -33,6 +34,7 @@ export function registerIdentityRoutes(app: FastifyInstance, ctx: AppContext): v
       authenticatedAt: principal.authenticatedAt.toISOString(),
       recentAuthUntil: new Date(principal.authenticatedAt.getTime() + RECENT_AUTH_MS).toISOString(),
       csrfToken: csrfTokenFor(ctx.config.CSRF_SECRET, 'org', principal.sessionId),
+      organizations: await membershipsOf(ctx.db, principal.accountId), // K-708
     };
   });
 

@@ -7,6 +7,7 @@ import { findToken } from '../access-tokens/tokens.js';
 import { recordAudit } from '../audit/audit.js';
 import { enqueue } from '../messaging/outbox.js';
 import { SESSION_ABSOLUTE_MS, sessionStillValid, type OrganizerPrincipal } from './sessions.js';
+import { ensurePersonalOrganization } from '../organizations/access.js';
 
 const SIGN_IN_TTL_MS = 15 * 60_000; // FR-ORG-3 c, R55
 const PRE_SESSION_MAX_MS = 15 * 60_000;
@@ -217,6 +218,7 @@ export async function confirmSignIn(
       .where('email', '=', request.email)
       .forUpdate()
       .executeTakeFirstOrThrow();
+    await ensurePersonalOrganization(trx, account.id, request.email, now); // transitional (PD-88)
     // Level 3: the request row; the first confirmation uses it up (FR-ORG-3 e).
     const current = await trx
       .selectFrom('app.sign_in_requests')

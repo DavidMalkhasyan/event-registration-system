@@ -6,6 +6,7 @@ import { AppError } from '../../platform/errors.js';
 import { withEventLock, type LockedEvent, type Tx } from '../../platform/tx.js';
 import { recordAudit } from '../audit/audit.js';
 import { requireRecentAuthentication, type OrganizerPrincipal } from '../identity/sessions.js';
+import { assertEventAccess } from '../organizations/access.js';
 
 // Event deletion (K-304d): FR-EVT-10, FR-EVT-11, FR-EVT-13, FR-EVT-14, BR-26, BR-29; TX-E06;
 // API #37 getDeletionPreview and #38 deleteEvent; API_DESIGN §7.4; PD-43 to PD-46.
@@ -112,7 +113,7 @@ const LABEL = { FAILED: 'failed', UNCONFIRMED: 'delivery_outcome_unknown' } as c
 export async function getDeletionPreview(ctx: AppContext, principal: OrganizerPrincipal, eventId: string) {
   if (!z.uuid().safeParse(eventId).success) throw new AppError(404, 'not_found');
   const result = await withEventLock(ctx.db, eventId, 'shared', async ({ trx, now, event }) => {
-    if (event.owner_account_id !== principal.accountId) return null;
+    await assertEventAccess(trx, principal.accountId, event);
     await requireRecentAuthentication(trx, principal.sessionId, now);
     const snapshot = await snapshotOf(trx, event);
     const exp = Math.floor((now.getTime() + PREVIEW_TTL_MS) / 1000);
@@ -152,7 +153,7 @@ export async function deleteEvent(
 ): Promise<void> {
   if (!z.uuid().safeParse(eventId).success) throw new AppError(404, 'not_found');
   const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
-    if (event.owner_account_id !== principal.accountId) return { error: new AppError(404, 'not_found') };
+    await assertEventAccess(trx, principal.accountId, event);
     await requireRecentAuthentication(trx, principal.sessionId, now);
     if (event.status === 'CANCELLED') return { error: new AppError(409, 'cancelled_event_not_deletable') };
 

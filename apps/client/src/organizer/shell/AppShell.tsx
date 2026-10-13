@@ -5,8 +5,16 @@ import { Button, Logo } from '../../shared/ui';
 import { SWATCHES, artworkIndex } from '../../shared/artwork';
 import { isUpcoming } from '../events/event-status';
 import { Link } from '../router';
-import type { EventListItem, Session } from '../types';
+import { ROLE_LABEL, type EventListItem, type Session } from '../types';
 import { useMobileNavigation } from './use-mobile-navigation';
+
+/** The organization shown under the account (K-708): the only one, or how many. */
+function organizationLabel(session: Session): string {
+  const active = session.organizations.filter((o) => o.status === 'active');
+  if (active.length === 1) return `${active[0]!.name} · ${ROLE_LABEL[active[0]!.role]}`;
+  if (active.length > 1) return `${active.length} organizations`;
+  return 'No active organization';
+}
 
 export type NavKey = 'overview' | 'events' | 'create' | 'event';
 
@@ -130,7 +138,7 @@ export function AppShell({
             </span>
             <div>
               <strong>{session.email}</strong>
-              <small>Organizer</small>
+              <small>{organizationLabel(session)}</small>
             </div>
           </div>
         </div>
