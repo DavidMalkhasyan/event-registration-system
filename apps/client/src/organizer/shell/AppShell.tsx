@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { CalendarDays, ChevronRight, LayoutDashboard, LogOut, Menu, Sparkles, X } from 'lucide-react';
+import {
+  Building2,
+  CalendarDays,
+  ChevronRight,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import { api } from '../../shared/api';
 import { Button, Logo } from '../../shared/ui';
 import { SWATCHES, artworkIndex } from '../../shared/artwork';
@@ -16,12 +25,13 @@ function organizationLabel(session: Session): string {
   return 'No active organization';
 }
 
-export type NavKey = 'overview' | 'events' | 'create' | 'event';
+export type NavKey = 'overview' | 'events' | 'create' | 'organization' | 'event';
 
 const NAV = [
   { key: 'overview', name: 'Overview', to: '/organizer', icon: LayoutDashboard },
   { key: 'events', name: 'All events', to: '/organizer/events', icon: CalendarDays },
   { key: 'create', name: 'Create event', to: '/organizer/events/new', icon: Sparkles },
+  { key: 'organization', name: 'Organization', to: '/organizer/organization', icon: Building2 },
 ] as const;
 
 async function signOut(session: Session) {

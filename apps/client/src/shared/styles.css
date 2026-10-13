@@ -1011,6 +1011,73 @@ svg {
   pointer-events: none;
 }
 
+/* Organization members and invitations (K-716) */
+.panel-title {
+  margin: 0 0 14px;
+  font-size: 17px;
+}
+.invite-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px auto;
+  gap: 12px;
+  align-items: end;
+}
+@media (max-width: 640px) {
+  .invite-form {
+    grid-template-columns: 1fr;
+  }
+}
+.invitation-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.invitation-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1eee9;
+  font-size: 13.5px;
+  overflow-wrap: anywhere;
+}
+.invitations {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.invitation {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  border: 1px solid var(--lavender);
+  border-radius: 12px;
+  background: var(--lavender-soft);
+  text-align: left;
+}
+.invitation > svg {
+  flex: none;
+  color: var(--lavender-strong);
+}
+.invitation p {
+  flex: 1 1 220px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.invitation small {
+  color: var(--muted-foreground);
+}
+.invitation-actions {
+  display: flex;
+  gap: 8px;
+}
+
 /* Super Admin area (K-710) */
 .admin-shell {
   min-height: 100vh;

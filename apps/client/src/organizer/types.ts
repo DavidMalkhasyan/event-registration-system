@@ -12,6 +12,16 @@ export interface Session {
   hasPassword: boolean;
   /** The account's organizations (K-708); events belong to an organization. */
   organizations: Membership[];
+  /** K-716: pending invitations for the account's verified address. */
+  invitations: Invitation[];
+}
+
+export interface Invitation {
+  id: string;
+  organizationName: string;
+  role: 'admin' | 'member';
+  invitedBy: string | null;
+  expiresAt: string;
 }
 
 export interface Membership {
