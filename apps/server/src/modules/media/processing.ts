@@ -43,7 +43,30 @@ function refuse(reason: string): AppError {
   return new AppError(422, 'image_rejected', { reason });
 }
 
+// K-719: decoding is CPU- and memory-heavy; at most this many images are processed at once per web
+// process, the rest wait (each upload is also limited per organizer and to 10 MB).
+const MAX_CONCURRENT = 2;
+let active = 0;
+const waiting: (() => void)[] = [];
+async function slot(): Promise<() => void> {
+  if (active >= MAX_CONCURRENT) await new Promise<void>((r) => waiting.push(r));
+  active += 1;
+  return () => {
+    active -= 1;
+    waiting.shift()?.();
+  };
+}
+
 export async function processImage(data: Buffer): Promise<ProcessedImage> {
+  const release = await slot();
+  try {
+    return await processOne(data);
+  } finally {
+    release();
+  }
+}
+
+async function processOne(data: Buffer): Promise<ProcessedImage> {
   if (data.length === 0) throw refuse('empty');
   if (data.length > MAX_UPLOAD_BYTES) throw new AppError(413, 'image_too_large');
   const format = sniffFormat(data);
