@@ -8,3 +8,4 @@ coverage/
 var/
 .vite/
 *.tsbuildinfo
+deploy/.env.production

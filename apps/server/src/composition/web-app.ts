@@ -1,12 +1,15 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { constants, existsSync } from 'node:fs';
+import { access, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import fastifyCookie from '@fastify/cookie';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { sql } from 'kysely';
 import type { Config } from '../platform/config.js';
 import type { Database } from '../platform/db.js';
 import { registerHttpPlumbing } from '../platform/http.js';
+import { expectedSchemaVersion } from '../platform/migrations.js';
 import { RateLimiter } from '../platform/ratelimit.js';
 import { LocalMediaStorage } from '../modules/media/storage.js';
 import { registerMediaRoutes } from '../modules/media/routes.js';
@@ -37,6 +40,9 @@ export async function buildWebApp(
 ): Promise<FastifyInstance> {
   const app = Fastify({
     genReqId: () => randomUUID(),
+    // K-720: the client address behind a reverse proxy (only the configured number of hops is trusted).
+    // hop 0 is the direct peer; with N trusted hops the client is the address after them.
+    trustProxy: (_address: string, hop: number) => hop < config.TRUST_PROXY_HOPS,
     logger:
       options.logger === false
         ? false
@@ -78,6 +84,46 @@ export async function buildWebApp(
       .select((eb) => eb.fn.max('version').as('v'))
       .executeTakeFirst();
     return { schemaVersion: Number(row?.v ?? 0), database: 'ok' };
+  });
+
+  // K-720 (PD-101): readiness for a load balancer or orchestrator. Ready when the database answers, its
+  // schema is the one this build expects and the media directory is writable. The age of the oldest
+  // overdue email is reported for monitoring (a stopped worker shows here first); it does not make the
+  // web process unready, because the web process can serve without the worker.
+  app.get('/readyz', async (_request, reply) => {
+    const expected = expectedSchemaVersion();
+    let schemaVersion = -1;
+    let oldestDueEmailSeconds: number | null = null;
+    let database = 'ok';
+    try {
+      const row = await db
+        .selectFrom('app.schema_migrations')
+        .select((eb) => eb.fn.max('version').as('v'))
+        .executeTakeFirst();
+      schemaVersion = Number(row?.v ?? 0);
+      const lag = await sql<{ s: number | null }>`
+        SELECT extract(epoch FROM now() - min(next_attempt_at))::int AS s FROM app.outbox_messages
+        WHERE status IN ('QUEUED', 'WAITING_RETRY') AND next_attempt_at <= now()`.execute(db);
+      oldestDueEmailSeconds = lag.rows[0]?.s ?? null;
+    } catch {
+      database = 'unavailable';
+    }
+    let media = 'ok';
+    try {
+      await mkdir(config.MEDIA_DIR, { recursive: true });
+      await access(config.MEDIA_DIR, constants.W_OK);
+    } catch {
+      media = 'not writable';
+    }
+    const ready = database === 'ok' && schemaVersion === expected && media === 'ok';
+    return reply.code(ready ? 200 : 503).send({
+      ready,
+      database,
+      schemaVersion,
+      expectedSchemaVersion: expected,
+      media,
+      oldestDueEmailSeconds,
+    });
   });
 
   if (config.NODE_ENV !== 'production' && config.EMAIL_PROVIDER === 'fake')
