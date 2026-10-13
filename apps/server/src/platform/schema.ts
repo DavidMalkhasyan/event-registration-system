@@ -65,6 +65,31 @@ export interface OrganizationsTable {
   submitted_at: Timestamp | null;
   decided_at: Timestamp | null;
   migrated_from_account_id: string | null;
+  /** Migration 0011 (K-710). */
+  decided_by_admin_id: string | null;
+  decision_reason: string | null;
+}
+
+/** Migration 0011 (K-710): Super Admins, separate from organizer accounts. */
+export interface PlatformAdminsTable {
+  id: Generated<string>;
+  email: string;
+  display_name: string;
+  password_hash: string;
+  created_at: Timestamp;
+  password_changed_at: Timestamp;
+  disabled_at: Timestamp | null;
+}
+
+export interface PlatformAdminSessionsTable {
+  id: Generated<string>;
+  admin_id: string;
+  session_hash: Buffer;
+  created_at: Timestamp;
+  last_seen_at: Timestamp;
+  absolute_expires_at: Timestamp;
+  revoked_at: Timestamp | null;
+  revoke_reason: 'sign_out' | 'admin_disabled' | null;
 }
 
 export interface OrganizationMembershipsTable {
@@ -266,8 +291,10 @@ export interface AuditRecordsTable {
   id: Generated<string>;
   occurred_at: Timestamp;
   action: string;
-  actor_kind: 'owner' | 'staff' | 'participant_link' | 'system' | 'account';
+  actor_kind: 'owner' | 'staff' | 'participant_link' | 'system' | 'account' | 'platform_admin';
   actor_account_id: string | null;
+  /** Migration 0011 (K-710). */
+  actor_admin_id: Generated<string | null>;
   actor_staff_session_id: string | null;
   event_id: string | null;
   registration_id: string | null;
@@ -392,4 +419,6 @@ export interface DB {
   'app.staff_sessions': StaffSessionsTable;
   'app.organizations': OrganizationsTable;
   'app.organization_memberships': OrganizationMembershipsTable;
+  'app.platform_admins': PlatformAdminsTable;
+  'app.platform_admin_sessions': PlatformAdminSessionsTable;
 }

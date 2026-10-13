@@ -17,6 +17,7 @@ export type ProblemCode =
   | 'invalid_credentials'
   | 'email_verification_required'
   | 'organization_required'
+  | 'invalid_transition'
   | 'cancelled_event_not_deletable'
   | 'deletion_blocked'
   | 'notifications_pending'
@@ -61,6 +62,7 @@ const TITLES: Record<ProblemCode, string> = {
   invalid_credentials: 'The email address or password is not correct',
   email_verification_required: 'Confirm your email address first',
   organization_required: 'Choose the organization for this event',
+  invalid_transition: 'This decision is not possible in the organization’s current state',
   cancelled_event_not_deletable: "Cancelled events can't be deleted",
   deletion_blocked: 'The event cannot be deleted yet',
   notifications_pending: 'Notifications are still being sent; try again later',

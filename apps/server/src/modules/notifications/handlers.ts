@@ -583,7 +583,59 @@ const accountExistsNotice: MessageHandler = {
   },
 };
 
+const DECISION_TEXT: Record<string, { subject: string; lines: (origin: string) => string[] }> = {
+  approve: {
+    subject: 'approved',
+    lines: (origin) => [
+      'is approved. You can now create and manage events.',
+      `Sign in at ${origin}/organizer.`,
+    ],
+  },
+  reject: {
+    subject: 'not approved',
+    lines: () => ['was not approved, so it cannot create or manage events.'],
+  },
+  suspend: {
+    subject: 'suspended',
+    lines: () => [
+      'is suspended: its organizers cannot create or manage events for now. Its public event pages and existing registrations are not affected.',
+    ],
+  },
+  reinstate: {
+    subject: 'reinstated',
+    lines: (origin) => [
+      'is active again. You can create and manage events.',
+      `Sign in at ${origin}/organizer.`,
+    ],
+  },
+};
+
+const organizationDecision: MessageHandler = {
+  // K-710: a Super Admin's decision on an organization, to each owner (no link, nothing to issue).
+  async freshness() {
+    return { fresh: true };
+  },
+  async issueTokens() {
+    return {};
+  },
+  async render(_db, msg, _tokens, origin) {
+    const { decision, organizationName, reason } = msg.payload as {
+      decision: string;
+      organizationName: string;
+      reason: string | null;
+    };
+    const text = DECISION_TEXT[decision]!;
+    const [first, ...rest] = text.lines(origin);
+    return email(`Your organization was ${text.subject}: Event Registration`, [
+      `Your organization "${organizationName}" ${first}`,
+      ...(reason ? [`Reason given: ${reason}`] : []),
+      ...rest,
+    ]);
+  },
+};
+
 export const HANDLERS: Record<string, MessageHandler> = {
+  organization_decision: organizationDecision,
   account_verification: accountVerification,
   password_reset: passwordReset,
   account_exists_notice: accountExistsNotice,

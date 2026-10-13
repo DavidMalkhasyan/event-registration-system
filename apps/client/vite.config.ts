@@ -3,8 +3,8 @@ import { resolve } from 'node:path';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
-// Three HTML entries on one origin (ADR-013): participant/link pages, the organizer area, and the
-// staff device page (PD-69).
+// Four HTML entries on one origin (ADR-013): participant/link pages, the organizer area, the staff
+// device page (PD-69) and the Super Admin area (K-710).
 // In development the API runs on :3000 and is proxied, so the browser still sees one origin.
 const entryRouter = (): Plugin => ({
   name: 'ers-entry-router',
@@ -14,6 +14,7 @@ const entryRouter = (): Plugin => ({
       if (/^\/(e\/|verify$|manage$|ticket$|sign-in$|invite$|verify-account$|reset-password$)/.test(path))
         req.url = '/public.html';
       else if (path === '/staff') req.url = '/staff.html';
+      else if (path === '/admin' || path.startsWith('/admin/')) req.url = '/admin.html';
       else if (path === '/' || path === '/organizer' || path.startsWith('/organizer/'))
         req.url = '/organizer.html';
       next();
@@ -41,6 +42,7 @@ export default defineConfig({
         public: resolve(import.meta.dirname, 'public.html'),
         organizer: resolve(import.meta.dirname, 'organizer.html'),
         staff: resolve(import.meta.dirname, 'staff.html'),
+        admin: resolve(import.meta.dirname, 'admin.html'),
       },
     },
   },

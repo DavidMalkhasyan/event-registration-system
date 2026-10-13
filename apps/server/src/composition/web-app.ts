@@ -10,6 +10,7 @@ import { registerHttpPlumbing } from '../platform/http.js';
 import { RateLimiter } from '../platform/ratelimit.js';
 import { registerEventCoreRoutes } from '../modules/event-core/routes.js';
 import { registerIdentityRoutes } from '../modules/identity/routes.js';
+import { registerPlatformAdminRoutes } from '../modules/platform-admin/routes.js';
 import { registerParticipantPortalRoutes } from '../modules/participant-portal/routes.js';
 import { registerStaffRoutes } from '../modules/staff/routes.js';
 import { registerLiveRoutes, type LiveHub } from '../modules/reporting/live.js';
@@ -54,6 +55,7 @@ export async function buildWebApp(
   registerEventCoreRoutes(app, ctx);
   registerParticipantPortalRoutes(app, ctx);
   registerStaffRoutes(app, ctx);
+  registerPlatformAdminRoutes(app, ctx);
   if (options.liveHub) registerLiveRoutes(app, ctx, options.liveHub);
 
   app.get('/healthz', async () => {
@@ -89,6 +91,7 @@ export async function buildWebApp(
       app.get(path, entry('public.html'));
     for (const path of ['/', '/organizer', '/organizer/*']) app.get(path, entry('organizer.html'));
     app.get('/staff', entry('staff.html')); // dedicated staff entry (PD-69)
+    for (const path of ['/admin', '/admin/*']) app.get(path, entry('admin.html')); // Super Admin area (K-710)
     app.get('/assets/*', async (request, reply) =>
       reply.sendFile((request.params as { '*': string })['*'], resolve(config.CLIENT_DIST_DIR!, 'assets')),
     );
