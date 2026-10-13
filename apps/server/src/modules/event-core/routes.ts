@@ -14,6 +14,7 @@ import {
   getPublicEvent,
   listEvents,
   listParticipants,
+  participantPageSchema,
 } from './events.js';
 import {
   cancelByManagementLink,
@@ -100,7 +101,12 @@ export function registerEventCoreRoutes(app: FastifyInstance, ctx: AppContext): 
 
   app.get('/api/events/:eventId/participants', async (request) => {
     const principal = await requireOrganizer(ctx, request, { csrf: false });
-    return listParticipants(ctx, principal, params.parse(request.params).eventId);
+    return listParticipants(
+      ctx,
+      principal,
+      params.parse(request.params).eventId,
+      participantPageSchema.parse(request.query),
+    );
   });
 
   app.post('/api/events/:eventId/reschedule', async (request) => {

@@ -313,46 +313,101 @@ export async function dashboard(ctx: AppContext, principal: OrganizerPrincipal, 
   };
 }
 
-/** Owner-only participant list (FR-DSH-4). Delivery labels cover our send states only until webhooks exist. */
-export async function listParticipants(ctx: AppContext, principal: OrganizerPrincipal, eventId: string) {
+/** Largest page of the participant list (K-723); the client follows `nextCursor` to the end. */
+export const PARTICIPANT_PAGE_MAX = 1000;
+
+export const participantPageSchema = z.object({
+  cursor: z.string().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(PARTICIPANT_PAGE_MAX).optional(),
+});
+
+// The keyset cursor: the last row's creation time (as PostgreSQL text, keeping microseconds) and id.
+function encodeParticipantCursor(createdKey: string, id: string): string {
+  return Buffer.from(JSON.stringify([createdKey, id])).toString('base64url');
+}
+
+function decodeParticipantCursor(cursor: string): { createdKey: string; id: string } {
+  try {
+    const value: unknown = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
+    const parsed = z.tuple([z.string().max(64), z.uuid()]).parse(value);
+    if (Number.isNaN(Date.parse(parsed[0]))) throw new Error('not a time');
+    return { createdKey: parsed[0], id: parsed[1] };
+  } catch {
+    throw new AppError(422, 'validation_failed', { errors: [{ field: 'cursor', code: 'invalid_cursor' }] });
+  }
+}
+
+/**
+ * Owner-only participant list (FR-DSH-4), in pages ordered by registration time (K-723: an event may
+ * have up to 100,000 registrations; before, the list stopped silently at 1,000). Waiting-list positions
+ * are counted over the whole event, not the page.
+ */
+export async function listParticipants(
+  ctx: AppContext,
+  principal: OrganizerPrincipal,
+  eventId: string,
+  page: z.infer<typeof participantPageSchema> = {},
+) {
   await getOwnedEvent(ctx, principal, eventId);
+  const limit = page.limit ?? PARTICIPANT_PAGE_MAX;
+  const after = page.cursor ? decodeParticipantCursor(page.cursor) : null;
   const rows = await sql<{
     id: string;
     email: string;
     state: string;
     end_reason: string | null;
     waitlist_seq: number | null;
+    created_key: string;
     position: number | null;
     checked_in_at: Date | null;
     check_in_id: string | null;
   }>`
-    SELECT r.id, r.email, r.state, r.end_reason, r.waitlist_seq,
-      CASE WHEN r.state = 'WAITLISTED' THEN
-        (SELECT count(*) FROM app.registrations w
-          WHERE w.event_id = r.event_id AND w.state = 'WAITLISTED' AND w.waitlist_seq <= r.waitlist_seq)::int END AS position,
-      c.checked_in_at, c.id AS check_in_id
-    FROM app.registrations r
-    LEFT JOIN app.tickets t ON t.registration_id = r.id
-    LEFT JOIN app.check_ins c ON c.ticket_id = t.id AND c.undone_at IS NULL
-    WHERE r.event_id = ${eventId}
-    ORDER BY r.created_at
-    LIMIT 1000`.execute(ctx.db);
-  const issues = await ctx.db
-    .selectFrom('app.outbox_messages')
-    .select(['registration_id', 'message_type', 'status', 'settled_at', 'last_error_code'])
-    .where('event_id', '=', eventId)
-    .where('status', 'in', ['FAILED', 'UNCONFIRMED'])
-    .execute();
+    SELECT * FROM (
+      SELECT r.id, r.email, r.state, r.end_reason, r.waitlist_seq, r.created_at, r.created_at::text AS created_key,
+        -- K-723: the waiting-list position in one pass (a per-row count was quadratic in the list's length).
+        CASE WHEN r.state = 'WAITLISTED' THEN
+          (count(*) FILTER (WHERE r.state = 'WAITLISTED')
+            OVER (ORDER BY r.waitlist_seq NULLS LAST ROWS UNBOUNDED PRECEDING))::int END AS position,
+        c.checked_in_at, c.id AS check_in_id
+      FROM app.registrations r
+      LEFT JOIN app.tickets t ON t.registration_id = r.id
+      LEFT JOIN app.check_ins c ON c.ticket_id = t.id AND c.undone_at IS NULL
+      WHERE r.event_id = ${eventId}
+    ) participants
+    ${after ? sql`WHERE (created_at, id) > (${after.createdKey}::timestamptz, ${after.id}::uuid)` : sql``}
+    ORDER BY created_at, id
+    LIMIT ${limit + 1}`.execute(ctx.db);
+  const pageRows = rows.rows.slice(0, limit);
+  const last = pageRows.at(-1);
+  const ids = pageRows.map((r) => r.id);
+  const issues = ids.length
+    ? await ctx.db
+        .selectFrom('app.outbox_messages')
+        .select(['registration_id', 'message_type', 'status', 'settled_at', 'last_error_code'])
+        .where('event_id', '=', eventId)
+        .where('registration_id', 'in', ids)
+        .where('status', 'in', ['FAILED', 'UNCONFIRMED'])
+        .execute()
+    : [];
   // K-402: provider evidence after acceptance (bounced, complained), from the generations' facts.
-  const evidence = await ctx.db
-    .selectFrom('app.outbox_messages as m')
-    .innerJoin('app.outbox_generations as g', 'g.outbox_id', 'm.id')
-    .select(['m.registration_id', 'm.message_type', 'g.bounced_at', 'g.complained_at', 'g.failure_reason'])
-    .where('m.event_id', '=', eventId)
-    .where((eb) => eb.or([eb('g.bounced_at', 'is not', null), eb('g.complained_at', 'is not', null)]))
-    .execute();
+  const evidence = ids.length
+    ? await ctx.db
+        .selectFrom('app.outbox_messages as m')
+        .innerJoin('app.outbox_generations as g', 'g.outbox_id', 'm.id')
+        .select([
+          'm.registration_id',
+          'm.message_type',
+          'g.bounced_at',
+          'g.complained_at',
+          'g.failure_reason',
+        ])
+        .where('m.event_id', '=', eventId)
+        .where('m.registration_id', 'in', ids)
+        .where((eb) => eb.or([eb('g.bounced_at', 'is not', null), eb('g.complained_at', 'is not', null)]))
+        .execute()
+    : [];
   return {
-    items: rows.rows.map((r) => ({
+    items: pageRows.map((r) => ({
       registrationId: r.id,
       email: r.email,
       state: r.state,
@@ -383,6 +438,6 @@ export async function listParticipants(ctx: AppContext, principal: OrganizerPrin
             })),
         ),
     })),
-    nextCursor: null,
+    nextCursor: rows.rows.length > limit && last ? encodeParticipantCursor(last.created_key, last.id) : null,
   };
 }
