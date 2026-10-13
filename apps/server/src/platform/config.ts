@@ -34,6 +34,13 @@ const schema = z.object({
     )
     .optional(),
   EMAIL_REPLY_TO: z.email().optional(),
+  // K-718: the key that encrypts Super Admins' TOTP secrets (32 bytes, base64), and whether Super Admins
+  // must use a second factor (default: in production yes, elsewhere no).
+  ADMIN_TOTP_KEY: z
+    .string()
+    .regex(/^[A-Za-z0-9+/]{43}=$/, 'must be 32 random bytes, base64-encoded')
+    .optional(),
+  ADMIN_REQUIRE_TOTP: z.enum(['true', 'false']).optional(),
   // K-402: the Svix signing secret of the Resend webhook endpoint; the endpoint is off without it.
   RESEND_WEBHOOK_SECRET: z
     .string()
@@ -87,6 +94,9 @@ export function parseConfig(env: Record<string, string | undefined>): Config {
         : []),
     ];
     if (missing.length) throw new ConfigError(missing);
+  }
+  if (config.NODE_ENV === 'production' && !config.ADMIN_TOTP_KEY && config.ADMIN_REQUIRE_TOTP !== 'false') {
+    throw new ConfigError(['ADMIN_TOTP_KEY (Super Admins need a second factor in production)']);
   }
   if (config.NODE_ENV === 'production' && config.EMAIL_PROVIDER === 'fake') {
     throw new ConfigError(['EMAIL_PROVIDER (the fake provider is not allowed in production)']);

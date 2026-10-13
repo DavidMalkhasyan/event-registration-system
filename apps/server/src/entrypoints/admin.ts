@@ -4,13 +4,16 @@ import {
   BootstrapError,
   createPlatformAdmin,
   disablePlatformAdmin,
+  enrolTotp,
 } from '../modules/platform-admin/bootstrap.js';
+import { newTotpSecret, otpauthUri, base32Encode } from '../platform/totp.js';
 import { ConfigError, requireEnv } from '../platform/config.js';
 import { createDatabase } from '../platform/db.js';
 
 // Super Admin operator commands (K-710, PD-90). Run on the server, never exposed over HTTP:
 //   pnpm admin:create --email <address> --name "<name>"   (asks for the password twice, without echo)
 //   pnpm admin:disable --email <address>
+//   pnpm admin:totp --email <address>   (K-718: shows a new secret once, then asks for a code from the app)
 // For scripted setups the password can come on standard input instead: one line, no prompt. It is
 // never accepted as an argument (it would land in shell history and process lists) and never printed.
 
@@ -52,6 +55,20 @@ async function readPassword(): Promise<string> {
   return first;
 }
 
+/** One line: typed at the terminal, or the first line of standard input for scripts. */
+async function readLine(prompt: string): Promise<string> {
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdin.isTTY ? process.stdout : undefined,
+  });
+  if (process.stdin.isTTY) process.stdout.write(prompt);
+  for await (const line of rl) {
+    rl.close();
+    return line;
+  }
+  return '';
+}
+
 const [command, ...rest] = process.argv.slice(2);
 const { values } = parseArgs({
   args: rest,
@@ -75,8 +92,22 @@ try {
       if (!values.email) throw new BootstrapError('usage: admin:disable --email <address>');
       await disablePlatformAdmin(db, values.email);
       process.stdout.write(`Super Admin ${values.email} disabled; its sessions have ended.\n`);
+    } else if (command === 'totp') {
+      if (!values.email) throw new BootstrapError('usage: admin:totp --email <address>');
+      const secret = newTotpSecret();
+      // Shown once, on the operator's own terminal, to add to the Super Admin's authenticator app.
+      process.stdout.write(
+        `Add this to the authenticator app of ${values.email}:
+  ${otpauthUri(secret, values.email)}
+  (or type the key ${base32Encode(secret)})
+`,
+      );
+      const code = await readLine('Then enter the 6-digit code the app shows: ');
+      await enrolTotp(db, process.env.ADMIN_TOTP_KEY, values.email, secret, code);
+      process.stdout.write(`Second factor enrolled for ${values.email}.
+`);
     } else {
-      throw new BootstrapError('commands: create, disable');
+      throw new BootstrapError('commands: create, disable, totp');
     }
   } finally {
     await db.destroy();

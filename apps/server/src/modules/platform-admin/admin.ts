@@ -10,6 +10,13 @@ import { decisionTime } from '../../platform/tx.js';
 import { recordAudit } from '../audit/audit.js';
 import { enqueue } from '../messaging/outbox.js';
 import { csrfTokenFor } from '../identity/sessions.js';
+import { openSecret, totpKeyFrom, verifyTotp } from '../../platform/totp.js';
+
+/** K-718: Super Admins need a second factor in production unless the operator explicitly opts out. */
+export function totpRequired(ctx: AppContext): boolean {
+  if (ctx.config.ADMIN_REQUIRE_TOTP) return ctx.config.ADMIN_REQUIRE_TOTP === 'true';
+  return ctx.config.NODE_ENV === 'production';
+}
 
 // The Super Admin area (K-710, amendment A-3, ADR-022, PD-90). Super Admins are not organizer
 // accounts: their own table (created only by the operator command `pnpm admin:create`), their own
@@ -29,7 +36,12 @@ export interface AdminPrincipal {
 }
 
 export const adminSignInSchema = z
-  .object({ email: z.email().max(254), password: z.string().min(1).max(PASSWORD_MAX) })
+  .object({
+    email: z.email().max(254),
+    password: z.string().min(1).max(PASSWORD_MAX),
+    /** K-718: the authenticator code, when the admin has a second factor. */
+    code: z.string().trim().max(12).optional(),
+  })
   .strict();
 
 /** POST /api/admin/sessions. One answer for an unknown address, a wrong password and a disabled admin. */
@@ -48,14 +60,35 @@ export async function adminSignIn(
   }
   const admin = await ctx.db
     .selectFrom('app.platform_admins')
-    .select(['id', 'password_hash', 'disabled_at'])
+    .select(['id', 'password_hash', 'disabled_at', 'totp_secret_sealed', 'totp_last_step'])
     .where('email', '=', email)
     .executeTakeFirst();
   const matches = await verifyPassword(admin?.password_hash ?? (await dummyPasswordHash()), input.password);
   if (!admin || !matches || admin.disabled_at) throw new AppError(401, 'invalid_credentials');
+  // K-718 (PD-99): the second factor. A wrong or reused code gets the same answer as a wrong password.
+  let step: number | null = null;
+  if (admin.totp_secret_sealed) {
+    if (!ctx.config.ADMIN_TOTP_KEY) throw new AppError(503, 'service_unavailable');
+    const secret = openSecret(totpKeyFrom(ctx.config.ADMIN_TOTP_KEY), admin.totp_secret_sealed);
+    const last = admin.totp_last_step === null ? null : Number(admin.totp_last_step);
+    step = verifyTotp(secret, input.code ?? '', Date.now(), last);
+    if (step === null) throw new AppError(401, 'invalid_credentials');
+  } else if (totpRequired(ctx)) {
+    throw new AppError(403, 'second_factor_required');
+  }
   const raw = randomToken();
   await ctx.db.transaction().execute(async (trx) => {
     const now = await decisionTime(trx);
+    if (step !== null) {
+      // Claimed atomically: of two sign-ins with the same code, only the first succeeds.
+      const claimed = await trx
+        .updateTable('app.platform_admins')
+        .set({ totp_last_step: step })
+        .where('id', '=', admin.id)
+        .where((eb) => eb.or([eb('totp_last_step', 'is', null), eb('totp_last_step', '<', String(step))]))
+        .executeTakeFirst();
+      if (!claimed.numUpdatedRows) throw new AppError(401, 'invalid_credentials');
+    }
     const session = await trx
       .insertInto('app.platform_admin_sessions')
       .values({
@@ -74,6 +107,7 @@ export async function adminSignIn(
       actorAdminId: admin.id,
       subjectId: session.id,
       outcome: 'success',
+      details: { secondFactor: step !== null },
     });
   });
   return { sessionId: raw, maxAgeSeconds: Math.floor(ADMIN_SESSION_ABSOLUTE_MS / 1000) };

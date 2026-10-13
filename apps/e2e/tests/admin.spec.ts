@@ -86,7 +86,9 @@ test('a Super Admin created by the operator command approves one organization an
   await adminPage.getByLabel('Email address').fill(good);
   await adminPage.getByLabel('Password').fill(PASSWORD);
   await adminPage.getByRole('button', { name: 'Sign in' }).click();
-  await expect(adminPage.getByText('The email address or password is not correct.')).toBeVisible();
+  await expect(
+    adminPage.getByText('The email address, password or authentication code is not correct.'),
+  ).toBeVisible();
   await adminPage.getByLabel('Email address').fill(admin);
   await adminPage.getByLabel('Password').fill(ADMIN_PASSWORD);
   await adminPage.getByRole('button', { name: 'Sign in' }).click();

@@ -131,6 +131,10 @@ export interface PlatformAdminsTable {
   created_at: Timestamp;
   password_changed_at: Timestamp;
   disabled_at: Timestamp | null;
+  /** Migration 0017 (K-718): the sealed TOTP secret, when enrolled, and the last step used. */
+  totp_secret_sealed: Buffer | null;
+  totp_enrolled_at: Timestamp | null;
+  totp_last_step: ColumnType<string | null, string | number | null, string | number | null>; // bigint
 }
 
 export interface PlatformAdminSessionsTable {
