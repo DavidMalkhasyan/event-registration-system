@@ -152,8 +152,9 @@ jobs:
           echo "$(openssl rand -hex 16)" | $C exec -T web node apps/server/dist/entrypoints/admin.js create --email ops@example.invalid --name "CI operator"
           $C exec -T web node apps/server/dist/entrypoints/media-sweep.js
           $C exec -T web node apps/server/dist/entrypoints/ops.js backup --out /data/backups/ci
-          set -a; . deploy/.env.production; set +a
-          $C exec -T -e RESTORE_ADMIN_URL="postgres://postgres:${POSTGRES_SUPERUSER_PASSWORD}@postgres:5432/postgres" web             node apps/server/dist/entrypoints/ops.js restore-drill --from /data/backups/ci | tee /tmp/drill.json
+          # The environment file is read by Compose, not by a shell (values such as EMAIL_FROM contain <>).
+          SUPERUSER_PW=$(grep '^POSTGRES_SUPERUSER_PASSWORD=' deploy/.env.production | cut -d= -f2-)
+          $C exec -T -e RESTORE_ADMIN_URL="postgres://postgres:${SUPERUSER_PW}@postgres:5432/postgres" web             node apps/server/dist/entrypoints/ops.js restore-drill --from /data/backups/ci | tee /tmp/drill.json
           grep -q '"ok": true' /tmp/drill.json
       - name: Logs on failure
         if: failure()
