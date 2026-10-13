@@ -1,0 +1,101 @@
+# EventFlow production stack (K-720, PD-101). One host, Docker Compose:
+#   postgres (18) -> migrate (one-shot, forward-only) -> web + worker  <- caddy (HTTPS, ports 80/443)
+# Configuration and secrets come from deploy/.env.production (copy deploy/env.production.example; never
+# commit it). Persistent data lives in named volumes: pgdata, media, tile-cache, backups, caddy-data.
+#   docker compose -f deploy/compose.yaml --env-file deploy/.env.production up -d --build
+# See docs/operations/DEPLOYMENT.md (procedures) and docs/operations/RUNBOOK.md (operations).
+
+name: eventflow
+
+x-app: &app
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  image: eventflow:${EVENTFLOW_VERSION:-local}
+  env_file: .env.production
+  environment:
+    DATABASE_URL: postgres://app_runtime:${APP_RUNTIME_PASSWORD}@postgres:5432/eventflow
+    MIGRATION_DATABASE_URL: postgres://app_owner:${APP_OWNER_PASSWORD}@postgres:5432/eventflow
+  volumes:
+    - media:/data/media
+    - tile-cache:/data/tile-cache
+    - backups:/data/backups
+  logging:
+    driver: json-file
+    options: { max-size: 20m, max-file: '5' }
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD}
+      APP_OWNER_PASSWORD: ${APP_OWNER_PASSWORD}
+      APP_RUNTIME_PASSWORD: ${APP_RUNTIME_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/10-eventflow.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d eventflow']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+    shm_size: 256m
+
+  migrate:
+    <<: *app
+    command: ['node', 'apps/server/dist/entrypoints/migrate.js']
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: 'no'
+
+  web:
+    <<: *app
+    command: ['node', 'apps/server/dist/entrypoints/web.js']
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: 1.5
+
+  worker:
+    <<: *app
+    command: ['node', 'apps/server/dist/entrypoints/worker.js']
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 0.5
+
+  caddy:
+    image: caddy:2
+    ports: ['80:80', '443:443']
+    environment:
+      EVENTFLOW_DOMAIN: ${EVENTFLOW_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      web: { condition: service_healthy }
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  media:
+  tile-cache:
+  backups:
+  caddy-data:
+  caddy-config:

@@ -48,6 +48,9 @@ const schema = z.object({
     .optional(),
   DEV_MAILBOX_DIR: z.string().min(1).default('var/mailbox'),
   CLIENT_DIST_DIR: z.string().min(1).optional(),
+  // K-720: how many reverse proxies in front of the web process may set X-Forwarded-For (0: none, the
+  // default; 1 behind one proxy such as Caddy). Per-IP rate limits depend on it.
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
   // K-712: where event images are stored (outside the repository; `var/` is ignored by Git).
   MEDIA_DIR: z.string().min(1).default('var/media'),
   // K-714: the participant map's tile source, the operator contact sent in the User-Agent (the map is

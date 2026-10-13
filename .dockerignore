@@ -1,0 +1,13 @@
+# Never send secrets, local data or build output into the image build context.
+.env
+.env.*
+!.env.example
+var/
+node_modules/
+**/node_modules/
+**/dist/
+.git/
+.github/
+coverage/
+*.log
+deploy/.env.production
