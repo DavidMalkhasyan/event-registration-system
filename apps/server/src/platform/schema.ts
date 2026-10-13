@@ -14,13 +14,18 @@ export interface AccountsTable {
   email: string;
   created_at: Timestamp;
   email_changed_at: Timestamp | null;
+  /** Migration 0010 (K-709). */
+  display_name: string | null;
+  password_hash: string | null;
+  password_changed_at: Timestamp | null;
+  email_verified_at: Timestamp | null;
 }
 
 export interface SignInRequestsTable {
   id: Generated<string>;
   email: string;
   account_id: string | null;
-  purpose: 'sign_in' | 'reauth';
+  purpose: 'sign_in' | 'reauth' | 'verify_email' | 'reset_password';
   reauth_session_id: string | null;
   status: Generated<'active' | 'used' | 'replaced' | 'revoked'>;
   created_at: Timestamp;
@@ -34,7 +39,8 @@ export interface OrganizerSessionsTable {
   account_id: string;
   session_hash: Buffer;
   hash_alg: Generated<number>;
-  created_from_request_id: string;
+  created_from_request_id: string | null;
+  auth_method: Generated<'email_link' | 'password'>;
   created_at: Timestamp;
   authenticated_at: Timestamp;
   last_seen_at: Timestamp;
@@ -150,7 +156,14 @@ export interface CheckInRequestsTable {
 }
 
 export type TokenType =
-  'verification' | 'management' | 'share' | 'staff_invitation' | 'sign_in' | 'email_change';
+  | 'verification'
+  | 'management'
+  | 'share'
+  | 'staff_invitation'
+  | 'sign_in'
+  | 'email_change'
+  | 'account_verification'
+  | 'password_reset';
 export interface AccessTokensTable {
   id: Generated<string>;
   token_type: TokenType;

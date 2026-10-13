@@ -746,6 +746,21 @@ svg {
   min-height: calc(100vh - 96px);
   min-height: calc(100dvh - 96px);
 }
+/* Organizer account pages (K-709) */
+.auth-card {
+  max-width: 460px;
+}
+.auth-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 18px;
+  font-size: 13.5px;
+}
+.auth-links a {
+  color: var(--primary-strong);
+  font-weight: 600;
+}
 /* A field corrected or refused on commit (K-707) */
 .field-note,
 .field-error {

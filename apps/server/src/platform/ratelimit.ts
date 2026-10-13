@@ -29,6 +29,12 @@ export const RULES = {
   registrationPerIp: { scope: 'register_ip', limit: 30, windowSeconds: 900 },
   registrationPerAddress: { scope: 'register_email', limit: 5, windowSeconds: 900 },
   failedCheckInsPerSession: { scope: 'checkin_fail_session', limit: 30, windowSeconds: 300 },
+  // K-709 (PD-89): organizer accounts.
+  organizationRegistrationPerIp: { scope: 'org_register_ip', limit: 10, windowSeconds: 3600 },
+  organizationRegistrationPerAddress: { scope: 'org_register_email', limit: 3, windowSeconds: 3600 },
+  passwordSignInPerAddress: { scope: 'password_signin_email', limit: 10, windowSeconds: 900 },
+  passwordSignInPerIp: { scope: 'password_signin_ip', limit: 30, windowSeconds: 900 },
+  passwordResetPerAddress: { scope: 'password_reset_email', limit: 3, windowSeconds: 900 },
 } satisfies Record<string, RateLimitRule>;
 
 export class RateLimiter {

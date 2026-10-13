@@ -511,7 +511,82 @@ const organizerCancellation: MessageHandler = {
   },
 };
 
+/** K-709: links bound to an account request (verification, password reset), issued at send time. */
+function accountLink(
+  type: 'account_verification' | 'password_reset',
+): Pick<MessageHandler, 'freshness' | 'issueTokens'> {
+  return {
+    async freshness(trx, msg, now) {
+      const request = await trx
+        .selectFrom('app.sign_in_requests')
+        .select(['status', 'expires_at'])
+        .where('id', '=', msg.sign_in_request_id!)
+        .forShare()
+        .executeTakeFirst();
+      if (!request || request.status !== 'active') return { fresh: false, reason: 'request_replaced' };
+      if (now.getTime() + 2 * 60_000 > request.expires_at.getTime())
+        return { fresh: false, reason: 'link_expiry' };
+      return { fresh: true };
+    },
+    async issueTokens(trx, msg, now, attemptNo) {
+      const t = await issueToken(trx, {
+        type,
+        now,
+        signInRequestId: msg.sign_in_request_id!,
+        via: 'email',
+        outboxMessageId: msg.id,
+        attemptNo,
+      });
+      return { link: t };
+    },
+  };
+}
+
+const accountVerification: MessageHandler = {
+  ...accountLink('account_verification'),
+  async render(_db, _msg, tokens, origin) {
+    return email('Confirm your email address: Event Registration', [
+      'Thank you for registering your organization. Confirm your email address to send the registration for approval.',
+      { label: 'Confirm my email address', link: `${origin}/verify-account#t=${tokens.link}` },
+      'The link works once and expires 15 minutes after it was sent. For a new one, use “Forgot your password?” on the sign-in page: setting a password also confirms the address.',
+      'If you did not register, you can ignore this email.',
+    ]);
+  },
+};
+
+const passwordReset: MessageHandler = {
+  ...accountLink('password_reset'),
+  async render(_db, _msg, tokens, origin) {
+    return email('Set a new password: Event Registration', [
+      'Use this link to set a new password for your organizer account.',
+      { label: 'Set a new password', link: `${origin}/reset-password#t=${tokens.link}` },
+      'The link works once and expires 15 minutes after it was sent. Setting a new password signs out every device that is signed in to your account.',
+      'If you did not ask for this, you can ignore this email; your password stays as it is.',
+    ]);
+  },
+};
+
+const accountExistsNotice: MessageHandler = {
+  // K-709: a registration was attempted with an address that already has an account (no link).
+  async freshness() {
+    return { fresh: true };
+  },
+  async issueTokens() {
+    return {};
+  },
+  async render(_db, _msg, _tokens, origin) {
+    return email('Your organizer account: Event Registration', [
+      'Someone tried to register an organization with this email address, which already has an organizer account.',
+      `If it was you, sign in at ${origin}/organizer, or reset your password from the sign-in page.`,
+      'If it was not you, you can ignore this email; nothing was changed.',
+    ]);
+  },
+};
+
 export const HANDLERS: Record<string, MessageHandler> = {
+  account_verification: accountVerification,
+  password_reset: passwordReset,
+  account_exists_notice: accountExistsNotice,
   sign_in: signIn,
   verification,
   ticket_confirmation: ticketConfirmation,

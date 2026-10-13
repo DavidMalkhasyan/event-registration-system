@@ -8,6 +8,8 @@ export type HashDomain =
   | 'staff_invitation'
   | 'sign_in'
   | 'email_change'
+  | 'account_verification'
+  | 'password_reset'
   | 'organizer_session'
   | 'staff_session';
 

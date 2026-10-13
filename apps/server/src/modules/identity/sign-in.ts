@@ -7,12 +7,15 @@ import { findToken } from '../access-tokens/tokens.js';
 import { recordAudit } from '../audit/audit.js';
 import { enqueue } from '../messaging/outbox.js';
 import { SESSION_ABSOLUTE_MS, sessionStillValid, type OrganizerPrincipal } from './sessions.js';
-import { ensurePersonalOrganization } from '../organizations/access.js';
 
 const SIGN_IN_TTL_MS = 15 * 60_000; // FR-ORG-3 c, R55
 const PRE_SESSION_MAX_MS = 15 * 60_000;
 
-/** TX-A01: always the same response, whether or not an account exists (FR-ORG-3 a). */
+/**
+ * TX-A01: always the same response, whether or not an account exists (FR-ORG-3 a). Since K-709 the
+ * emailed sign-in link is only a fallback for existing accounts without a password (organizers from
+ * before K-709, until they set one); it never creates an account. New organizers register (accounts.ts).
+ */
 export async function requestSignIn(
   ctx: AppContext,
   rawEmail: string,
@@ -30,13 +33,14 @@ export async function requestSignIn(
   await withAccountLocks(ctx.db, [email], async ({ trx, now }) => {
     const account = await trx
       .selectFrom('app.accounts')
-      .select('id')
+      .select(['id', 'password_hash'])
       .where('email', '=', email)
       .forUpdate()
       .executeTakeFirst();
+    if (!account || account.password_hash) return; // nothing is sent; the response is the same
     await insertSignInRequest(trx, now, {
       email,
-      accountId: account?.id ?? null,
+      accountId: account.id,
       purpose: 'sign_in',
       reauthSessionId: null,
       correlationId,
@@ -49,13 +53,13 @@ export async function requestSignIn(
  * (FR-ORG-3 b, partial unique index), so a new request replaces the previous one, whichever
  * its purpose. The link is issued at send time by the priority `sign_in` message (NFR-REL-12).
  */
-async function insertSignInRequest(
+export async function insertSignInRequest(
   trx: Tx,
   now: Date,
   input: {
     email: string;
     accountId: string | null;
-    purpose: 'sign_in' | 'reauth';
+    purpose: 'sign_in' | 'reauth' | 'verify_email' | 'reset_password';
     reauthSessionId: string | null;
     correlationId: string;
   },
@@ -79,9 +83,15 @@ async function insertSignInRequest(
     })
     .returning('id')
     .executeTakeFirstOrThrow();
+  const type =
+    input.purpose === 'verify_email'
+      ? 'account_verification'
+      : input.purpose === 'reset_password'
+        ? 'password_reset'
+        : 'sign_in';
   await enqueue(trx, {
-    type: 'sign_in',
-    logicalKey: `sign_in:${request.id}`,
+    type,
+    logicalKey: `${type}:${request.id}`,
     recipientEmail: input.email,
     now,
     horizonAt: new Date(expiresAt.getTime() - 2 * 60_000),
@@ -149,6 +159,7 @@ async function activeRequestForToken(ctx: AppContext, rawToken: string): Promise
     .where('id', '=', token.sign_in_request_id)
     .executeTakeFirst();
   if (!request || request.status !== 'active') return null;
+  if (request.purpose !== 'sign_in' && request.purpose !== 'reauth') return null;
   const now = await decisionTime(ctx.db);
   if (now >= request.expires_at) return null;
   return { id: request.id, email: request.email, purpose: request.purpose, expiresAt: request.expires_at };
@@ -206,19 +217,14 @@ export async function confirmSignIn(
 
   const rawSession = randomToken();
   const result = await withAccountLocks(ctx.db, [request.email], async ({ trx, now }) => {
-    // Level 2: the account row, creating it on first sign-in under the address lock (NFR-CON-7 c).
-    await trx
-      .insertInto('app.accounts')
-      .values({ email: request.email, created_at: now })
-      .onConflict((oc) => oc.column('email').doNothing())
-      .execute();
+    // Level 2: the account row (K-709: links are only sent to existing accounts; none is created here).
     const account = await trx
       .selectFrom('app.accounts')
       .select('id')
       .where('email', '=', request.email)
       .forUpdate()
-      .executeTakeFirstOrThrow();
-    await ensurePersonalOrganization(trx, account.id, request.email, now); // transitional (PD-88)
+      .executeTakeFirst();
+    if (!account) return null;
     // Level 3: the request row; the first confirmation uses it up (FR-ORG-3 e).
     const current = await trx
       .selectFrom('app.sign_in_requests')

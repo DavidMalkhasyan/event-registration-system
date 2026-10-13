@@ -76,7 +76,16 @@ export async function buildWebApp(
     });
     const entry = (file: string) => async (_req: unknown, reply: { sendFile: (f: string) => unknown }) =>
       reply.sendFile(file);
-    for (const path of ['/e/*', '/verify', '/manage', '/ticket', '/sign-in', '/invite'])
+    for (const path of [
+      '/e/*',
+      '/verify',
+      '/manage',
+      '/ticket',
+      '/sign-in',
+      '/invite',
+      '/verify-account',
+      '/reset-password',
+    ])
       app.get(path, entry('public.html'));
     for (const path of ['/', '/organizer', '/organizer/*']) app.get(path, entry('organizer.html'));
     app.get('/staff', entry('staff.html')); // dedicated staff entry (PD-69)

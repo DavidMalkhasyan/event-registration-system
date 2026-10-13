@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from './fixtures.js';
+import { seedOrganizer } from './db.js';
 import {
   HOUR,
   REGISTER_BUTTON,
@@ -123,6 +124,7 @@ test('production bundle: the link token is captured before any application modul
 
   // Sign-in confirmation page (not confirmed here).
   const other = address('other-organizer');
+  await seedOrganizer(other); // K-709: links go only to existing accounts without a password
   await page.request.post('/api/auth/sign-in-requests', {
     headers: { origin: new URL(publicUrl).origin },
     data: { email: other },

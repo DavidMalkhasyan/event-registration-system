@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Approved** in principle (stakeholder, 2026-10-13, prompt 29; amendment A-3). Parts implemented: the data model and authorization (K-708, PD-88). Planned: password accounts and approval (K-709, K-710) |
+| **Status** | **Approved** in principle (stakeholder, 2026-10-13, prompt 29; amendment A-3). Parts implemented: the data model and authorization (K-708, PD-88), registration and password accounts (K-709, PD-89). Planned: Super Admin approval (K-710), member invitations (K-716) |
 | **Supersedes in part** | ADR-010 for organizer sign-up and sign-in (participants and staff are unchanged) |
 | **Related** | [POST_RELEASE_PLAN.md](../process/POST_RELEASE_PLAN.md), [REQUIREMENT_AMENDMENTS.md](../process/REQUIREMENT_AMENDMENTS.md) A-3, [POST_RELEASE_SCHEMA.md](../database/POST_RELEASE_SCHEMA.md) |
 
@@ -17,7 +17,7 @@ In v1.0.0 an event belongs to one organizer account, and anyone who confirms an 
 3. **Organization lifecycle:** `pending_verification` → `pending_approval` → `active`, or `rejected`; `active` ↔ `suspended`. Only `active` organizations can create or manage events. Public event pages and registration are not affected by an organization's status.
 4. **Platform administration is separate** (K-710): a Super Admin role held outside organizations, created only by an operator command, never by a web form, and never implied by an organization role.
 5. **Staff stay event-scoped** device sessions (ADR-010, FR-STAFF); they never reach organization or administration checks.
-6. **Migration of existing data** (migration 0009): each existing organizer account becomes the owner of one active organization (named after the account's address until renamed), and its events move to it. A membership-less account that signs in by emailed link before K-709 gets the same personal organization (transitional; removed when organization registration replaces passwordless organizer sign-up).
+6. **Migration of existing data** (migration 0009): each existing organizer account becomes the owner of one active organization (named after the account's address until renamed), and its events move to it. Until K-709, a membership-less account that signed in by emailed link got the same personal organization; K-709 (migration 0010, PD-89) removed that: the emailed link is now only for existing accounts without a password, which migration 0010 marks as verified.
 
 ## Consequences
 

@@ -12,6 +12,7 @@ import { parseConfig, type Config } from '../src/platform/config.js';
 import { createDatabase, type Database } from '../src/platform/db.js';
 import { setTestClockOffset } from '../src/platform/tx.js';
 import { loadTestEnv } from './env.js';
+import { hashPassword } from '../src/platform/passwords.js';
 
 export const ORIGIN = 'http://localhost:5173';
 
@@ -102,8 +103,56 @@ export interface Session {
   accountId: string;
 }
 
-/** Full passwordless sign-in through the API and the fake mailbox (FR-ORG-3, ADR-010). */
+/**
+ * Test setup (K-709): an approved organizer, as an approved registration or a migrated organizer would
+ * be: a verified account (with a password if given), owner of an active organization. Written with the
+ * owner role in the test database; the application has no endpoint for this.
+ */
+export async function ensureOrganizer(h: Harness, email: string, password?: string): Promise<string> {
+  const existing = await h.owner
+    .selectFrom('app.accounts')
+    .select('id')
+    .where('email', '=', email)
+    .executeTakeFirst();
+  if (existing) return existing.id;
+  const now = new Date();
+  const account = await h.owner
+    .insertInto('app.accounts')
+    .values({
+      email,
+      created_at: now,
+      email_verified_at: now,
+      password_hash: password ? await hashPassword(password) : null,
+      password_changed_at: password ? now : null,
+    })
+    .returning('id')
+    .executeTakeFirstOrThrow();
+  const org = await h.owner
+    .insertInto('app.organizations')
+    .values({
+      name: email,
+      status: 'active',
+      created_at: now,
+      updated_at: now,
+      email_verified_at: now,
+      submitted_at: now,
+      decided_at: now,
+    })
+    .returning('id')
+    .executeTakeFirstOrThrow();
+  await h.owner
+    .insertInto('app.organization_memberships')
+    .values({ organization_id: org.id, account_id: account.id, role: 'owner', created_at: now })
+    .execute();
+  return account.id;
+}
+
+/**
+ * Sign-in of an approved organizer through the emailed-link fallback for accounts without a password
+ * (FR-ORG-3, ADR-010; K-709 keeps it for them). Password sign-in has its own tests (accounts.test.ts).
+ */
 export async function signIn(h: Harness, email: string): Promise<Session> {
+  await ensureOrganizer(h, email);
   const request = await h.app.inject({
     method: 'POST',
     url: '/api/auth/sign-in-requests',
