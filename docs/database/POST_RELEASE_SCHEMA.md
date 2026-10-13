@@ -12,6 +12,7 @@ The design documents in this folder describe the full designed system (27 tables
 | `0013_event_images` | K-712 (PD-92, amendment A-4) | New table `event_images` (metadata only; files in the media storage). |
 | `0014_organization_invitations` | K-716 (PD-94, amendment A-3) | New table `organization_invitations`; message type `organization_invitation`. |
 | `0015_staff_self_end` | K-715 (PD-95) | `staff_sessions_ck74` allows the revocation reason `staff_ended` (a device ending its own access). |
+| `0016_provider_events` | K-402 (PD-98) | New tables `provider_events` (verified webhook events, unique by Svix ID, no personal data) and `provider_event_matches` (events to outbox generations), as designed in DATABASE_DESIGN.md. |
 
 ## `organizations` (0009)
 
