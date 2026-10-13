@@ -5,9 +5,12 @@ import {
   ForgotPassword,
   OrganizationStatus,
   PasswordSignIn,
+  JoinAccount,
   RegisterOrganization,
   SignInLinkRequest,
 } from './auth/AuthPages';
+import { Invitations } from './organization/Invitations';
+import { OrganizationPage } from './organization/OrganizationPage';
 import { Overview } from './dashboard/Overview';
 import { EventWorkspace } from './event/EventWorkspace';
 import { CreateEvent } from './events/CreateEvent';
@@ -54,6 +57,7 @@ export function App() {
     if (path === '/organizer/register') return <RegisterOrganization />;
     if (path === '/organizer/forgot-password') return <ForgotPassword />;
     if (path === '/organizer/sign-in-link') return <SignInLinkRequest />;
+    if (path === '/organizer/join') return <JoinAccount />;
     return <PasswordSignIn />;
   }
   if (!session.organizations.some((o) => o.status === 'active'))
@@ -94,6 +98,13 @@ export function App() {
         <EventsList events={events} error={eventsError} refresh={eventsRefresh} />
       </AppShell>
     );
+  if (route.page === 'organization')
+    return (
+      <AppShell session={session} events={events} active="organization" crumbs={[{ label: 'Organization' }]}>
+        <Invitations session={session} />
+        <OrganizationPage session={session} />
+      </AppShell>
+    );
   if (route.page === 'create')
     return (
       <AppShell session={session} events={events} active="create" crumbs={[{ label: 'Create event' }]}>
@@ -103,6 +114,7 @@ export function App() {
   if (route.page === 'overview')
     return (
       <AppShell session={session} events={events} active="overview" crumbs={[{ label: 'Overview' }]}>
+        <Invitations session={session} />
         <Overview
           events={events}
           error={eventsError}

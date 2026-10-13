@@ -10,6 +10,7 @@ import {
   confirmAccountVerification,
   confirmPasswordReset,
   organizationRegistrationSchema,
+  accountRegistrationSchema,
   passwordReauthentication,
   passwordSignIn,
   passwordSignInSchema,
@@ -18,6 +19,7 @@ import {
   resolveAccountLink,
 } from './accounts.js';
 import { membershipsOf } from '../organizations/access.js';
+import { invitationsFor } from '../organizations/members.js';
 
 const emailSchema = z.object({ email: z.email().max(254) }).strict();
 
@@ -45,6 +47,12 @@ export function registerIdentityRoutes(app: FastifyInstance, ctx: AppContext): v
       request.ip,
       request.id,
     );
+    return reply.code(202).send({ status: 'check_your_email' });
+  });
+
+  // K-716: an organizer account without an organization (for invitees); the same answers and limits.
+  app.post('/api/accounts/registrations', async (request, reply) => {
+    await registerOrganization(ctx, accountRegistrationSchema.parse(request.body), request.ip, request.id);
     return reply.code(202).send({ status: 'check_your_email' });
   });
 
@@ -101,6 +109,7 @@ export function registerIdentityRoutes(app: FastifyInstance, ctx: AppContext): v
       recentAuthUntil: new Date(principal.authenticatedAt.getTime() + RECENT_AUTH_MS).toISOString(),
       csrfToken: csrfTokenFor(ctx.config.CSRF_SECRET, 'org', principal.sessionId),
       organizations: await membershipsOf(ctx.db, principal.accountId), // K-708
+      invitations: await invitationsFor(ctx.db, principal.accountId), // K-716
     };
   });
 

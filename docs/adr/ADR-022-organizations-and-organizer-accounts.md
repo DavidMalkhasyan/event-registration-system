@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Approved** in principle (stakeholder, 2026-10-13, prompt 29; amendment A-3). Parts implemented: the data model and authorization (K-708, PD-88), registration and password accounts (K-709, PD-89), the Super Admin area (K-710, PD-90). Planned: member invitations (K-716) |
+| **Status** | **Approved** in principle (stakeholder, 2026-10-13, prompt 29; amendment A-3). Parts implemented: the data model and authorization (K-708, PD-88), registration and password accounts (K-709, PD-89), the Super Admin area (K-710, PD-90), several organizers per organization (K-716, PD-94) |
 | **Supersedes in part** | ADR-010 for organizer sign-up and sign-in (participants and staff are unchanged) |
 | **Related** | [POST_RELEASE_PLAN.md](../process/POST_RELEASE_PLAN.md), [REQUIREMENT_AMENDMENTS.md](../process/REQUIREMENT_AMENDMENTS.md) A-3, [POST_RELEASE_SCHEMA.md](../database/POST_RELEASE_SCHEMA.md) |
 

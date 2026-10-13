@@ -70,6 +70,19 @@ export interface OrganizationsTable {
   decision_reason: string | null;
 }
 
+/** Migration 0014 (K-716). */
+export interface OrganizationInvitationsTable {
+  id: Generated<string>;
+  organization_id: string;
+  email: string;
+  role: 'admin' | 'member';
+  invited_by_account_id: string;
+  created_at: Timestamp;
+  expires_at: Timestamp;
+  status: Generated<'pending' | 'accepted' | 'declined' | 'revoked'>;
+  decided_at: Timestamp | null;
+}
+
 /** Migration 0013 (K-712): event image metadata; the files are in the media storage. */
 export interface EventImagesTable {
   id: Generated<string>;
@@ -450,4 +463,5 @@ export interface DB {
   'app.platform_admins': PlatformAdminsTable;
   'app.platform_admin_sessions': PlatformAdminSessionsTable;
   'app.event_images': EventImagesTable;
+  'app.organization_invitations': OrganizationInvitationsTable;
 }

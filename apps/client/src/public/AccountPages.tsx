@@ -55,11 +55,15 @@ export function AccountVerificationPage() {
         {done ? (
           <>
             <h1>Email address confirmed</h1>
-            <p>
-              {view.organizationName ? <strong>{view.organizationName}</strong> : 'Your organization'} now
-              waits for approval. We email you when it is decided; you can sign in meanwhile to see its
-              status.
-            </p>
+            {view.organizationName ? (
+              <p>
+                <strong>{view.organizationName}</strong> now waits for approval. We email you when it is
+                decided; you can sign in meanwhile to see its status.
+              </p>
+            ) : (
+              // K-716: an account without an organization (an invited organizer).
+              <p>Your organizer account is ready. Sign in to accept your invitation.</p>
+            )}
             <a className="btn btn-lg btn-block" href="/organizer">
               Go to sign-in
             </a>

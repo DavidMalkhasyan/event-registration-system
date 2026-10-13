@@ -4,6 +4,7 @@ import { ApiError, api, errorMessage } from '../../shared/api';
 import { Alert, Button, DevMailboxHint, Field, Logo } from '../../shared/ui';
 import { Link } from '../router';
 import type { Session } from '../types';
+import { Invitations } from '../organization/Invitations';
 
 // Organizer accounts (K-709, PD-89): password sign-in, organization registration, password reset, and
 // the emailed sign-in link kept for organizers from before K-709 who have not set a password yet.
@@ -109,6 +110,7 @@ export function PasswordSignIn() {
       <nav className="auth-links" aria-label="Account options">
         <Link to="/organizer/forgot-password">Forgot your password?</Link>
         <Link to="/organizer/register">Register your organization</Link>
+        <Link to="/organizer/join">Invited to an organization? Create your account</Link>
         <Link to="/organizer/sign-in-link">No password yet? Get a sign-in link by email</Link>
       </nav>
     </AuthShell>
@@ -250,6 +252,106 @@ export function RegisterOrganization() {
   );
 }
 
+/** K-716: an organizer account without an organization, for people invited into one. */
+export function JoinAccount() {
+  const [form, setForm] = useState({ contactName: '', email: '', password: '', confirm: '' });
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string>();
+  const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
+  const mismatch = form.confirm.length > 0 && form.confirm !== form.password;
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (form.password !== form.confirm) return setError('The two passwords are not the same.');
+    setBusy(true);
+    setError(undefined);
+    try {
+      await api('/api/accounts/registrations', {
+        method: 'POST',
+        body: { contactName: form.contactName, email: form.email, password: form.password },
+      });
+      setSent(true);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (sent)
+    return (
+      <AuthShell title="Check your email" eyebrow="Join an organization">
+        <Sent>
+          We sent a link to <strong>{form.email}</strong> to confirm the address. Then sign in: the invitation
+          waits for you there. If the address already has an account, we sent it a note instead.
+        </Sent>
+        <p className="auth-links">
+          <Link to="/organizer">Back to sign-in</Link>
+        </p>
+      </AuthShell>
+    );
+  return (
+    <AuthShell title="Create your organizer account" eyebrow="Join an organization">
+      <p>
+        For people invited to organize an organization’s events. Use the email address the invitation was sent
+        to. To start a new organization instead, <Link to="/organizer/register">register it</Link>.
+      </p>
+      <form className="stack" onSubmit={submit}>
+        <Field label="Your name">
+          {(id) => (
+            <input
+              id={id}
+              className="input"
+              required
+              maxLength={200}
+              value={form.contactName}
+              onChange={(e) => set({ contactName: e.target.value })}
+              autoComplete="name"
+            />
+          )}
+        </Field>
+        <EmailField value={form.email} onChange={(email) => set({ email })} />
+        <Field label="Password" hint={`At least ${PASSWORD_MIN} characters.`}>
+          {(id) => (
+            <input
+              id={id}
+              className="input"
+              type="password"
+              required
+              minLength={PASSWORD_MIN}
+              maxLength={128}
+              value={form.password}
+              onChange={(e) => set({ password: e.target.value })}
+              autoComplete="new-password"
+            />
+          )}
+        </Field>
+        <Field label="Confirm password">
+          {(id) => (
+            <input
+              id={id}
+              className="input"
+              type="password"
+              required
+              aria-invalid={mismatch || undefined}
+              value={form.confirm}
+              onChange={(e) => set({ confirm: e.target.value })}
+              autoComplete="new-password"
+            />
+          )}
+        </Field>
+        {mismatch && <p className="field-error">The two passwords are not the same.</p>}
+        <Button type="submit" size="lg" disabled={busy || mismatch}>
+          {busy ? 'Creating…' : 'Create account'}
+        </Button>
+      </form>
+      {error && <Alert>{error}</Alert>}
+      <p className="auth-links">
+        <Link to="/organizer">Already have an account? Sign in</Link>
+      </p>
+    </AuthShell>
+  );
+}
+
 /** Password reset request (also how organizers from before K-709 set a first password). */
 export function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -377,8 +479,11 @@ export function OrganizationStatus({ session, onSignOut }: { session: Session; o
       <span className="result-icon">{status?.icon ?? <Building2 aria-hidden="true" />}</span>
       <p>
         {status?.text ??
-          'This account does not belong to an active organization. Register an organization, or ask an organization’s owner to add you.'}
+          (session.invitations.length > 0
+            ? 'Accept an invitation below to start organizing that organization’s events.'
+            : 'This account does not belong to an active organization yet. Ask an organization’s owner or admin to invite this email address, or register an organization.')}
       </p>
+      <Invitations session={session} />
       {!session.hasPassword && (
         <Alert kind="info">
           <KeyRound size={15} aria-hidden="true" /> Your account has no password yet. Set one with “Forgot

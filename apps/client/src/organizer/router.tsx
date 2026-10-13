@@ -61,6 +61,7 @@ export type Route =
   | { page: 'overview' }
   | { page: 'events' }
   | { page: 'create' }
+  | { page: 'organization' }
   | { page: 'event'; eventId: string; tab: EventTab }
   | { page: 'not-found' };
 
@@ -70,6 +71,7 @@ export function parseRoute(path: string): Route {
   if (path === '/' || path === '/organizer' || path === '/organizer/') return { page: 'overview' };
   if (path === '/organizer/events') return { page: 'events' };
   if (path === '/organizer/events/new') return { page: 'create' };
+  if (path === '/organizer/organization') return { page: 'organization' };
   const match = new RegExp(`^/organizer/events/(${UUID})(?:/([a-z-]+))?$`).exec(path);
   if (match) {
     const tab = match[2];

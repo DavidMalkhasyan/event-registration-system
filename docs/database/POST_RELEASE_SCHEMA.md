@@ -10,6 +10,7 @@ The design documents in this folder describe the full designed system (27 tables
 | `0011_platform_admins` | K-710 (PD-90, ADR-022, amendment A-3) | New tables `platform_admins` and `platform_admin_sessions`; who decided on an organization and why; audit actor `platform_admin`; message type `organization_decision`. |
 | `0012_event_location` | K-711 (PD-91, amendment A-5) | Optional venue columns, coordinates and `location_version` on `events`; message type `venue_change`. |
 | `0013_event_images` | K-712 (PD-92, amendment A-4) | New table `event_images` (metadata only; files in the media storage). |
+| `0014_organization_invitations` | K-716 (PD-94, amendment A-3) | New table `organization_invitations`; message type `organization_invitation`. |
 
 ## `organizations` (0009)
 
@@ -93,3 +94,13 @@ The migration adds tables, columns and checks; it changes no existing row and gr
 | `created_at`, `created_by_account_id` | | Who added the image (references `accounts`) |
 
 No image data is stored in PostgreSQL.
+
+## `organization_invitations` (0014)
+
+| Column | Meaning |
+|---|---|
+| `organization_id`, `email`, `role` | Who is invited where, as `admin` or `member` (owners are made from members); the address normalized |
+| `invited_by_account_id`, `created_at`, `expires_at` | Who invited, when, and until when (14 days) |
+| `status`, `decided_at` | `pending`, then `accepted`, `declined` or `revoked`, with the time (`decided_at` is set exactly when no longer pending) |
+
+A partial unique index allows one pending invitation per organization and address. `outbox_messages_ck48` gains `organization_invitation` (class A, bulk lane).

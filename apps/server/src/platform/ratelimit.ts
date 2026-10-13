@@ -40,6 +40,8 @@ export const RULES = {
   adminSignInPerIp: { scope: 'admin_signin_ip', limit: 20, windowSeconds: 900 },
   // K-712 (PD-92): image uploads and replacements per organizer account.
   imageUploadsPerAccount: { scope: 'image_upload_account', limit: 60, windowSeconds: 3600 },
+  // K-716 (PD-94): invitations sent per organizer account.
+  invitationsPerAccount: { scope: 'invitations_account', limit: 30, windowSeconds: 3600 },
 } satisfies Record<string, RateLimitRule>;
 
 export class RateLimiter {
