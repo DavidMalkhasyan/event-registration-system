@@ -12,7 +12,7 @@ export class ApiError extends Error {
 }
 
 export interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'PATCH';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   csrf?: string;
   linkToken?: string | null;
@@ -38,6 +38,37 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
     throw new ApiError(0, 'network_error', {});
   }
   if (response.status === 204) return undefined as T;
+  const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!response.ok) throw new ApiError(response.status, String(body.code ?? 'error'), body);
+  return body as T;
+}
+
+/**
+ * Sends a file as the raw request body (K-713: event images). The server decides what the bytes are; the
+ * declared type only lets the request through.
+ */
+export async function uploadFile<T>(
+  path: string,
+  file: Blob,
+  options: { method?: 'POST' | 'PUT'; csrf: string },
+): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      method: options.method ?? 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
+          ? file.type
+          : 'application/octet-stream',
+        'x-csrf-token': options.csrf,
+      },
+      credentials: 'same-origin',
+      body: file,
+    });
+  } catch {
+    throw new ApiError(0, 'network_error', {});
+  }
   const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok) throw new ApiError(response.status, String(body.code ?? 'error'), body);
   return body as T;

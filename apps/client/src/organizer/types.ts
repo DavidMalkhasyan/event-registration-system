@@ -1,4 +1,5 @@
 import type { Location } from '../shared/location';
+import type { EventImage } from '../shared/images';
 
 export interface Session {
   accountId: string;
@@ -49,12 +50,15 @@ export interface EventItem {
   /** K-711: the venue, or null; the version guards against a concurrent change. */
   location: Location | null;
   locationVersion: number;
+  /** K-713: the cover image, when the event has one (single-event responses only). */
+  cover?: EventImage | null;
 }
 
 /** An item of GET /api/events, with the per-event counts of PD-67. */
 export interface EventListItem extends EventItem {
   waitlistedCount: number;
   checkedInCount: number;
+  coverThumbnailUrl: string | null;
 }
 
 export interface Counts {

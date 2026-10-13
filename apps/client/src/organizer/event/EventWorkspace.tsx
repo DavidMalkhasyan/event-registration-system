@@ -19,13 +19,14 @@ import {
   formatDay,
   formatLocal,
 } from '../../shared/ui';
-import { EventArtwork } from '../../shared/artwork';
+import { EventCover } from '../../shared/images';
 import { fillPercent, phaseOf } from '../events/event-status';
 import { Link, eventPath, type EventTab } from '../router';
 import type { Counts, EventItem, Notice, Session } from '../types';
 import { CheckInTab } from './CheckInTab';
 import { ParticipantsTab } from './ParticipantsTab';
 import { SettingsTab } from './SettingsTab';
+import { PhotosTab } from './PhotosTab';
 import { StaffTab } from './StaffTab';
 import { RefreshControl } from '../RefreshControl';
 import { useEventData } from './use-event-data';
@@ -36,6 +37,7 @@ const TABS: { key: EventTab; label: string }[] = [
   { key: 'waiting-list', label: 'Waiting list' },
   { key: 'check-in', label: 'Check-in' },
   { key: 'staff', label: 'Staff' },
+  { key: 'photos', label: 'Photos' },
   { key: 'settings', label: 'Settings' },
 ];
 
@@ -209,7 +211,12 @@ export function EventWorkspace({
       </Link>
       {!focused && (
         <div className="event-cover">
-          <EventArtwork artKey={event.publicId} caption={formatDay(event.startsAt, event.timeZone)} />
+          <EventCover
+            artKey={event.publicId}
+            src={event.cover?.url}
+            alt={event.cover?.alt}
+            caption={formatDay(event.startsAt, event.timeZone)}
+          />
           <span className="cover-caption">{formatDay(event.startsAt, event.timeZone)}</span>
         </div>
       )}
@@ -322,6 +329,11 @@ export function EventWorkspace({
           {kept('staff') && (
             <div hidden={tab !== 'staff'}>
               <StaffTab session={session} event={event} active={tab === 'staff'} />
+            </div>
+          )}
+          {kept('photos') && (
+            <div hidden={tab !== 'photos'}>
+              <PhotosTab session={session} event={event} onChanged={changed} />
             </div>
           )}
           {kept('settings') && (
