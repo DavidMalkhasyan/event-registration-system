@@ -26,7 +26,8 @@ export interface Harness {
   close(): Promise<void>;
 }
 
-export async function createHarness(): Promise<Harness> {
+/** `env` overrides configuration for a test file (for example K-714's map tile source). */
+export async function createHarness(env: Record<string, string> = {}): Promise<Harness> {
   loadTestEnv();
   const mailboxDir = mkdtempSync(join(tmpdir(), 'ers-mailbox-'));
   const secret = () => randomBytes(32).toString('base64url');
@@ -41,6 +42,8 @@ export async function createHarness(): Promise<Harness> {
     EMAIL_PROVIDER: 'fake',
     DEV_MAILBOX_DIR: mailboxDir,
     MEDIA_DIR: mkdtempSync(join(tmpdir(), 'ers-media-')),
+    TILE_CACHE_DIR: mkdtempSync(join(tmpdir(), 'ers-tiles-')),
+    ...env,
   });
   const db = createDatabase(config.DATABASE_URL, 40);
   const owner = createDatabase(process.env.TEST_MIGRATION_DATABASE_URL!, 2);
@@ -69,6 +72,7 @@ export async function resetData(h: Harness): Promise<void> {
   for (const entry of readdirSync(h.mailboxDir))
     rmSync(join(h.mailboxDir, entry), { recursive: true, force: true });
   rmSync(h.config.MEDIA_DIR, { recursive: true, force: true }); // K-712: image files go with their rows
+  rmSync(h.config.TILE_CACHE_DIR, { recursive: true, force: true }); // K-714: each test starts uncached
   await sql`TRUNCATE app.staff_sessions, app.staff_invitations, app.rotation_requests, app.deletion_markers, app.reminder_slots, app.scheduled_tasks, app.check_in_requests, app.check_ins, app.tickets,
     app.access_tokens, app.outbox_attempts, app.outbox_generations, app.outbox_messages, app.registrations, app.events,
     app.organizer_sessions, app.sign_in_requests, app.organization_memberships, app.organizations, app.accounts, app.audit_records, app.rate_limit_counters,
