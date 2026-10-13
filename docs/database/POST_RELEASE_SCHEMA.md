@@ -9,6 +9,7 @@ The design documents in this folder describe the full designed system (27 tables
 | `0010_organizer_accounts` | K-709 (PD-89, ADR-022, amendment A-3) | Password and verification columns on `accounts`; new sign-in request purposes and token types for verification and reset; password sessions; three new message types. |
 | `0011_platform_admins` | K-710 (PD-90, ADR-022, amendment A-3) | New tables `platform_admins` and `platform_admin_sessions`; who decided on an organization and why; audit actor `platform_admin`; message type `organization_decision`. |
 | `0012_event_location` | K-711 (PD-91, amendment A-5) | Optional venue columns, coordinates and `location_version` on `events`; message type `venue_change`. |
+| `0013_event_images` | K-712 (PD-92, amendment A-4) | New table `event_images` (metadata only; files in the media storage). |
 
 ## `organizations` (0009)
 
@@ -78,3 +79,17 @@ The migration adds tables, columns and checks; it changes no existing row and gr
 | `location_version` | Starts at 0 and grows with each change; guards concurrent edits and makes older venue-change notices obsolete |
 
 `outbox_messages_ck48` gains `venue_change` (class B, bulk lane). Existing events keep no location; the migration changes no row.
+
+## `event_images` (0013)
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | uuid | Primary key |
+| `event_id` | uuid, not null | References `events`; the rows are deleted with the event |
+| `role`, `position` | text, smallint | `cover` at position 0, or `gallery` at 1 to 8 (`event_images_ck_role`); unique per event and role, checked at commit (`DEFERRABLE INITIALLY DEFERRED`) so reorders and cover swaps can trade positions |
+| `storage_key` | text, unique | Random 32-hex name of the WebP files in the media storage (`<key>.webp`, `<key>-thumb.webp`); never a path |
+| `width`, `height`, `byte_size`, `thumb_byte_size` | integer | Of the re-encoded files (at most 2400 px a side and 10 MB, checked) |
+| `alt_text` | text, nullable | Alternative text for screen readers (1 to 300 characters) |
+| `created_at`, `created_by_account_id` | | Who added the image (references `accounts`) |
+
+No image data is stored in PostgreSQL.
