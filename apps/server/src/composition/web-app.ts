@@ -8,6 +8,8 @@ import type { Config } from '../platform/config.js';
 import type { Database } from '../platform/db.js';
 import { registerHttpPlumbing } from '../platform/http.js';
 import { RateLimiter } from '../platform/ratelimit.js';
+import { LocalMediaStorage } from '../modules/media/storage.js';
+import { registerMediaRoutes } from '../modules/media/routes.js';
 import { registerEventCoreRoutes } from '../modules/event-core/routes.js';
 import { registerIdentityRoutes } from '../modules/identity/routes.js';
 import { registerPlatformAdminRoutes } from '../modules/platform-admin/routes.js';
@@ -50,12 +52,18 @@ export async function buildWebApp(
   await app.register(fastifyCookie);
   registerHttpPlumbing(app, config.PUBLIC_ORIGIN);
 
-  const ctx: AppContext = { db, config, limiter: new RateLimiter(db, config.RATE_LIMIT_SECRET) };
+  const ctx: AppContext = {
+    db,
+    config,
+    limiter: new RateLimiter(db, config.RATE_LIMIT_SECRET),
+    media: new LocalMediaStorage(config.MEDIA_DIR),
+  };
   registerIdentityRoutes(app, ctx);
   registerEventCoreRoutes(app, ctx);
   registerParticipantPortalRoutes(app, ctx);
   registerStaffRoutes(app, ctx);
   registerPlatformAdminRoutes(app, ctx);
+  registerMediaRoutes(app, ctx);
   if (options.liveHub) registerLiveRoutes(app, ctx, options.liveHub);
 
   app.get('/healthz', async () => {

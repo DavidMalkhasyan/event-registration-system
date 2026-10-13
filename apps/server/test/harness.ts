@@ -40,6 +40,7 @@ export async function createHarness(): Promise<Harness> {
     PREVIEW_SECRET: process.env.PREVIEW_SECRET ?? secret(),
     EMAIL_PROVIDER: 'fake',
     DEV_MAILBOX_DIR: mailboxDir,
+    MEDIA_DIR: mkdtempSync(join(tmpdir(), 'ers-media-')),
   });
   const db = createDatabase(config.DATABASE_URL, 40);
   const owner = createDatabase(process.env.TEST_MIGRATION_DATABASE_URL!, 2);
@@ -67,10 +68,11 @@ export async function resetData(h: Harness): Promise<void> {
   // Empty the fake mailbox too, so emails from an earlier test are never counted again.
   for (const entry of readdirSync(h.mailboxDir))
     rmSync(join(h.mailboxDir, entry), { recursive: true, force: true });
+  rmSync(h.config.MEDIA_DIR, { recursive: true, force: true }); // K-712: image files go with their rows
   await sql`TRUNCATE app.staff_sessions, app.staff_invitations, app.rotation_requests, app.deletion_markers, app.reminder_slots, app.scheduled_tasks, app.check_in_requests, app.check_ins, app.tickets,
     app.access_tokens, app.outbox_attempts, app.outbox_generations, app.outbox_messages, app.registrations, app.events,
     app.organizer_sessions, app.sign_in_requests, app.organization_memberships, app.organizations, app.accounts, app.audit_records, app.rate_limit_counters,
-    app.platform_admin_sessions, app.platform_admins`.execute(h.owner);
+    app.platform_admin_sessions, app.platform_admins, app.event_images`.execute(h.owner);
 }
 
 /** Runs the worker until there is nothing left to do (tasks first, then the outbox). */

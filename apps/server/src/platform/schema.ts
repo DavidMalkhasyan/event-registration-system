@@ -70,6 +70,22 @@ export interface OrganizationsTable {
   decision_reason: string | null;
 }
 
+/** Migration 0013 (K-712): event image metadata; the files are in the media storage. */
+export interface EventImagesTable {
+  id: Generated<string>;
+  event_id: string;
+  role: 'cover' | 'gallery';
+  position: number;
+  storage_key: string;
+  width: number;
+  height: number;
+  byte_size: number;
+  thumb_byte_size: number;
+  alt_text: string | null;
+  created_at: Timestamp;
+  created_by_account_id: string;
+}
+
 /** Migration 0011 (K-710): Super Admins, separate from organizer accounts. */
 export interface PlatformAdminsTable {
   id: Generated<string>;
@@ -433,4 +449,5 @@ export interface DB {
   'app.organization_memberships': OrganizationMembershipsTable;
   'app.platform_admins': PlatformAdminsTable;
   'app.platform_admin_sessions': PlatformAdminSessionsTable;
+  'app.event_images': EventImagesTable;
 }

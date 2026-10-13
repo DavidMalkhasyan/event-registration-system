@@ -38,6 +38,8 @@ export const RULES = {
   // K-710 (PD-90): Super Admin sign-in, stricter than organizers'.
   adminSignInPerAddress: { scope: 'admin_signin_email', limit: 5, windowSeconds: 900 },
   adminSignInPerIp: { scope: 'admin_signin_ip', limit: 20, windowSeconds: 900 },
+  // K-712 (PD-92): image uploads and replacements per organizer account.
+  imageUploadsPerAccount: { scope: 'image_upload_account', limit: 60, windowSeconds: 3600 },
 } satisfies Record<string, RateLimitRule>;
 
 export class RateLimiter {

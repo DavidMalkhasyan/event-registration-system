@@ -7,6 +7,7 @@ import { withEventLock, type LockedEvent, type Tx } from '../../platform/tx.js';
 import { recordAudit } from '../audit/audit.js';
 import { requireRecentAuthentication, type OrganizerPrincipal } from '../identity/sessions.js';
 import { assertEventAccess } from '../organizations/access.js';
+import { deleteEventImages } from '../media/images.js';
 
 // Event deletion (K-304d): FR-EVT-10, FR-EVT-11, FR-EVT-13, FR-EVT-14, BR-26, BR-29; TX-E06;
 // API #37 getDeletionPreview and #38 deleteEvent; API_DESIGN §7.4; PD-43 to PD-46.
@@ -229,9 +230,12 @@ export async function deleteEvent(
     // FR-STAFF-4: staff access ends with the event (§8.4 steps 8 and 9).
     await trx.deleteFrom('app.staff_sessions').where('event_id', '=', eventId).execute();
     await trx.deleteFrom('app.staff_invitations').where('event_id', '=', eventId).execute();
+    // K-712: image rows go with the event; their files are removed after the commit.
+    const imageKeys = await deleteEventImages(trx, eventId);
     await trx.deleteFrom('app.events').where('id', '=', eventId).execute();
-    return { error: null };
+    return { error: null, imageKeys };
   });
   if (result === null) throw new AppError(404, 'not_found'); // already deleted: a repeat gets 404
   if (result.error) throw result.error;
+  await Promise.all((result.imageKeys ?? []).map((k) => ctx.media.remove(k).catch(() => undefined)));
 }
