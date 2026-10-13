@@ -1125,6 +1125,65 @@ svg {
   overflow-wrap: anywhere;
 }
 
+/* Participant map (K-714) */
+.map-panel {
+  margin-top: 18px;
+  padding: 20px;
+}
+.map-panel h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+.participant-map {
+  margin: 12px 0 0;
+}
+.map-canvas {
+  height: 320px;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--muted);
+}
+@media (max-width: 480px) {
+  .map-canvas {
+    height: 260px;
+  }
+}
+.participant-map figcaption {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+.participant-map figcaption a {
+  color: var(--primary-strong);
+}
+.map-fallback {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 12px 0 0;
+  font-size: 13.5px;
+  color: var(--muted-foreground);
+}
+/* Leaflet positions the marker with its own transform; only the drawing inside it is rotated (a
+   rotate on the marker itself would be applied before that transform and move the marker away). */
+.map-pin::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50% 50% 50% 0;
+  background: var(--primary-strong);
+  border: 3px solid #fff;
+  box-shadow: 0 2px 6px #0004;
+  rotate: -45deg;
+}
+.leaflet-container a.leaflet-control-zoom-in,
+.leaflet-container a.leaflet-control-zoom-out {
+  color: var(--foreground);
+}
+
 /* Super Admin area (K-710) */
 .admin-shell {
   min-height: 100vh;
