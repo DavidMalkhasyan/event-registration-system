@@ -1,7 +1,7 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:http';
 import { crc32, deflateSync } from 'node:zlib';
-import { rmSync } from 'node:fs';
+import { mkdirSync, openSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import resetTestDatabase from '../server/test/global-setup.js';
 import { E2E_MAILBOX, E2E_PORT, ORIGIN, REPO_ROOT } from './tests/env.js';
@@ -75,11 +75,16 @@ const env = {
   CLIENT_DIST_DIR: resolve(REPO_ROOT, 'apps/client/dist'),
 };
 const server = resolve(REPO_ROOT, 'apps/server');
+// K-722: each process's log is kept in var/e2e-logs, so the audit can check that no link token is ever
+// written to a log (ENG-ERR-6) by the real processes, not only in the server's own tests.
+const LOGS = resolve(REPO_ROOT, 'var/e2e-logs');
+rmSync(LOGS, { recursive: true, force: true });
+mkdirSync(LOGS, { recursive: true });
 const children: ChildProcess[] = ['web', 'worker'].map((name) =>
   spawn(process.execPath, ['--import', 'tsx', `src/entrypoints/${name}.ts`], {
     cwd: server,
     env,
-    stdio: ['ignore', 'ignore', 'inherit'],
+    stdio: ['ignore', openSync(resolve(LOGS, `${name}.log`), 'a'), 'inherit'],
   }),
 );
 for (const child of children) child.on('exit', (code) => process.exit(code ?? 1));
