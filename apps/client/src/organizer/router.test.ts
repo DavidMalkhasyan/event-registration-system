@@ -22,6 +22,12 @@ describe('organizer routes (K-507)', () => {
       eventId: ID,
       tab: 'settings',
     });
+    // K-713: the photos section.
+    expect(parseRoute(`/organizer/events/${ID}/photos`)).toEqual({
+      page: 'event',
+      eventId: ID,
+      tab: 'photos',
+    });
   });
 
   it('rejects unknown sections and malformed IDs instead of guessing', () => {

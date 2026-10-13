@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, api, errorMessage } from '../shared/api';
 import type { EventSummary } from './shell';
+import type { EventImage } from '../shared/images';
 
 // Live public availability (PD-81): the public event is re-read every REFRESH_MS while the page is
 // visible, and at once when it becomes visible again or regains focus. Hidden tabs make no requests.
@@ -21,6 +22,8 @@ export interface PublicAvailability {
 
 export type PublicEvent = EventSummary & {
   description: string | null;
+  /** K-713: the published cover and gallery. */
+  images?: { cover: EventImage | null; gallery: EventImage[] };
   phase: string;
   availability: PublicAvailability;
 };

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { ArrowRight, CalendarDays, Clock3, Globe, Info, Mail, ShieldCheck } from 'lucide-react';
 import { api, errorMessage } from '../shared/api';
-import { EventArtwork } from '../shared/artwork';
+import { EventCover, Gallery } from '../shared/images';
 import { Alert, Button, DevMailboxHint, Field, formatDay, formatLocal, formatTime } from '../shared/ui';
 import { VenueDetails } from '../shared/location';
 import { Availability } from './Availability';
@@ -73,7 +73,7 @@ export function EventPage({ publicId }: { publicId: string }) {
     <PublicShell>
       <main className="public-main">
         <div className="public-art">
-          <EventArtwork artKey={publicId} />
+          <EventCover artKey={publicId} src={event.images?.cover?.url} alt={event.images?.cover?.alt} />
           <div>
             <span>{formatDay(event.startsAt, event.timeZone).toUpperCase()}</span>
             <h1>{event.title}</h1>
@@ -90,6 +90,7 @@ export function EventPage({ publicId }: { publicId: string }) {
             <h2>{headline}</h2>
             {event.description && <p className="event-description">{event.description}</p>}
             {event.location && <VenueDetails location={event.location} />}
+            {event.images && <Gallery images={event.images.gallery} title={event.title} />}
             <div className="event-facts">
               <div>
                 <CalendarDays aria-hidden="true" />

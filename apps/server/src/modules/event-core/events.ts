@@ -209,7 +209,11 @@ export async function getOwnedEvent(ctx: AppContext, principal: OrganizerPrincip
     .where('organization_id', 'in', manageableOrganizationIds(ctx.db, principal.accountId))
     .executeTakeFirst();
   if (!row) throw new AppError(404, 'not_found');
-  return eventView(ctx, row, await decisionTime(ctx.db));
+  const images = (await imagesOf(ctx.db, [row.id])).get(row.id)!;
+  return {
+    ...eventView(ctx, row, await decisionTime(ctx.db)),
+    cover: images.find((i) => i.role === 'cover') ?? null, // K-713: the workspace header
+  };
 }
 
 /**

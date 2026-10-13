@@ -47,7 +47,14 @@ export function Link({ to, onClick, ...props }: AnchorHTMLAttributes<HTMLAnchorE
   );
 }
 
-export const EVENT_TABS = ['participants', 'waiting-list', 'check-in', 'staff', 'settings'] as const;
+export const EVENT_TABS = [
+  'participants',
+  'waiting-list',
+  'check-in',
+  'staff',
+  'photos',
+  'settings',
+] as const;
 export type EventTab = 'overview' | (typeof EVENT_TABS)[number];
 
 export type Route =
