@@ -584,6 +584,8 @@ const BLOCKER_TEXT: Record<string, string> = {
 const NOTICE_TEXT: Record<string, string> = {
   failed: 'failed',
   delivery_outcome_unknown: 'delivery outcome unknown',
+  bounced: 'bounced (not delivered)',
+  complained: 'marked as spam by the recipient',
 };
 
 /**

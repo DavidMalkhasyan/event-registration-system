@@ -24,6 +24,8 @@ const END_REASON: Record<string, string> = {
 const ISSUE: Record<string, string> = {
   failed: 'failed',
   delivery_outcome_unknown: 'delivery outcome unknown',
+  bounced: 'bounced (not delivered)',
+  complained: 'marked as spam by the recipient',
 };
 
 /** One event's participants (FR-DSH-4), or only its waiting list in queue order (FR-WL). */

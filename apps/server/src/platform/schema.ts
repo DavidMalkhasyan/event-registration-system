@@ -70,6 +70,29 @@ export interface OrganizationsTable {
   decision_reason: string | null;
 }
 
+/** Migration 0016 (K-402): verified provider webhook events and their matches to generations. */
+export interface ProviderEventsTable {
+  id: Generated<string>;
+  svix_id: string;
+  event_type: string;
+  provider_email_id: string | null;
+  tag_outbox_id: string | null;
+  tag_generation: number | null;
+  provider_created_at: Timestamp | null;
+  received_at: Timestamp;
+  bounce_kind: string | null;
+  reason_masked: string | null;
+  payload_masked: Json;
+}
+
+export interface ProviderEventMatchesTable {
+  provider_event_id: string;
+  outbox_id: string;
+  generation: number;
+  method: 'tag' | 'provider_id';
+  matched_at: Timestamp;
+}
+
 /** Migration 0014 (K-716). */
 export interface OrganizationInvitationsTable {
   id: Generated<string>;
@@ -464,4 +487,6 @@ export interface DB {
   'app.platform_admin_sessions': PlatformAdminSessionsTable;
   'app.event_images': EventImagesTable;
   'app.organization_invitations': OrganizationInvitationsTable;
+  'app.provider_events': ProviderEventsTable;
+  'app.provider_event_matches': ProviderEventMatchesTable;
 }
