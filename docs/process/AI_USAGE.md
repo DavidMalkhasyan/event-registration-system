@@ -80,6 +80,8 @@ Significant prompts, summarized in order. The stakeholder's own instructions are
 | 28 | "run" | S-19: the development stack was already running the latest `dev` code; the organizer page was opened |
 | 29 | "EVENTFLOW — COMPLETE POST-RELEASE PRODUCT ENHANCEMENT ROADMAP": organizer navigation without scroll jumps; increase-only capacity with normalized input; organizations with password accounts, approval by a Super Admin and migration of existing organizers; event photographs and gallery; event location and venue-change notices; a real participant map subject to a provider decision; staff experience review; pull requests A to J into `dev`; no tag, no release. | S-19: plan, K-706 (PR A) first |
 | 30 | "continue" (after the Claude Code session restarted) | S-19: work resumed on PR C from the uncommitted branch; nothing was lost |
+| 31 | "continue" (2026-10-13 14:17:59, after the Claude Code session restarted again) | S-19: no tool ran before the next prompt |
+| 32 | "continue" (14:42:26) | S-19: PostgreSQL restarted, PR #32 merged, PR J (staff review and final review) implemented |
 
 **Context management:** Claude Code summarized earlier parts of the long session automatically to stay within the context window. Decisions taken before a summary were re-read from the documents and the transcript whenever exact wording mattered.
 
