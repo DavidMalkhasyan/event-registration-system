@@ -92,14 +92,15 @@ Created in S-17. Work goes through feature branches and pull requests into `dev`
 | K-705 Event images and galleries, event addresses and maps | Earlier product requests (prompt 27) | **Split** in S-19 into K-711 to K-714 (prompt 29) |
 | K-706 Organizer navigation and scroll: no jump on section changes, refreshes or actions; sections keep search, filters and unsaved edits (PD-85) | Prompt 29, PR A | **Done**: [PR #24](https://github.com/DavidMalkhasyan/event-registration-system/pull/24) into `dev`, CI [run 38303929361](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38303929361) passed (156/156, 24/24, 31/31); merged 2026-10-13 00:29:09 as `0f5f5d8`. Not in `main` |
 | K-707 Capacity: increase-only (amendment A-2), 1 to 100 000, normalized in the forms (PD-87) | Prompt 29, PR B | **Done**: [PR #25](https://github.com/DavidMalkhasyan/event-registration-system/pull/25) into `dev`, CI [run 38305926846](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38305926846) passed (157/157, 30/30, 32/32); merged 2026-10-13 00:47:39 as `0fed928`. Not in `main` |
-| K-708 Organizations, memberships and roles; events owned by organizations; migration of existing organizers (PD-88, ADR-022) | Prompt 29, PR C (amendment A-3) | **Review**: implemented and tested on `feature/organizations-model` (migration `0009`); pull request into `dev` |
-| K-709 Organization registration, password sign-in, email verification, password reset, transition of existing organizers | Prompt 29, PR D (A-3) | **To Do** |
+| K-708 Organizations, memberships and roles; events owned by organizations; migration of existing organizers (PD-88, ADR-022) | Prompt 29, PR C (amendment A-3) | **Done**: [PR #26](https://github.com/DavidMalkhasyan/event-registration-system/pull/26) into `dev`, CI [run 38351624575](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38351624575) passed (161/161, 30/30, 32/32); merged 2026-10-13 09:33:41 as `e5b3e73`. Not in `main` |
+| K-709 Organization registration, password sign-in, email verification, password reset, transition of existing organizers (PD-89) | Prompt 29, PR D (A-3) | **Review**: implemented and tested on `feature/organization-accounts` (migration `0010`); pull request into `dev` |
 | K-710 Super Admin area: applications, approval, rejection, suspension, audit, bootstrap command | Prompt 29, PR E (A-3) | **To Do** |
 | K-711 Event location: venue, address, arrival instructions, coordinates, display, directions, venue-change notices | Prompt 29, PR F (A-5) | **To Do** |
 | K-712 Event media backend: validated uploads, re-encoding, storage adapter, serving, lifecycle | Prompt 29, PR G (A-4) | **To Do** |
 | K-713 Organizer image management and public gallery with a viewer | Prompt 29, PR H (A-4) | **To Do** |
 | K-714 Participant map | Prompt 29, PR I (A-6) | **Blocked**: awaiting the stakeholder's choice of map data provider ([POST_RELEASE_PLAN.md](POST_RELEASE_PLAN.md)) |
 | K-715 Staff experience review and refinements; final end-to-end review | Prompt 29, PR J | **To Do** |
+| K-716 Several organizers per organization: owners and admins invite organizers by email and change roles; members leave (A-3) | Prompt 29 ("multiple organizers in one organization"), after K-710 | **To Do**: the model and authorization exist (K-708); the invitation flow does not |
 
 ## Partly done (remaining parts are in Backlog or Deferred)
 
