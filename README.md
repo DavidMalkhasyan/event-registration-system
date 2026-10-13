@@ -220,18 +220,20 @@ Errors use RFC 9457 Problem Details (`application/problem+json`) with a stable `
 - **Camera scanning** (accepted as a documented limitation for this release): QR scanning uses the browser's `BarcodeDetector` where it exists (desktop Chromium on Windows and Linux has none), so the scan button appears only there; manual code entry always works. The browser test `camera-scan` covers scanning with **simulated** camera and `BarcodeDetector` APIs; everything after detection is real. It has **not been tried on a physical phone or camera**.
 - **Test environment:** tests use a local PostgreSQL database instead of Testcontainers (no container runtime on the development machine).
 - **Verified on one platform only:** the setup was verified from a clean clone on Windows (Git Bash) in S-03 and again in S-14, and in CI on Ubuntu; macOS and Linux desktops have not been tried.
-- **CI warnings:** GitHub reports that the v4 actions target the deprecated Node.js 20 runtime (they run on Node.js 24). Updating the action versions is pending.
+- **Browsers and devices:** the browser tests and the device audit (1440, 768 and 390 px, [E2E_AUDIT.md](docs/process/E2E_AUDIT.md)) run in Chromium (Microsoft Edge locally); Safari and Firefox have not been tried, and phone and tablet sizes are emulated.
 - **Upgrading an existing setup:** after pulling, run `pnpm migrate` (migrations `0003` to `0017`; `0009` gives each existing organizer its own organization, `0010` adds passwords and keeps existing organizers on the emailed sign-in link until they set one, `0011` adds the Super Admin tables, `0012` the optional event location, `0013` event image metadata, `0014` organization invitations, `0015` lets a staff device end its own access, `0016` stores delivery webhook events, `0017` the Super Admins' second factor; then create a Super Admin, §2.4) and add `PREVIEW_SECRET` to `.env`; the processes refuse to start with an outdated schema or a missing variable.
 - **Development server headers:** the Vite development server does not send the production page headers (content security policy and others) and injects its own client script. The production-like run (§3) is the tested path.
-- **Event artwork:** events have no uploaded image; each gets one of six original CSS posters (geometric shapes and type in the EventFlow palette, chosen per event from its public ID; no image files). The v0 design's three AI-generated photographs were removed before the release because their reuse rights were not established; they remain in earlier commits, since the history is not rewritten ([AI_USAGE.md](docs/process/AI_USAGE.md) §7).
-- **Release state:** `main` holds the v1.0.0 release ([PR #17](https://github.com/DavidMalkhasyan/event-registration-system/pull/17), merged 2026-10-12; CI passed on the merge commit). No release tag has been created yet.
-- **Not production-ready:** no deployment exists, and there is no deployment configuration, TLS termination, backups or load testing.
+- **Event artwork:** an event without photographs gets one of six original CSS posters (geometric shapes and type in the EventFlow palette, chosen per event from its public ID; no image files). The v0 design's three AI-generated photographs were removed before the release because their reuse rights were not established; they remain in earlier commits, since the history is not rewritten ([AI_USAGE.md](docs/process/AI_USAGE.md) §7).
+- **Release state:** `main` holds the v1.0.0 release ([PR #17](https://github.com/DavidMalkhasyan/event-registration-system/pull/17), merged 2026-10-12; CI passed on the merge commit). No release tag has been created yet. `dev` holds the release candidate of prompt 33 ([RELEASE_CANDIDATE.md](docs/process/RELEASE_CANDIDATE.md)); merging it into `main`, a tag and a deployment wait for the stakeholder.
+- **Not production-ready yet:** the deployment templates (Docker Compose with Caddy for HTTPS), backups with a restore drill and load measurements exist and are verified (in CI and locally), but nothing is deployed, and real email (a Resend account and domain), a production map provider, hosting and the organizer second factor are open; see the blockers in [RELEASE_CANDIDATE.md](docs/process/RELEASE_CANDIDATE.md).
 
 ## 9. Future improvements
 
-1. **Real email:** a Resend provider behind configuration, with delivery webhooks and a delivery-problem view.
-2. **Test infrastructure:** Testcontainers once a container runtime is available, and a load test of the last-seat path.
-3. **Camera check on real devices:** scan tickets with a phone and a laptop camera, and record which browsers offer `BarcodeDetector`.
+1. **Real email:** connect a Resend account and a verified domain (the provider and webhooks are implemented), then test delivery, bounces and complaints for real.
+2. **Map in production:** a tile provider with an agreement (option B or C of PD-96) instead of OpenStreetMap's community tiles.
+3. **Deployment:** choose a host, deploy with `deploy/`, and repeat the backup, restore drill and `pnpm bench` there.
+4. **Test infrastructure:** Testcontainers once a container runtime is available on the development machine.
+5. **Camera check on real devices:** scan tickets with a phone and a laptop camera, and record which browsers offer `BarcodeDetector`; run the browser tests in Safari and Firefox.
 
 ## 10. How this was built
 
@@ -241,4 +243,5 @@ The project was developed with **Claude Code** (model Claude Opus 5.5, `claude-o
 - **Sessions with real timestamps, commands and results:** [docs/process/DEVELOPMENT_JOURNAL.md](docs/process/DEVELOPMENT_JOURNAL.md)
 - **Process decisions:** [docs/process/DECISION_LOG.md](docs/process/DECISION_LOG.md)
 - **Work tracking:** [docs/process/KANBAN.md](docs/process/KANBAN.md)
+- **Release candidate, audit and operations:** [RELEASE_CANDIDATE.md](docs/process/RELEASE_CANDIDATE.md), [E2E_AUDIT.md](docs/process/E2E_AUDIT.md), [docs/operations/](docs/operations/) (deployment, environment, backups, runbook, performance)
 - **Client inventory before a UI redesign:** [docs/frontend/UI_INVENTORY.md](docs/frontend/UI_INVENTORY.md). The redesign adapts the approved design made with Vercel v0 ([eventflow-v0-design](https://github.com/DavidMalkhasyan/eventflow-v0-design)): its visual components and styles were ported onto this project's own backend and security architecture; see PD-65 to PD-71 and [AI_USAGE.md](docs/process/AI_USAGE.md) §7.

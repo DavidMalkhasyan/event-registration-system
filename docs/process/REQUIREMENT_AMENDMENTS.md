@@ -6,10 +6,10 @@
 |---|---|
 | A-1 | **Approved** by the stakeholder on 2026-10-13 (prompt 29, S-19); proposed in S-18. Implemented in `dev` under PD-83 (K-703, PR #22). REQUIREMENTS.md itself is unchanged; this record is the amendment. |
 | A-2 | **Approved** (prompt 29, S-19): capacity can only be increased. Implemented by K-707 (PD-87) on `feature/capacity-increase-only`. |
-| A-3 | **Approved** (prompt 29, S-19): organizations, organizer accounts with passwords, Super Admin approval. K-708 (data model, authorization, migration; PD-88) and K-709 (registration, passwords, verification, reset; PD-89) merged into `dev`; K-710 (Super Admin; PD-90) merged into `dev`; K-716 (several organizers per organization; PD-94) implemented. |
+| A-3 | **Approved** (prompt 29, S-19): organizations, organizer accounts with passwords, Super Admin approval. K-708 (data model, authorization, migration; PD-88) and K-709 (registration, passwords, verification, reset; PD-89) merged into `dev`; K-710 (Super Admin; PD-90) merged into `dev`; K-716 (several organizers per organization; PD-94) implemented. Prompt 33: a TOTP second factor for Super Admins, required in production (K-718, PD-99, PR #38); a second factor for organizers awaits the stakeholder's decision. |
 | A-4 | **Approved** (prompt 29, S-19): event photographs and a gallery. Implemented by K-712 (server, PD-92) and K-713 (interface, PD-93). |
 | A-5 | **Approved** (prompt 29, S-19): event location and venue-change notices. Implemented by K-711 (PD-91). |
-| A-6 | **Approved** (prompt 29; provider chosen in prompt 33: OpenStreetMap, option A, for development and the demonstration): a real map for confirmed participants. Implemented by K-714 (PD-96). |
+| A-6 | **Approved** (prompt 29; provider chosen in prompt 33: OpenStreetMap, option A, for development and the demonstration): a real map for confirmed participants. Implemented by K-714 (PD-96), merged into `dev` (PR #35); production use needs a provider with an agreement (option B or C). |
 
 ## A-1 Organizer cancellation of one confirmed registration
 
