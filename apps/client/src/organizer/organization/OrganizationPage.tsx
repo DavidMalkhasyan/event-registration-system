@@ -24,6 +24,8 @@ interface Members {
 }
 
 const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+const sinceDate = (iso: string) =>
+  new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(iso));
 
 /** The roles the caller may give to `target` (owners: any; admins: admin or member, never to owners). */
 function assignable(you: Role, target: Role): Role[] {
@@ -99,83 +101,68 @@ function OrganizationMembers({ session, organizationId }: { session: Session; or
       <section className="panel">
         <div className="panel-body">
           <h2 className="panel-title">Members</h2>
-          <div className="table-scroll">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th scope="col">Person</th>
-                  <th scope="col">Role</th>
-                  <th scope="col">Member since</th>
-                  <th scope="col">
-                    <span className="sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.members.map((m) => {
-                  const roles = m.you ? [] : assignable(data.yourRole, m.role);
-                  const canRemove = m.you || (manager && !(data.yourRole === 'admin' && m.role === 'owner'));
-                  return (
-                    <tr key={m.accountId}>
-                      <td>
-                        {m.name ?? m.email}
-                        {m.you && ' (you)'}
-                        {m.name && <small>{m.email}</small>}
-                      </td>
-                      <td>
-                        {roles.length > 0 ? (
-                          <select
-                            className="select select-auto"
-                            aria-label={`Role of ${m.name ?? m.email}`}
-                            value={m.role}
-                            disabled={busy}
-                            onChange={(e) => {
-                              const next = e.target.value as Role;
-                              void run(
-                                () =>
-                                  api(`${base}/members/${m.accountId}`, {
-                                    method: 'PATCH',
-                                    csrf: session.csrfToken,
-                                    body: { role: next },
-                                  }),
-                                `${m.name ?? m.email} is now ${ROLE_LABEL[next].toLowerCase()}.`,
-                              );
-                            }}
-                          >
-                            {roles.map((r) => (
-                              <option key={r} value={r}>
-                                {ROLE_LABEL[r]}
-                              </option>
-                            ))}
-                          </select>
+          {/* A list rather than a table (K-715 review): it wraps on a phone instead of scrolling sideways. */}
+          <ul className="member-list">
+            {data.members.map((m) => {
+              const roles = m.you ? [] : assignable(data.yourRole, m.role);
+              const canRemove = m.you || (manager && !(data.yourRole === 'admin' && m.role === 'owner'));
+              return (
+                <li key={m.accountId}>
+                  <div className="member-who">
+                    <strong>
+                      {m.name ?? m.email}
+                      {m.you && ' (you)'}
+                    </strong>
+                    {m.name && <span>{m.email}</span>}
+                    <small>Member since {sinceDate(m.since)}</small>
+                  </div>
+                  <div className="member-actions">
+                    {roles.length > 0 ? (
+                      <select
+                        className="select select-auto"
+                        aria-label={`Role of ${m.name ?? m.email}`}
+                        value={m.role}
+                        disabled={busy}
+                        onChange={(e) => {
+                          const next = e.target.value as Role;
+                          void run(
+                            () =>
+                              api(`${base}/members/${m.accountId}`, {
+                                method: 'PATCH',
+                                csrf: session.csrfToken,
+                                body: { role: next },
+                              }),
+                            `${m.name ?? m.email} is now ${ROLE_LABEL[next].toLowerCase()}.`,
+                          );
+                        }}
+                      >
+                        {roles.map((r) => (
+                          <option key={r} value={r}>
+                            {ROLE_LABEL[r]}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <Status tone={m.role === 'owner' ? 'accepted' : 'neutral'}>{ROLE_LABEL[m.role]}</Status>
+                    )}
+                    {canRemove && (
+                      <Button size="sm" variant="ghost" disabled={busy} onClick={() => setRemoving(m)}>
+                        {m.you ? (
+                          <>
+                            <LogOut size={15} aria-hidden="true" /> Leave
+                          </>
                         ) : (
-                          <Status tone={m.role === 'owner' ? 'accepted' : 'neutral'}>
-                            {ROLE_LABEL[m.role]}
-                          </Status>
+                          <>
+                            <UserMinus size={15} aria-hidden="true" /> Remove
+                          </>
                         )}
-                      </td>
-                      <td>{formatLocal(m.since, zone())}</td>
-                      <td>
-                        {canRemove && (
-                          <Button size="sm" variant="ghost" disabled={busy} onClick={() => setRemoving(m)}>
-                            {m.you ? (
-                              <>
-                                <LogOut size={15} aria-hidden="true" /> Leave
-                              </>
-                            ) : (
-                              <>
-                                <UserMinus size={15} aria-hidden="true" /> Remove
-                              </>
-                            )}
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </Button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       </section>
 
