@@ -9,6 +9,9 @@ export const MESSAGE_POLICY = {
   staff_invitation: { regenClass: 'A', lane: 'bulk', required: false },
   sign_in: { regenClass: 'A', lane: 'priority', required: false },
   email_change_confirmation: { regenClass: 'A', lane: 'priority', required: false },
+  account_verification: { regenClass: 'A', lane: 'priority', required: false }, // K-709, migration 0010
+  password_reset: { regenClass: 'A', lane: 'priority', required: false },
+  account_exists_notice: { regenClass: 'A', lane: 'bulk', required: false },
   ticket_confirmation: { regenClass: 'B', lane: 'bulk', required: false },
   promotion: { regenClass: 'B', lane: 'bulk', required: false },
   event_change: { regenClass: 'B', lane: 'bulk', required: false },

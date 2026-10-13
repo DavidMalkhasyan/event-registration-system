@@ -80,38 +80,3 @@ export async function organizationForNewEvent(
   if (active.length === 0) throw new AppError(403, 'organization_not_active');
   throw new AppError(422, 'organization_required');
 }
-
-/**
- * Transitional (PD-88, until K-709 replaces passwordless organizer sign-up): an account created by the
- * passwordless sign-in gets its own active organization, as it could create events before K-708.
- */
-export async function ensurePersonalOrganization(
-  trx: Tx,
-  accountId: string,
-  email: string,
-  now: Date,
-): Promise<void> {
-  const existing = await trx
-    .selectFrom('app.organization_memberships')
-    .select('organization_id')
-    .where('account_id', '=', accountId)
-    .executeTakeFirst();
-  if (existing) return;
-  const org = await trx
-    .insertInto('app.organizations')
-    .values({
-      name: email,
-      status: 'active',
-      created_at: now,
-      updated_at: now,
-      email_verified_at: now,
-      submitted_at: now,
-      decided_at: now,
-    })
-    .returning('id')
-    .executeTakeFirstOrThrow();
-  await trx
-    .insertInto('app.organization_memberships')
-    .values({ organization_id: org.id, account_id: accountId, role: 'owner', created_at: now })
-    .execute();
-}

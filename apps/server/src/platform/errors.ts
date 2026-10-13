@@ -14,6 +14,8 @@ export type ProblemCode =
   | 'event_started'
   | 'capacity_decrease_not_allowed'
   | 'organization_not_active'
+  | 'invalid_credentials'
+  | 'email_verification_required'
   | 'organization_required'
   | 'cancelled_event_not_deletable'
   | 'deletion_blocked'
@@ -56,6 +58,8 @@ const TITLES: Record<ProblemCode, string> = {
   event_started: 'The event has started',
   capacity_decrease_not_allowed: 'Capacity can only be increased',
   organization_not_active: 'Your organization is not active',
+  invalid_credentials: 'The email address or password is not correct',
+  email_verification_required: 'Confirm your email address first',
   organization_required: 'Choose the organization for this event',
   cancelled_event_not_deletable: "Cancelled events can't be deleted",
   deletion_blocked: 'The event cannot be deleted yet',
