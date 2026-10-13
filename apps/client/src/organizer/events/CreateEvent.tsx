@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { ApiError, api, errorMessage } from '../../shared/api';
 import { CAPACITY_MAX, CAPACITY_MIN, normalizeCapacity, type CapacityCheck } from '../../shared/capacity';
 import { Alert, Button, Field, PageHeader, SectionHeading, buttonClass } from '../../shared/ui';
+import { EMPTY_LOCATION, LocationFields, payloadOf, type LocationDraft } from '../../shared/location';
 import { Link, navigate } from '../router';
 import { activeOrganizations, type EventItem, type Session } from '../types';
 
@@ -28,6 +29,7 @@ export function CreateEvent({ session, onCreated }: { session: Session; onCreate
   const [capacityCheck, setCapacityCheck] = useState<CapacityCheck>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const [location, setLocation] = useState<LocationDraft>(EMPTY_LOCATION);
   // One request ID per distinct payload: retries of the same submission are idempotent (D-17).
   const requestRef = useRef<{ key: string; id: string } | null>(null);
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
@@ -43,6 +45,8 @@ export function CreateEvent({ session, onCreated }: { session: Session; onCreate
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!commitCapacity()) return; // corrected or invalid: shown to the organizer before anything is sent
+    const venue = payloadOf(location);
+    if ('error' in venue) return setError(venue.error);
     setBusy(true);
     setError(undefined);
     const payload = {
@@ -53,6 +57,7 @@ export function CreateEvent({ session, onCreated }: { session: Session; onCreate
       capacity: Number(form.capacity),
       ...(form.utcOffset ? { utcOffset: form.utcOffset } : {}),
       ...(organizations.length > 1 && form.organizationId ? { organizationId: form.organizationId } : {}),
+      ...(venue.payload ? { location: venue.payload } : {}),
     };
     const key = JSON.stringify(payload);
     if (requestRef.current?.key !== key) requestRef.current = { key, id: crypto.randomUUID() };
@@ -225,6 +230,13 @@ export function CreateEvent({ session, onCreated }: { session: Session; onCreate
               )}
             </Field>
           )}
+        </div>
+        <div className="form-section">
+          <SectionHeading
+            title="Location (optional)"
+            description="Shown on the registration page and tickets, with a directions link. You can add or change it later; participants are emailed when it changes."
+          />
+          <LocationFields value={location} onChange={setLocation} />
         </div>
         {error && <Alert>{error}</Alert>}
         <div className="form-footer">

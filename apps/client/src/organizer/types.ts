@@ -1,3 +1,5 @@
+import type { Location } from '../shared/location';
+
 export interface Session {
   accountId: string;
   email: string;
@@ -44,6 +46,9 @@ export interface EventItem {
   checkInOpensAt: string;
   checkInClosesAt: string;
   cancelledAt: string | null;
+  /** K-711: the venue, or null; the version guards against a concurrent change. */
+  location: Location | null;
+  locationVersion: number;
 }
 
 /** An item of GET /api/events, with the per-event counts of PD-67. */

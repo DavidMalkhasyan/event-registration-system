@@ -4,6 +4,7 @@ import { linkToken } from './bootstrap-token';
 import { ApiError, api, errorMessage } from '../shared/api';
 import { takeReturnTo } from '../shared/return-to';
 import { Alert, Button, CopyLink, formatLocal } from '../shared/ui';
+import { VenueDetails } from '../shared/location';
 import { CenterPage, InvalidLinkPage, LoadingPage, TicketCard, type EventSummary } from './shell';
 
 // Link pages (ADR-011): the token comes from bootstrap-token (memory only) and is sent as
@@ -210,6 +211,11 @@ export function TicketPage() {
             )
           }
         />
+        {view.state === 'valid' && view.event.location && (
+          <div className="panel ticket-venue-panel">
+            <VenueDetails location={view.event.location} heading="Where to go" />
+          </div>
+        )}
       </div>
     </CenterPage>
   );
