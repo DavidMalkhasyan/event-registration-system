@@ -4,7 +4,7 @@ import { loadConfigOrExit } from '../platform/config.js';
 import { createDatabase } from '../platform/db.js';
 import { assertSchemaVersion } from '../platform/migrations.js';
 import { Dispatcher } from '../modules/messaging/dispatcher.js';
-import { FakeEmailProvider } from '../modules/messaging/fake-provider.js';
+import { emailProviderFor } from '../modules/messaging/providers.js';
 import { runDueTasks } from '../modules/jobs/tasks.js';
 
 const config = loadConfigOrExit();
@@ -16,12 +16,7 @@ try {
 }
 const db = createDatabase(config.DATABASE_URL);
 const workerId = `${hostname()}:${process.pid}:${randomUUID().slice(0, 8)}`;
-const dispatcher = new Dispatcher(
-  db,
-  new FakeEmailProvider(config.DEV_MAILBOX_DIR),
-  config.PUBLIC_ORIGIN,
-  workerId,
-);
+const dispatcher = new Dispatcher(db, emailProviderFor(config), config.PUBLIC_ORIGIN, workerId);
 
 let running = true;
 process.on('SIGINT', () => (running = false));
@@ -31,7 +26,7 @@ process.on('unhandledRejection', (error) => {
   process.exit(1);
 });
 
-process.stdout.write(`worker ${workerId} started\n`);
+process.stdout.write(`worker ${workerId} started (email provider: ${config.EMAIL_PROVIDER})\n`);
 while (running) {
   let worked = 0;
   try {
