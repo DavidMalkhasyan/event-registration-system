@@ -30,6 +30,7 @@ import { PhotosTab } from './PhotosTab';
 import { StaffTab } from './StaffTab';
 import { RefreshControl } from '../RefreshControl';
 import { useEventData } from './use-event-data';
+import { formatWindow } from '../../checkin/CheckInPanel';
 
 const TABS: { key: EventTab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
@@ -108,7 +109,12 @@ function OverviewTab({ event, counts }: { event: EventItem; counts?: Counts }) {
       </div>
       <aside className="glance">
         <span className="eyebrow">Registration at a glance</span>
-        <h3>{counts?.confirmed ?? event.confirmedCount} people. One great gathering.</h3>
+        <h3>
+          {(counts?.confirmed ?? event.confirmedCount) === 1
+            ? '1 person'
+            : `${counts?.confirmed ?? event.confirmedCount} people`}
+          . One great gathering.
+        </h3>
         <p>
           {counts?.waitlisted ?? 0} on the waiting list · {counts?.checkedIn ?? 0} checked in
         </p>
@@ -127,10 +133,7 @@ function OverviewTab({ event, counts }: { event: EventItem; counts?: Counts }) {
             <CalendarClock aria-hidden="true" />
             <span>
               <strong>Check-in window</strong>
-              <small>
-                {formatLocal(event.checkInOpensAt, event.timeZone)} to{' '}
-                {formatLocal(event.checkInClosesAt, event.timeZone)}
-              </small>
+              <small>{formatWindow(event.checkInOpensAt, event.checkInClosesAt, event.timeZone)}</small>
             </span>
           </div>
         </div>

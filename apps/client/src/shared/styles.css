@@ -1078,6 +1078,53 @@ svg {
   gap: 8px;
 }
 
+/* Staff device (K-715) */
+.staff-end {
+  display: flex;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.member-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.member-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px 16px;
+  flex-wrap: wrap;
+  padding: 12px 0;
+  border-bottom: 1px solid #f1eee9;
+}
+.member-list li:last-child {
+  border-bottom: 0;
+}
+.member-who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.member-who span,
+.member-who small {
+  color: var(--muted-foreground);
+  font-size: 12.5px;
+}
+.member-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.page-heading h1 {
+  overflow-wrap: anywhere;
+}
+
 /* Super Admin area (K-710) */
 .admin-shell {
   min-height: 100vh;
@@ -3383,7 +3430,8 @@ svg {
   .overview-bottom-grid,
   .event-overview-content,
   .scanner-grid {
-    grid-template-columns: 1fr;
+    /* minmax(0, …): a long single-line title must not widen the column past the screen (K-715). */
+    grid-template-columns: minmax(0, 1fr);
   }
   .small-event-grid {
     grid-template-rows: none;

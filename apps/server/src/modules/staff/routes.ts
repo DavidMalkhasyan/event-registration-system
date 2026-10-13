@@ -4,9 +4,11 @@ import type { AppContext } from '../../composition/context.js';
 import { AppError } from '../../platform/errors.js';
 import { linkToken } from '../../platform/http.js';
 import { withLinkRateLimit } from '../access-tokens/link-guard.js';
-import { requireOrganizer } from '../identity/sessions.js';
+import { csrfTokenFor, requireOrganizer } from '../identity/sessions.js';
+import { safeEqual } from '../../platform/crypto.js';
 import { STAFF_COOKIE, resolveStaff } from '../identity/staff-sessions.js';
 import {
+  endStaffSession,
   acceptInvitation,
   inviteSchema,
   inviteStaff,
@@ -40,6 +42,24 @@ export function registerStaffRoutes(app: FastifyInstance, ctx: AppContext): void
       throw new AppError(401, 'unauthenticated');
     }
     return staffSessionView(ctx, staff);
+  });
+
+  // K-715 (PD-95): the device ends its own access (a shared phone at the end of a shift).
+  app.post('/api/staff/sign-out', async (request, reply) => {
+    const staff = await resolveStaff(ctx, request);
+    if (!staff) {
+      reply.clearCookie(STAFF_COOKIE, cookieBase);
+      return reply.code(204).send();
+    }
+    const header = request.headers['x-csrf-token'];
+    if (
+      typeof header !== 'string' ||
+      !safeEqual(header, csrfTokenFor(ctx.config.CSRF_SECRET, 'staff', staff.staffSessionId))
+    )
+      throw new AppError(403, 'csrf_failed');
+    await endStaffSession(ctx, staff);
+    reply.clearCookie(STAFF_COOKIE, cookieBase);
+    return reply.code(204).send();
   });
 
   // ---- the owner

@@ -1,9 +1,9 @@
 import { StrictMode, useEffect, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ShieldOff } from 'lucide-react';
+import { LogOut, ShieldOff } from 'lucide-react';
 import { CheckInPanel } from '../checkin/CheckInPanel';
-import { api } from '../shared/api';
-import { Logo, PageSkeleton, Status } from '../shared/ui';
+import { api, errorMessage } from '../shared/api';
+import { Alert, Button, ConfirmDialog, Logo, PageSkeleton, Status } from '../shared/ui';
 
 // Staff device entry (FR-STAFF-2, PD-69): its own bundle, no organizer code. It calls only
 // /api/staff/session and, through CheckInPanel, the check-in, count and live endpoints of its event.
@@ -28,8 +28,53 @@ function StaffShell({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * K-715 (PD-95): ends this device's own access, for a shared or borrowed phone at the end of a shift.
+ * The organizer can still invite the person again.
+ */
+function EndAccess({ csrfToken, onEnded }: { csrfToken: string; onEnded: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  const end = async () => {
+    setBusy(true);
+    setError(undefined);
+    try {
+      await api('/api/staff/sign-out', { method: 'POST', csrf: csrfToken });
+      onEnded();
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="staff-end">
+      <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
+        <LogOut size={15} aria-hidden="true" /> End access on this device
+      </Button>
+      <ConfirmDialog
+        open={open}
+        title="End check-in access on this device?"
+        confirmLabel="End access"
+        cancelLabel="Keep checking in"
+        destructive
+        busy={busy}
+        onConfirm={() => void end()}
+        onClose={() => setOpen(false)}
+      >
+        <p>
+          This device can no longer check tickets in. Use it when you hand the phone back or your shift ends;
+          the organizer can invite you again.
+        </p>
+        {error && <Alert>{error}</Alert>}
+      </ConfirmDialog>
+    </div>
+  );
+}
+
 function StaffApp() {
   const [view, setView] = useState<StaffView | null | undefined>();
+  const [ended, setEnded] = useState(false);
   useEffect(() => {
     api<StaffView>('/api/staff/session')
       .then(setView)
@@ -39,6 +84,18 @@ function StaffApp() {
     return (
       <StaffShell>
         <PageSkeleton />
+      </StaffShell>
+    );
+  if (ended)
+    return (
+      <StaffShell>
+        <section className="center-card">
+          <span className="result-icon">
+            <ShieldOff aria-hidden="true" />
+          </span>
+          <h1>Access ended on this device</h1>
+          <p>This device can no longer check tickets in. Thank you for helping at the door.</p>
+        </section>
       </StaffShell>
     );
   if (view === null)
@@ -70,6 +127,7 @@ function StaffApp() {
           status: <Status tone="active">Staff access</Status>,
         }}
       />
+      <EndAccess csrfToken={view.csrfToken} onEnded={() => setEnded(true)} />
     </StaffShell>
   );
 }
