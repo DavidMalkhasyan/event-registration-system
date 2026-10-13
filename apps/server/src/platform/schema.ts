@@ -393,7 +393,7 @@ export interface StaffSessionsTable {
   last_seen_at: Timestamp;
   absolute_expires_at: Timestamp;
   revoked_at: Timestamp | null;
-  revoke_reason: 'owner_revoked' | null;
+  revoke_reason: 'owner_revoked' | 'staff_ended' | null; // 'staff_ended': migration 0015 (K-715)
 }
 
 export interface RotationRequestsTable {

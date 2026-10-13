@@ -279,6 +279,31 @@ export async function revokeStaffSession(
   });
 }
 
+/**
+ * POST /api/staff/sign-out (K-715, PD-95): the staff device ends its own access. Under the exclusive
+ * event lock, like the owner's revocation, so no check-in from this device commits after it.
+ */
+export async function endStaffSession(ctx: AppContext, principal: StaffPrincipal): Promise<void> {
+  await withEventLock(ctx.db, principal.eventId, 'exclusive', async ({ trx, now }) => {
+    const ended = await trx
+      .updateTable('app.staff_sessions')
+      .set({ revoked_at: now, revoke_reason: 'staff_ended' })
+      .where('id', '=', principal.staffSessionId)
+      .where('revoked_at', 'is', null)
+      .executeTakeFirst();
+    if (!ended.numUpdatedRows) return;
+    await recordAudit(trx, {
+      now,
+      action: 'staff_session_ended',
+      actorKind: 'staff',
+      actorStaffSessionId: principal.staffSessionId,
+      eventId: principal.eventId,
+      subjectId: principal.staffSessionId,
+      outcome: 'success',
+    });
+  });
+}
+
 /** An invitation token that can still be accepted (FR-STAFF-5); anything else is just an invalid link. */
 async function usableInvitation(
   db: AppContext['db'] | Tx,

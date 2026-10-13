@@ -395,6 +395,46 @@ describe('staff sessions (FR-STAFF-2 to FR-STAFF-4, PD-56)', () => {
     expect((await staffSession(two)).statusCode).toBe(401);
   });
 
+  it('the device can end its own access, with its anti-forgery token; nothing checks in after it (K-715, PD-95)', async () => {
+    const s = await signIn(h, ORGANIZER);
+    const event = await createEvent(h, s, { capacity: 3, startsInHours: 72 });
+    const a = await registerConfirmed(h, event.publicId, 'a@example.test');
+    const staff = await staffFor(s, event.id);
+    moveClockTo(new Date(event.startsAt), -HOUR);
+    const signOut = (csrf?: string) =>
+      h.app.inject({
+        method: 'POST',
+        url: '/api/staff/sign-out',
+        headers: { origin: ORIGIN, cookie: staff.cookie, ...(csrf ? { 'x-csrf-token': csrf } : {}) },
+      });
+    expect((await signOut()).statusCode).toBe(403); // no token: a cross-site form cannot end it
+    expect((await signOut('v1.1.forged')).statusCode).toBe(403);
+    const ended = await signOut(staff.csrf);
+    expect(ended.statusCode).toBe(204);
+    expect(ended.cookies.find((c) => c.name === '__Host-ers_staff')?.value).toBe('');
+    expect((await staffSession(staff)).statusCode).toBe(401);
+    expect((await staffCheckIn(staff, event.id, a.ticket.code)).statusCode).toBe(401);
+    const [row] = await staffRows();
+    expect(row).toMatchObject({ revoke_reason: 'staff_ended' });
+    const audit = await h.db
+      .selectFrom('app.audit_records')
+      .select(['action', 'actor_kind', 'actor_staff_session_id'])
+      .where('action', '=', 'staff_session_ended')
+      .execute();
+    expect(audit).toEqual([
+      { action: 'staff_session_ended', actor_kind: 'staff', actor_staff_session_id: row!.id },
+    ]);
+    // Repeating it (for example a second tap) is harmless.
+    expect((await signOut(staff.csrf)).statusCode).toBe(204);
+    // The organizer no longer lists the device.
+    const overview = await h.app.inject({
+      method: 'GET',
+      url: `/api/events/${event.id}/staff`,
+      headers: { cookie: s.cookie },
+    });
+    expect(overview.json().sessions).toEqual([]);
+  });
+
   it('revocation vs. check-in: forced in both orders, and while both wait on the lock (AC-156)', async () => {
     const s = await signIn(h, ORGANIZER);
     const event = await createEvent(h, s, { capacity: 10, startsInHours: 72 });
