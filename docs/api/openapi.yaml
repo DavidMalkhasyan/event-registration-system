@@ -1073,7 +1073,11 @@ paths:
           required: false
           schema: { $ref: '#/components/schemas/RegistrationState' }
         - $ref: '#/components/parameters/cursor'
-        - $ref: '#/components/parameters/limit'
+        # K-723 (PD-102): pages of up to 1,000 in registration order; positions count the whole event.
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 1000 }
       responses:
         '200':
           description: A page of participants.
