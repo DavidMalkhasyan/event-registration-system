@@ -16,6 +16,7 @@ export const MESSAGE_POLICY = {
   ticket_confirmation: { regenClass: 'B', lane: 'bulk', required: false },
   promotion: { regenClass: 'B', lane: 'bulk', required: false },
   event_change: { regenClass: 'B', lane: 'bulk', required: false },
+  venue_change: { regenClass: 'B', lane: 'bulk', required: false }, // K-711, migration 0012
   event_cancellation: { regenClass: 'B', lane: 'bulk', required: false },
   registration_cancelled: { regenClass: 'B', lane: 'bulk', required: true },
   waitlist_removed: { regenClass: 'B', lane: 'bulk', required: true },

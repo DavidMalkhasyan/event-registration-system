@@ -6,6 +6,14 @@ import { Alert, Button, ConfirmDialog, Field, formatLocal } from '../../shared/u
 import { ReauthPrompt } from '../auth/Reauth';
 import type { Counts, EventItem, Notice, Session } from '../types';
 import { describeLocalInput, toZonedLocalInput } from './schedule';
+import {
+  LocationFields,
+  draftOf,
+  payloadOf,
+  sameLocation,
+  type LocationDraft,
+  type LocationPayload,
+} from '../../shared/location';
 
 // Settings of one event (PD-68, K-702). Each form keeps the organizer's unsaved edit as a draft: the
 // field shows the server's current value until it is edited, and a background refresh never
@@ -93,6 +101,116 @@ function DetailsEditor({
         </Button>
       </div>
       {message && <Alert kind={message.kind}>{message.text}</Alert>}
+    </form>
+  );
+}
+
+/**
+ * Location (K-711, PD-91). The form keeps the organizer's draft; saving a change of the venue after people
+ * registered asks for confirmation first, because each confirmed and waiting participant is emailed
+ * (queued through the outbox; delivery is not claimed). A location changed elsewhere in the meantime is
+ * not overwritten: the server compares the version this form started from.
+ */
+function LocationEditor({
+  session,
+  event,
+  counts,
+  onSaved,
+}: {
+  session: Session;
+  event: EventItem;
+  counts?: Counts;
+  onSaved: OnSaved;
+}) {
+  const [draft, setDraft] = useState<LocationDraft>();
+  const [confirming, setConfirming] = useState<LocationPayload | null | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<Notice>();
+  const value = draft ?? draftOf(event.location);
+  const parsed = payloadOf(value);
+  const dirty = 'payload' in parsed ? !sameLocation(event.location, parsed.payload) : true;
+
+  const send = async (payload: LocationPayload | null) => {
+    setBusy(true);
+    setMessage(undefined);
+    try {
+      const result = await api<{ event: EventItem; notified: number }>(`/api/events/${event.id}/location`, {
+        method: 'PUT',
+        csrf: session.csrfToken,
+        body: { location: payload, expectedLocationVersion: event.locationVersion },
+      });
+      setMessage({
+        kind: 'success',
+        text:
+          result.notified > 0
+            ? `Location saved. Venue-change emails are queued for ${plural(result.notified, 'participant', 'participants')}.`
+            : 'Location saved. Nobody needed an email for this change.',
+      });
+      setDraft(undefined);
+      setConfirming(undefined);
+      onSaved(result.event);
+    } catch (err) {
+      setConfirming(undefined);
+      setMessage({
+        kind: 'error',
+        text:
+          err instanceof ApiError && err.code === 'location_version_mismatch'
+            ? 'The location was changed in the meantime (perhaps in another tab). Nothing was saved; the form shows your edit, compare it with the reloaded event and save again.'
+            : errorMessage(err),
+      });
+      onSaved(event);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if ('error' in parsed) return setMessage({ kind: 'error', text: parsed.error });
+    // Always confirmed, as a reschedule is: the counts on screen may be older than the server's (the
+    // server decides who is emailed, and the result says how many were queued).
+    setConfirming(parsed.payload);
+  };
+  return (
+    <form className="stack" onSubmit={submit}>
+      <LocationFields
+        value={value}
+        onChange={(next) => {
+          setDraft(next);
+          setMessage(undefined);
+        }}
+      />
+      <div className="inline-actions">
+        <Button type="submit" disabled={busy || !dirty}>
+          {busy ? 'Saving…' : 'Save location'}
+        </Button>
+        {event.location && (
+          <Button
+            variant="ghost"
+            disabled={busy}
+            onClick={() => {
+              setDraft(draftOf(null));
+              setMessage(undefined);
+            }}
+          >
+            Clear the form
+          </Button>
+        )}
+      </div>
+      {message && <Alert kind={message.kind}>{message.text}</Alert>}
+      <ConfirmDialog
+        open={confirming !== undefined}
+        title={confirming ? 'Change the venue?' : 'Remove the location?'}
+        confirmLabel={confirming ? 'Save and notify' : 'Remove and notify'}
+        cancelLabel="Keep editing"
+        busy={busy}
+        onConfirm={() => void send(confirming ?? null)}
+        onClose={() => setConfirming(undefined)}
+      >
+        <p>
+          A venue-change email will be queued for {audience(counts)}, with the new details and their
+          management link. A change of the coordinates alone sends nothing.
+        </p>
+      </ConfirmDialog>
     </form>
   );
 }
@@ -634,6 +752,18 @@ function SettingsSections({
         </div>
         <CapacityEditor session={session} event={event} onSaved={onSaved} />
       </div>
+      {!started && (
+        <div className="settings-section">
+          <div>
+            <h3>Location</h3>
+            <p>
+              Venue and address on the registration page and tickets, with directions. Confirmed and waiting
+              participants are emailed when the venue changes.
+            </p>
+          </div>
+          <LocationEditor session={session} event={event} counts={counts} onSaved={onSaved} />
+        </div>
+      )}
       {!started && (
         <div className="settings-section">
           <div>

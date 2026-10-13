@@ -3,6 +3,7 @@ import { ArrowRight, CalendarDays, Clock3, Globe, Info, Mail, ShieldCheck } from
 import { api, errorMessage } from '../shared/api';
 import { EventArtwork } from '../shared/artwork';
 import { Alert, Button, DevMailboxHint, Field, formatDay, formatLocal, formatTime } from '../shared/ui';
+import { VenueDetails } from '../shared/location';
 import { Availability } from './Availability';
 import { CenterPage, LoadingPage, PublicShell } from './shell';
 import { usePublicEvent } from './use-public-event';
@@ -88,6 +89,7 @@ export function EventPage({ publicId }: { publicId: string }) {
             </span>
             <h2>{headline}</h2>
             {event.description && <p className="event-description">{event.description}</p>}
+            {event.location && <VenueDetails location={event.location} />}
             <div className="event-facts">
               <div>
                 <CalendarDays aria-hidden="true" />

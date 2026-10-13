@@ -14,6 +14,13 @@ import {
 import type { OrganizerPrincipal } from '../identity/sessions.js';
 import { scheduleCutoffTask, scheduleReminderTask } from './lifecycle.js';
 import { manageableOrganizationIds, organizationForNewEvent } from '../organizations/access.js';
+import {
+  LOCATION_COLUMNS,
+  locationColumns,
+  locationSchema,
+  locationView,
+  type LocationRow,
+} from './location.js';
 
 export const eventCreateSchema = z
   .object({
@@ -28,11 +35,13 @@ export const eventCreateSchema = z
       .optional(),
     capacity: z.number().int().min(1).max(100_000),
     organizationId: z.uuid().optional(),
+    /** K-711: optional venue. */
+    location: locationSchema.nullable().optional(),
   })
   .strict();
 export type EventCreateInput = z.infer<typeof eventCreateSchema>;
 
-interface EventRow {
+interface EventRow extends LocationRow {
   id: string;
   public_id: string;
   title: string;
@@ -60,6 +69,7 @@ const EVENT_COLUMNS = [
   'schedule_version',
   'created_at',
   'cancelled_at',
+  ...LOCATION_COLUMNS,
 ] as const;
 
 export function eventView(ctx: AppContext, row: EventRow, now: Date) {
@@ -82,6 +92,8 @@ export function eventView(ctx: AppContext, row: EventRow, now: Date) {
     checkInClosesAt: window.closes.toISOString(),
     createdAt: row.created_at.toISOString(),
     cancelledAt: row.cancelled_at ? row.cancelled_at.toISOString() : null,
+    location: locationView(row),
+    locationVersion: row.location_version,
   };
 }
 
@@ -104,6 +116,7 @@ export async function createEvent(ctx: AppContext, principal: OrganizerPrincipal
     timeZone: input.timeZone,
     utcOffset: input.utcOffset ?? null,
     capacity: input.capacity,
+    ...(input.location ? { location: input.location } : {}),
   };
   const fingerprint = sha256(canonicalJson(normalized));
 
@@ -124,6 +137,7 @@ export async function createEvent(ctx: AppContext, principal: OrganizerPrincipal
         starts_at: resolved.instant,
         time_zone: input.timeZone,
         capacity: input.capacity,
+        ...locationColumns(input.location ?? null),
         created_at: now,
         updated_at: now,
       })
@@ -222,6 +236,7 @@ export async function getPublicEvent(ctx: AppContext, id: string) {
       'e.status',
       'e.capacity',
       'e.confirmed_count',
+      ...LOCATION_COLUMNS.map((c) => `e.${c}` as const),
       eb
         .selectFrom('app.registrations as r')
         .select((r) => r.fn.countAll<number>().as('n'))
@@ -257,6 +272,7 @@ export async function getPublicEvent(ctx: AppContext, id: string) {
     description: row.description,
     startsAt: row.starts_at.toISOString(),
     timeZone: row.time_zone,
+    location: locationView(row),
     phase,
     availability,
   };

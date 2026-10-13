@@ -8,6 +8,7 @@ The design documents in this folder describe the full designed system (27 tables
 | `0009_organizations` | K-708 (PD-88, ADR-022, amendment A-3) | New tables `organizations` and `organization_memberships`; `events.organization_id` (not null) with a backfill of existing data. |
 | `0010_organizer_accounts` | K-709 (PD-89, ADR-022, amendment A-3) | Password and verification columns on `accounts`; new sign-in request purposes and token types for verification and reset; password sessions; three new message types. |
 | `0011_platform_admins` | K-710 (PD-90, ADR-022, amendment A-3) | New tables `platform_admins` and `platform_admin_sessions`; who decided on an organization and why; audit actor `platform_admin`; message type `organization_decision`. |
+| `0012_event_location` | K-711 (PD-91, amendment A-5) | Optional venue columns, coordinates and `location_version` on `events`; message type `venue_change`. |
 
 ## `organizations` (0009)
 
@@ -66,3 +67,14 @@ Run on the development database on 2026-10-13 (91 ms): schema 10; 7 accounts, al
 | `outbox_messages` | Type `organization_decision` (class A, bulk lane) (ck48). |
 
 The migration adds tables, columns and checks; it changes no existing row and grants no one the role.
+
+## `0012_event_location`
+
+| Column on `events` | Meaning |
+|---|---|
+| `venue_name`, `street_address`, `city`, `country` | Set together or not at all (`events_ck_location`); trimmed lengths 1 to 200, 300, 120 and 2 to 120 |
+| `region`, `postal_code`, `arrival_instructions` | Optional, only with a location (1 to 120, 20 and 1000 characters) |
+| `latitude` `numeric(8,6)`, `longitude` `numeric(9,6)` | Optional, both or neither, within ±90 and ±180 (`events_ck_coordinates`); only as entered by the organizer |
+| `location_version` | Starts at 0 and grows with each change; guards concurrent edits and makes older venue-change notices obsolete |
+
+`outbox_messages_ck48` gains `venue_change` (class B, bulk lane). Existing events keep no location; the migration changes no row.

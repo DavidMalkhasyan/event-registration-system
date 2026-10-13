@@ -3,6 +3,7 @@ import type { Database } from '../../platform/db.js';
 import { checkInWindow, cutoffOf } from '../../platform/time.js';
 import type { Tx } from '../../platform/tx.js';
 import { issueToken } from '../access-tokens/tokens.js';
+import { LOCATION_COLUMNS, addressLine, locationView } from '../event-core/location.js';
 
 // The §4.9 catalogue in code for the message types of this slice: freshness checks, link issuance
 // at send time (FR-LNK-3) and deterministic rendering (NFR-REL-17). Texts are English (OQ-8 pending).
@@ -332,6 +333,48 @@ const eventChange: MessageHandler = {
   },
 };
 
+const venueChange: MessageHandler = {
+  // K-711 (PD-91): the venue changed. Fresh while the registration is active, the event scheduled and
+  // this is still the latest location; an older notice is dropped in favour of the newer one.
+  async freshness(trx, msg) {
+    const registration = await registrationOf(trx, msg.registration_id!);
+    const event = await trx
+      .selectFrom('app.events')
+      .select(['status', 'location_version'])
+      .where('id', '=', msg.event_id!)
+      .executeTakeFirst();
+    const fresh =
+      !!registration &&
+      ['CONFIRMED', 'WAITLISTED'].includes(registration.state) &&
+      event?.status === 'SCHEDULED' &&
+      event.location_version === msg.payload.locationVersion;
+    return fresh ? { fresh: true } : { fresh: false, reason: 'obsolete' };
+  },
+  issueTokens: registrationMessage('ACTIVE', false).issueTokens,
+  async render(db, msg, tokens, origin) {
+    const event = await db
+      .selectFrom('app.events')
+      .select(['title', 'starts_at', 'time_zone', ...LOCATION_COLUMNS])
+      .where('id', '=', msg.event_id!)
+      .executeTakeFirstOrThrow();
+    const location = locationView(event);
+    const lines: (string | { link: string; label: string })[] = location
+      ? [
+          `The venue of "${event.title}" (${localTime(event.starts_at, event.time_zone)}) has changed.`,
+          `New venue: ${location.venueName}, ${addressLine(location)}.`,
+          ...(location.arrivalInstructions ? [`Arrival: ${location.arrivalInstructions}`] : []),
+        ]
+      : [
+          `The venue of "${event.title}" (${localTime(event.starts_at, event.time_zone)}) has been removed from the event page; the organizer will share the new details.`,
+        ];
+    lines.push(
+      { label: 'Manage or cancel your registration', link: `${origin}/manage#t=${tokens.manage}` },
+      FORWARD_WARNING,
+    );
+    return email(`Venue changed: ${event.title}`, lines);
+  },
+};
+
 const waitlistClosed: MessageHandler = {
   // §4.9 "Waiting list closed" (FR-WL-5): event SCHEDULED, version current, still WAITLISTED. No links.
   async freshness(trx, msg) {
@@ -647,6 +690,7 @@ export const HANDLERS: Record<string, MessageHandler> = {
   promotion,
   reminder,
   event_change: eventChange,
+  venue_change: venueChange,
   waitlist_closed: waitlistClosed,
   registration_cancelled: registrationCancelled,
   waitlist_removed: waitlistRemoved,

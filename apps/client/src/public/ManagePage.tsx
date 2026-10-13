@@ -3,6 +3,7 @@ import { Clock3, Mail, RefreshCw, Share2 } from 'lucide-react';
 import { linkToken, replaceLinkToken } from './bootstrap-token';
 import { ApiError, api, errorMessage } from '../shared/api';
 import { Alert, Button, ConfirmDialog, CopyLink } from '../shared/ui';
+import { VenueDetails } from '../shared/location';
 import { CenterPage, InvalidLinkPage, LoadingPage, TicketCard, type EventSummary } from './shell';
 
 type ManageView =
@@ -316,6 +317,7 @@ export function ManagePage() {
         )}
         <aside className="panel manage-actions" aria-label="Manage your registration">
           <h2>A few useful things</h2>
+          {view.event.location && <VenueDetails location={view.event.location} heading="Where to go" />}
           {confirmedView && token && <TicketActions token={token} />}
           {token && (
             <LinkRotation

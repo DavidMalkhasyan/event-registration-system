@@ -17,6 +17,7 @@ import {
 import { enqueue, type MessageType } from '../messaging/outbox.js';
 import { revokeInvitationsOnCancellation } from '../staff/staff.js';
 import { assertEventAccess } from '../organizations/access.js';
+import { LOCATION_COLUMNS, locationView } from './location.js';
 
 const DAY_MS = 24 * 3_600_000;
 export const TRANSFER_STATEMENT = 'This ticket can be transferred, but it admits one person, once.';
@@ -226,13 +227,18 @@ export async function managementView(ctx: AppContext, raw: string) {
   if (!found) throw new InvalidLinkError();
   const event = await ctx.db
     .selectFrom('app.events')
-    .select(['title', 'starts_at', 'time_zone', 'status'])
+    .select(['title', 'starts_at', 'time_zone', 'status', ...LOCATION_COLUMNS])
     .where('id', '=', found.registration.event_id)
     .executeTakeFirstOrThrow();
   const now = await decisionTime(ctx.db);
   if (event.status !== 'SCHEDULED' || now > checkInWindow(event.starts_at).closes)
     throw new InvalidLinkError();
-  const summary = { title: event.title, startsAt: event.starts_at.toISOString(), timeZone: event.time_zone };
+  const summary = {
+    title: event.title,
+    startsAt: event.starts_at.toISOString(),
+    timeZone: event.time_zone,
+    location: locationView(event),
+  };
   const beforeStart = now < event.starts_at;
   if (found.registration.state === 'CONFIRMED') {
     const ticket = await ctx.db
@@ -272,12 +278,26 @@ export async function shareView(ctx: AppContext, raw: string) {
     .leftJoin('app.check_ins as c', (join) =>
       join.onRef('c.ticket_id', '=', 't.id').on('c.undone_at', 'is', null),
     )
-    .select(['r.state', 'e.title', 'e.starts_at', 'e.time_zone', 'e.status', 't.code', 'c.id as check_in_id'])
+    .select([
+      'r.state',
+      'e.title',
+      'e.starts_at',
+      'e.time_zone',
+      'e.status',
+      't.code',
+      'c.id as check_in_id',
+      ...LOCATION_COLUMNS.map((c) => `e.${c}` as const),
+    ])
     .where('r.id', '=', token.registration_id)
     .executeTakeFirst();
   const now = await decisionTime(ctx.db);
   if (!row || now > checkInWindow(row.starts_at).closes) throw new InvalidLinkError(); // FR-LNK-5
-  const event = { title: row.title, startsAt: row.starts_at.toISOString(), timeZone: row.time_zone };
+  const event = {
+    title: row.title,
+    startsAt: row.starts_at.toISOString(),
+    timeZone: row.time_zone,
+    location: locationView(row),
+  };
   if (row.state !== 'CONFIRMED' || row.status !== 'SCHEDULED' || !row.code)
     return { state: 'not_available' as const, event };
   if (row.check_in_id) return { state: 'checked_in' as const, event, transferStatement: TRANSFER_STATEMENT };
