@@ -43,10 +43,37 @@ export interface OrganizerSessionsTable {
   revoke_reason: string | null;
 }
 
+export type OrganizationStatus =
+  'pending_verification' | 'pending_approval' | 'active' | 'rejected' | 'suspended';
+export type OrganizationRole = 'owner' | 'admin' | 'member';
+
+/** Migration 0009 (K-708). */
+export interface OrganizationsTable {
+  id: Generated<string>;
+  name: string;
+  description: string | null;
+  status: OrganizationStatus;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+  email_verified_at: Timestamp | null;
+  submitted_at: Timestamp | null;
+  decided_at: Timestamp | null;
+  migrated_from_account_id: string | null;
+}
+
+export interface OrganizationMembershipsTable {
+  organization_id: string;
+  account_id: string;
+  role: OrganizationRole;
+  created_at: Timestamp;
+}
+
 export type EventStatus = 'SCHEDULED' | 'CANCELLED';
 export interface EventsTable {
   id: Generated<string>;
+  /** The account that created the event (history, D-17); access goes through organization_id (K-708). */
   owner_account_id: string;
+  organization_id: string;
   creation_request_id: string;
   creation_fingerprint: Buffer;
   public_id: string;
@@ -350,4 +377,6 @@ export interface DB {
   'app.rotation_requests': RotationRequestsTable;
   'app.staff_invitations': StaffInvitationsTable;
   'app.staff_sessions': StaffSessionsTable;
+  'app.organizations': OrganizationsTable;
+  'app.organization_memberships': OrganizationMembershipsTable;
 }

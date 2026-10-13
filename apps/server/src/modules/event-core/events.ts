@@ -13,6 +13,7 @@ import {
 } from '../../platform/time.js';
 import type { OrganizerPrincipal } from '../identity/sessions.js';
 import { scheduleCutoffTask, scheduleReminderTask } from './lifecycle.js';
+import { manageableOrganizationIds, organizationForNewEvent } from '../organizations/access.js';
 
 export const eventCreateSchema = z
   .object({
@@ -26,6 +27,7 @@ export const eventCreateSchema = z
       .regex(/^[+-]\d{2}:\d{2}$/)
       .optional(),
     capacity: z.number().int().min(1).max(100_000),
+    organizationId: z.uuid().optional(),
   })
   .strict();
 export type EventCreateInput = z.infer<typeof eventCreateSchema>;
@@ -107,10 +109,13 @@ export async function createEvent(ctx: AppContext, principal: OrganizerPrincipal
 
   return withTransaction(ctx.db, async ({ trx, now }) => {
     if (resolved.instant <= now) throw new AppError(422, 'start_not_in_future');
+    // K-708: the event belongs to an active organization of which the creator is a member.
+    const organizationId = await organizationForNewEvent(trx, principal.accountId, input.organizationId);
     const inserted = await trx
       .insertInto('app.events')
       .values({
         owner_account_id: principal.accountId,
+        organization_id: organizationId,
         creation_request_id: input.requestId,
         creation_fingerprint: fingerprint,
         public_id: publicId(),
@@ -148,7 +153,7 @@ export async function listEvents(ctx: AppContext, principal: OrganizerPrincipal)
   const rows = await ctx.db
     .selectFrom('app.events')
     .select(EVENT_COLUMNS)
-    .where('owner_account_id', '=', principal.accountId)
+    .where('organization_id', 'in', manageableOrganizationIds(ctx.db, principal.accountId))
     .orderBy('starts_at', 'desc')
     .limit(200)
     .execute();
@@ -177,14 +182,14 @@ export async function listEvents(ctx: AppContext, principal: OrganizerPrincipal)
   };
 }
 
-/** Another owner's event and an unknown event look the same: 404 (AC-155). */
+/** Another organization's event and an unknown event look the same: 404 (AC-155, K-708). */
 export async function getOwnedEvent(ctx: AppContext, principal: OrganizerPrincipal, eventId: string) {
   if (!z.uuid().safeParse(eventId).success) throw new AppError(404, 'not_found');
   const row = await ctx.db
     .selectFrom('app.events')
     .select(EVENT_COLUMNS)
     .where('id', '=', eventId)
-    .where('owner_account_id', '=', principal.accountId)
+    .where('organization_id', 'in', manageableOrganizationIds(ctx.db, principal.accountId))
     .executeTakeFirst();
   if (!row) throw new AppError(404, 'not_found');
   return eventView(ctx, row, await decisionTime(ctx.db));

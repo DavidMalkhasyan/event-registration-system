@@ -16,6 +16,7 @@ import {
 } from '../identity/sessions.js';
 import { enqueue, type MessageType } from '../messaging/outbox.js';
 import { revokeInvitationsOnCancellation } from '../staff/staff.js';
+import { assertEventAccess } from '../organizations/access.js';
 
 const DAY_MS = 24 * 3_600_000;
 export const TRANSFER_STATEMENT = 'This ticket can be transferred, but it admits one person, once.';
@@ -380,7 +381,7 @@ export async function removeFromWaitlist(
   if (!z.uuid().safeParse(eventId).success || !z.uuid().safeParse(registrationId).success)
     throw new AppError(404, 'not_found');
   const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
-    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    await assertEventAccess(trx, principal.accountId, event);
     if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
     const reg = await trx
       .selectFrom('app.registrations')
@@ -460,7 +461,7 @@ export async function cancelEvent(
   if (!limit.allowed) throw new AppError(429, 'rate_limited', { retryAfterSeconds: limit.retryAfterSeconds });
 
   const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
-    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    await assertEventAccess(trx, principal.accountId, event);
     await requireRecentAuthentication(trx, principal.sessionId, now); // 401 unauthenticated / reauthentication_required
     if (event.status === 'CANCELLED') return 'already_cancelled' as const;
     if (now >= event.starts_at) return 'started' as const;
@@ -516,7 +517,7 @@ export async function cancelEvent(
     });
     return 'cancelled' as const;
   });
-  if (result === null || result === 'not_found') throw new AppError(404, 'not_found');
+  if (result === null) throw new AppError(404, 'not_found');
   if (result === 'started') throw new AppError(409, 'event_started');
 }
 
@@ -546,7 +547,7 @@ export async function cancelRegistrationByOrganizer(
   if (!z.uuid().safeParse(eventId).success || !z.uuid().safeParse(registrationId).success)
     throw new AppError(404, 'not_found');
   const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
-    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    await assertEventAccess(trx, principal.accountId, event);
     if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
     const reg = await trx
       .selectFrom('app.registrations')
@@ -631,7 +632,7 @@ export async function updateEventDetails(
 ) {
   if (!z.uuid().safeParse(eventId).success) throw new AppError(404, 'not_found');
   const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
-    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    await assertEventAccess(trx, principal.accountId, event);
     if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
     if (event.status !== 'SCHEDULED') return 'not_scheduled' as const;
     const current = await trx
@@ -668,7 +669,7 @@ export async function updateEventDetails(
     });
     return 'changed' as const;
   });
-  if (result === null || result === 'not_found') throw new AppError(404, 'not_found');
+  if (result === null) throw new AppError(404, 'not_found');
   if (result === 'unauthenticated') throw new AppError(401, 'unauthenticated');
   if (result === 'not_scheduled') throw new AppError(409, 'event_not_scheduled');
 }
@@ -695,7 +696,7 @@ export async function setCapacity(
 ) {
   if (!z.uuid().safeParse(eventId).success) throw new AppError(404, 'not_found');
   const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
-    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    await assertEventAccess(trx, principal.accountId, event);
     if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
     if (event.status !== 'SCHEDULED') return 'not_scheduled' as const;
     if (input.capacity < event.capacity) return { currentCapacity: event.capacity };
@@ -719,7 +720,7 @@ export async function setCapacity(
     });
     return 'changed' as const;
   });
-  if (result === null || result === 'not_found') throw new AppError(404, 'not_found');
+  if (result === null) throw new AppError(404, 'not_found');
   if (result === 'unauthenticated') throw new AppError(401, 'unauthenticated');
   if (result === 'not_scheduled') throw new AppError(409, 'event_not_scheduled');
   if (typeof result === 'object') throw new AppError(409, 'capacity_decrease_not_allowed', result);
@@ -759,7 +760,7 @@ export async function rescheduleEvent(
     throw new AppError(422, 'ambiguous_local_time', { offsets: resolved.offsets });
 
   const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
-    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    await assertEventAccess(trx, principal.accountId, event);
     if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
     if (event.status !== 'SCHEDULED') return 'not_scheduled' as const;
     if (now >= event.starts_at) return 'started' as const;
@@ -811,7 +812,7 @@ export async function rescheduleEvent(
     });
     return 'rescheduled' as const;
   });
-  if (result === null || result === 'not_found') throw new AppError(404, 'not_found');
+  if (result === null) throw new AppError(404, 'not_found');
   if (result === 'unauthenticated') throw new AppError(401, 'unauthenticated');
   if (result === 'not_scheduled') throw new AppError(409, 'event_not_scheduled');
   if (result === 'started') throw new AppError(409, 'event_started');

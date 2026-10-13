@@ -10,6 +10,7 @@ import { recordAudit } from '../audit/audit.js';
 import { csrfTokenFor, sessionStillValid, type OrganizerPrincipal } from '../identity/sessions.js';
 import { STAFF_SESSION_ABSOLUTE_MS, type StaffPrincipal } from '../identity/staff-sessions.js';
 import { enqueue } from '../messaging/outbox.js';
+import { assertEventAccess, manageableOrganizationIds } from '../organizations/access.js';
 
 // Staff invitations and sessions (K-406): FR-STAFF-1 to FR-STAFF-7, TX-S01 to TX-S03, API #14 to #16
 // and #46 to #50, decisions PD-53 to PD-58. Every state change runs under the exclusive event lock,
@@ -31,7 +32,7 @@ async function ownerTransaction<T>(
 ): Promise<T> {
   if (!z.uuid().safeParse(eventId).success) throw new AppError(404, 'not_found');
   const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
-    if (event.owner_account_id !== principal.accountId) return { error: new AppError(404, 'not_found') };
+    await assertEventAccess(trx, principal.accountId, event);
     if (!(await sessionStillValid(trx, principal.sessionId, now)))
       return { error: new AppError(401, 'unauthenticated') };
     return { value: await fn({ trx, now, event }) };
@@ -174,7 +175,7 @@ export async function staffOverview(ctx: AppContext, principal: OrganizerPrincip
     .selectFrom('app.events')
     .select(['status', 'starts_at'])
     .where('id', '=', eventId)
-    .where('owner_account_id', '=', principal.accountId)
+    .where('organization_id', 'in', manageableOrganizationIds(ctx.db, principal.accountId))
     .executeTakeFirst();
   if (!event) throw new AppError(404, 'not_found');
   const now = await decisionTime(ctx.db);

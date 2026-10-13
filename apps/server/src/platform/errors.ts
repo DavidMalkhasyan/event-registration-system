@@ -13,6 +13,8 @@ export type ProblemCode =
   | 'event_not_scheduled'
   | 'event_started'
   | 'capacity_decrease_not_allowed'
+  | 'organization_not_active'
+  | 'organization_required'
   | 'cancelled_event_not_deletable'
   | 'deletion_blocked'
   | 'notifications_pending'
@@ -53,6 +55,8 @@ const TITLES: Record<ProblemCode, string> = {
   event_not_scheduled: 'The event is not scheduled',
   event_started: 'The event has started',
   capacity_decrease_not_allowed: 'Capacity can only be increased',
+  organization_not_active: 'Your organization is not active',
+  organization_required: 'Choose the organization for this event',
   cancelled_event_not_deletable: "Cancelled events can't be deleted",
   deletion_blocked: 'The event cannot be deleted yet',
   notifications_pending: 'Notifications are still being sent; try again later',
