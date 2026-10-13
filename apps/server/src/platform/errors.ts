@@ -35,6 +35,12 @@ export type ProblemCode =
   | 'registration_not_confirmed'
   | 'schedule_version_mismatch'
   | 'location_version_mismatch'
+  | 'image_rejected'
+  | 'image_too_large'
+  | 'cover_exists'
+  | 'gallery_full'
+  | 'gallery_changed'
+  | 'unsupported_media_type'
   | 'nonexistent_local_time'
   | 'ambiguous_local_time'
   | 'start_not_in_future'
@@ -81,6 +87,12 @@ const TITLES: Record<ProblemCode, string> = {
   registration_not_confirmed: 'This registration is no longer confirmed',
   schedule_version_mismatch: 'The event was changed by another request; reload and try again',
   location_version_mismatch: 'The location was changed in the meantime; reload and try again',
+  image_rejected: 'This file is not a JPEG, PNG or WebP image of at least 200 × 200 pixels',
+  image_too_large: 'Images can be at most 10 MB',
+  cover_exists: 'The event already has a cover image; replace it instead',
+  gallery_full: 'The gallery already has 8 images',
+  gallery_changed: 'The gallery was changed in the meantime; reload and try again',
+  unsupported_media_type: 'Send the image file itself as the request body',
   nonexistent_local_time: 'This local time does not exist in the time zone',
   ambiguous_local_time: 'This local time is ambiguous in the time zone',
   start_not_in_future: 'The start must be in the future',

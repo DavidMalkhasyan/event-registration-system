@@ -21,6 +21,7 @@ import {
   locationView,
   type LocationRow,
 } from './location.js';
+import { imagesOf, publicImages } from '../media/images.js';
 
 export const eventCreateSchema = z
   .object({
@@ -186,9 +187,11 @@ export async function listEvents(ctx: AppContext, principal: OrganizerPrincipal)
     for (const r of waiting.rows) counts.get(r.event_id)!.waitlisted = r.n;
     for (const r of checked.rows) counts.get(r.event_id)!.checkedIn = r.n;
   }
+  const images = await imagesOf(ctx.db, ids);
   return {
     items: rows.map((r) => ({
       ...eventView(ctx, r, now),
+      coverThumbnailUrl: images.get(r.id)!.find((i) => i.role === 'cover')?.thumbnailUrl ?? null,
       waitlistedCount: counts.get(r.id)!.waitlisted,
       checkedInCount: counts.get(r.id)!.checkedIn,
     })),
@@ -229,6 +232,7 @@ export async function getPublicEvent(ctx: AppContext, id: string) {
   const row = await ctx.db
     .selectFrom('app.events as e')
     .select((eb) => [
+      'e.id',
       'e.title',
       'e.description',
       'e.starts_at',
@@ -273,6 +277,7 @@ export async function getPublicEvent(ctx: AppContext, id: string) {
     startsAt: row.starts_at.toISOString(),
     timeZone: row.time_zone,
     location: locationView(row),
+    images: publicImages((await imagesOf(ctx.db, [row.id])).get(row.id)!),
     phase,
     availability,
   };

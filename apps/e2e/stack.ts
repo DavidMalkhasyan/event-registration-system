@@ -17,6 +17,7 @@ if (build.status !== 0) process.exit(build.status ?? 1);
 
 await resetTestDatabase(); // loads .env, drops the "app" schema of the test database, applies migrations
 rmSync(E2E_MAILBOX, { recursive: true, force: true });
+rmSync(resolve(REPO_ROOT, 'var/e2e-media'), { recursive: true, force: true });
 
 const env = {
   ...process.env,
@@ -26,6 +27,7 @@ const env = {
   PUBLIC_ORIGIN: ORIGIN,
   DATABASE_URL: process.env.TEST_DATABASE_URL,
   DEV_MAILBOX_DIR: E2E_MAILBOX,
+  MEDIA_DIR: resolve(REPO_ROOT, 'var/e2e-media'),
   CLIENT_DIST_DIR: resolve(REPO_ROOT, 'apps/client/dist'),
 };
 const server = resolve(REPO_ROOT, 'apps/server');

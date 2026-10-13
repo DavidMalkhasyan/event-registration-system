@@ -36,8 +36,18 @@ const AVAILABILITY_KEYS = [
   'registrationMode',
   'waitlistedCount',
 ];
-// K-711 added `location`: the organizer's venue (public, like the title), or null.
-const EVENT_KEYS = ['availability', 'description', 'location', 'phase', 'startsAt', 'timeZone', 'title'];
+// K-711 added `location` (the organizer's venue, or null) and K-712 `images` (the cover and gallery the
+// organizer published); both are public like the title.
+const EVENT_KEYS = [
+  'availability',
+  'description',
+  'images',
+  'location',
+  'phase',
+  'startsAt',
+  'timeZone',
+  'title',
+];
 
 async function publicEvent(publicId: string) {
   const response = await h.app.inject({ method: 'GET', url: `/api/public/events/${publicId}` });
@@ -220,6 +230,7 @@ describe('public availability (PD-81)', () => {
     expect(Object.keys(body).sort()).toEqual(EVENT_KEYS);
     expect(Object.keys(body.availability).sort()).toEqual(AVAILABILITY_KEYS);
     expect(body.location).toBeNull(); // this event has no venue; nothing else is put in its place
+    expect(body.images).toEqual({ cover: null, gallery: [] });
     const text = response.body;
     expect(text).not.toContain('@');
     expect(text).not.toContain('private.person');

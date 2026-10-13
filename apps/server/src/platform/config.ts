@@ -22,6 +22,8 @@ const schema = z.object({
   EMAIL_PROVIDER: z.enum(['fake']).default('fake'),
   DEV_MAILBOX_DIR: z.string().min(1).default('var/mailbox'),
   CLIENT_DIST_DIR: z.string().min(1).optional(),
+  // K-712: where event images are stored (outside the repository; `var/` is ignored by Git).
+  MEDIA_DIR: z.string().min(1).default('var/media'),
 });
 
 export type Config = z.infer<typeof schema>;
@@ -42,6 +44,7 @@ export function parseConfig(env: Record<string, string | undefined>): Config {
   // Relative paths are relative to the repository root, whichever package directory a process runs from.
   if (!isAbsolute(config.DEV_MAILBOX_DIR))
     config.DEV_MAILBOX_DIR = resolve(REPO_ROOT, config.DEV_MAILBOX_DIR);
+  if (!isAbsolute(config.MEDIA_DIR)) config.MEDIA_DIR = resolve(REPO_ROOT, config.MEDIA_DIR);
   if (config.CLIENT_DIST_DIR && !isAbsolute(config.CLIENT_DIST_DIR))
     config.CLIENT_DIST_DIR = resolve(REPO_ROOT, config.CLIENT_DIST_DIR);
   if (config.NODE_ENV === 'production' && config.EMAIL_PROVIDER === 'fake') {
