@@ -82,7 +82,8 @@ Significant prompts, summarized in order. The stakeholder's own instructions are
 | 30 | "continue" (after the Claude Code session restarted) | S-19: work resumed on PR C from the uncommitted branch; nothing was lost |
 | 31 | "continue" (2026-10-13 14:17:59, after the Claude Code session restarted again) | S-19: no tool ran before the next prompt |
 | 32 | "continue" (14:42:26) | S-19: PostgreSQL restarted, PR #32 merged, PR J (staff review and final review) implemented |
-| 33 | "EVENTFLOW — PRODUCTION READINESS & RELEASE CANDIDATE" (2026-10-13 16:46): map provider option A, real email provider, security audit, media reliability, deployment, backups, end-to-end audit, performance, CI, release candidate report; no tag, release, deployment, submission or paid service without authorization | S-20: plan in POST_RELEASE_PLAN.md; cards K-717 to K-725; PR A (K-714) first |
+| 33 | "EVENTFLOW — PRODUCTION READINESS & RELEASE CANDIDATE" (2026-10-13 16:46): map provider option A, real email provider, security audit, media reliability, deployment, backups, end-to-end audit, performance, CI, release candidate report; no tag, release, deployment, submission or paid service without authorization | S-20: plan in POST_RELEASE_PLAN.md; cards K-717 to K-725; PRs #35 to #43 merged into `dev` after green CI (map, email, webhooks, Super Admin TOTP, media, deployment and backups, CI versions, measurements, end-to-end audit); release candidate report (PR I); no tag, release or deployment |
+| 34 | "сштештгу" ("continue" typed with a Russian keyboard layout, after the session was summarized) | S-20: PR F resumed from the uncommitted branch and finished; nothing was lost |
 
 **Context management:** Claude Code summarized earlier parts of the long session automatically to stay within the context window. Decisions taken before a summary were re-read from the documents and the transcript whenever exact wording mattered.
 
@@ -107,6 +108,10 @@ Caught during implementation (S-02), all by tests, typecheck or runtime checks b
 - **Over-strict lint rule:** the first ESLint layering rule wrongly forbade the composition layer from importing modules.
 - **Verification-script bug (S-03):** the clean-clone walkthrough script picked an already-used sign-in email. It failed loudly; the script was fixed, and the application was unchanged.
 - **Overstated decision-log entry:** a first draft claimed ADR-003, 016, 019 and 020 were "implemented in their recommended form". Checking the ADR index showed ADR-016 names no library and ADR-019 specifies Testcontainers, so the entry was corrected before commit.
+- **Wrong commit message (S-20):** a chained command committed code under a records message (`896aabe`), because a failing script stopped before its own commit. Corrected forward with a separate records commit and notes; since then code and records are committed in separate steps.
+- **An impossible measurement (S-20):** the first live-update figure (4.9 ms) was below the server's own 250 ms coalescing delay. The load script counted the count that every stream receives when it opens; it was fixed and the run repeated before any figure was recorded.
+- **Hand-written totals (S-20):** the request totals in the first draft of PERFORMANCE.md were computed by hand and wrong; they were replaced by the totals computed from the reports before commit.
+- **A test measuring itself (S-20):** the audit's scroll check read the position during a smooth mouse-wheel scroll and reported a jump that did not exist; the screenshot showed none, and the test now scrolls instantly and measures the row on screen.
 
 ## 6. Data handling
 
