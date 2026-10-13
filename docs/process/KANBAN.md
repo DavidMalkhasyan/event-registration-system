@@ -98,9 +98,18 @@ Created in S-17. Work goes through feature branches and pull requests into `dev`
 | K-711 Event location: venue, address, arrival instructions, coordinates, display, directions, venue-change notices (PD-91) | Prompt 29, PR F (A-5) | **Done**: [PR #29](https://github.com/DavidMalkhasyan/event-registration-system/pull/29) into `dev`, CI [run 38359002896](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38359002896) passed (189/189, 35/35, 36/36); merged 2026-10-13 10:56:58 as `290da5d`. Not in `main` |
 | K-712 Event media backend: validated uploads, re-encoding, storage adapter, serving, lifecycle (PD-92) | Prompt 29, PR G (A-4) | **Done**: [PR #30](https://github.com/DavidMalkhasyan/event-registration-system/pull/30) into `dev`, CI [run 38360608990](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38360608990) passed (199/199, 35/35, 36/36; `sharp` on Linux); merged 2026-10-13 11:12:15 as `07823c5`. Not in `main` |
 | K-713 Organizer image management and public gallery with a viewer (PD-93) | Prompt 29, PR H (A-4) | **Done**: [PR #31](https://github.com/DavidMalkhasyan/event-registration-system/pull/31) into `dev`, CI [run 38362276282](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38362276282) passed (199/199, 35/35, 37/37); merged 2026-10-13 11:36:35 as `c43fe39`. Not in `main` |
-| K-714 Participant map | Prompt 29, PR I (A-6) | **Blocked**: awaiting the stakeholder's choice of map data provider ([POST_RELEASE_PLAN.md](POST_RELEASE_PLAN.md)) |
+| K-714 Participant map: OpenStreetMap tiles through an identified, bounded, caching same-origin proxy (PD-96) | Prompt 29, PR I (A-6); provider chosen in prompt 33 (option A) | **Review**: implemented and tested on `feature/participant-map`; pull request into `dev`. Off until an operator sets `MAP_TILE_CONTACT` |
 | K-715 Staff experience review and refinements; final end-to-end review (PD-95) | Prompt 29, PR J | **Done**: [PR #33](https://github.com/DavidMalkhasyan/event-registration-system/pull/33) into `dev`, CI [run 38387925266](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38387925266) passed (207/207, 37/37, 40/40); merged 2026-10-13 15:14:01 as `bae328a`. Not in `main` |
 | K-716 Several organizers per organization: invitations by email, account sign-up for invitees, roles, removal, leaving, at least one owner (PD-94) | Prompt 29 ("multiple organizers in one organization"), after K-710 | **Done**: [PR #32](https://github.com/DavidMalkhasyan/event-registration-system/pull/32) into `dev`, CI [run 38364791115](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38364791115) passed (206/206, 35/35, 38/38); merged 2026-10-13 14:45:04 as `a6cac9b`. Not in `main` |
+| K-717 Real email provider (Resend) behind the provider interface: configuration, startup checks, failure classes, timeouts, idempotency, safe logs | Prompt 33, PR B | **To Do** |
+| K-718 Authentication, organization and Super Admin security audit; second-factor decision | Prompt 33, PR D | **To Do** |
+| K-719 Media reliability: orphan-file recovery with a dry run; malware-scanning assessment | Prompt 33, PR E | **To Do** |
+| K-720 Deployment architecture, configuration templates, runbook | Prompt 33, PR F | **To Do** |
+| K-721 Backups and a tested restore drill (database and media) | Prompt 33, PR F | **To Do** |
+| K-722 Full end-to-end product audit (scenarios A to G) and the 1440, 768 and 390 px review | Prompt 33, PR H | **To Do** |
+| K-723 Performance and reliability measurements of the critical paths | Prompt 33, PR G | **To Do** |
+| K-724 CI: supported action versions | Prompt 33, PR G | **To Do** |
+| K-725 Release candidate report (no tag, no release pull request) | Prompt 33, PR I | **To Do** |
 
 ## Partly done (remaining parts are in Backlog or Deferred)
 
@@ -125,4 +134,4 @@ Created in S-17. Work goes through feature branches and pull requests into `dev`
 | Card | Priority |
 |---|---|
 | K-205 `migrate budget-sync` | P2 |
-| K-402 Webhooks, provider-event log, delivery facts | P2 |
+| K-402 Webhooks, provider-event log, delivery facts (prompt 33, PR C) | P1 |

@@ -9,7 +9,7 @@
 | A-3 | **Approved** (prompt 29, S-19): organizations, organizer accounts with passwords, Super Admin approval. K-708 (data model, authorization, migration; PD-88) and K-709 (registration, passwords, verification, reset; PD-89) merged into `dev`; K-710 (Super Admin; PD-90) merged into `dev`; K-716 (several organizers per organization; PD-94) implemented. |
 | A-4 | **Approved** (prompt 29, S-19): event photographs and a gallery. Implemented by K-712 (server, PD-92) and K-713 (interface, PD-93). |
 | A-5 | **Approved** (prompt 29, S-19): event location and venue-change notices. Implemented by K-711 (PD-91). |
-| A-6 | **Approved in principle** (prompt 29, S-19): a real map for confirmed participants; the map data provider awaits the stakeholder's choice (POST_RELEASE_PLAN.md). K-714. |
+| A-6 | **Approved** (prompt 29; provider chosen in prompt 33: OpenStreetMap, option A, for development and the demonstration): a real map for confirmed participants. Implemented by K-714 (PD-96). |
 
 ## A-1 Organizer cancellation of one confirmed registration
 
