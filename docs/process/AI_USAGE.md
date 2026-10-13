@@ -82,6 +82,7 @@ Significant prompts, summarized in order. The stakeholder's own instructions are
 | 30 | "continue" (after the Claude Code session restarted) | S-19: work resumed on PR C from the uncommitted branch; nothing was lost |
 | 31 | "continue" (2026-10-13 14:17:59, after the Claude Code session restarted again) | S-19: no tool ran before the next prompt |
 | 32 | "continue" (14:42:26) | S-19: PostgreSQL restarted, PR #32 merged, PR J (staff review and final review) implemented |
+| 33 | "EVENTFLOW — PRODUCTION READINESS & RELEASE CANDIDATE" (2026-10-13 16:46): map provider option A, real email provider, security audit, media reliability, deployment, backups, end-to-end audit, performance, CI, release candidate report; no tag, release, deployment, submission or paid service without authorization | S-20: plan in POST_RELEASE_PLAN.md; cards K-717 to K-725; PR A (K-714) first |
 
 **Context management:** Claude Code summarized earlier parts of the long session automatically to stay within the context window. Decisions taken before a summary were re-read from the documents and the transcript whenever exact wording mattered.
 

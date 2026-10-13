@@ -4,6 +4,7 @@ import { linkToken, replaceLinkToken } from './bootstrap-token';
 import { ApiError, api, errorMessage } from '../shared/api';
 import { Alert, Button, ConfirmDialog, CopyLink } from '../shared/ui';
 import { VenueDetails } from '../shared/location';
+import { ParticipantMap, type MapData } from '../shared/ParticipantMap';
 import { CenterPage, InvalidLinkPage, LoadingPage, TicketCard, type EventSummary } from './shell';
 
 type ManageView =
@@ -12,6 +13,8 @@ type ManageView =
       event: EventSummary;
       ticket: { code: string };
       checkedIn: boolean;
+      /** K-714: the venue map (null without coordinates or when the server has no map). */
+      map: MapData | null;
       actions: { cancel: boolean };
     }
   | { state: 'WAITLISTED'; event: EventSummary; position: number; actions: { cancel: boolean } };
@@ -355,6 +358,12 @@ export function ManagePage() {
           {error && <Alert>{error}</Alert>}
         </aside>
       </div>
+      {confirmedView && view.event.location && (
+        <section className="panel map-panel" aria-labelledby="map-heading">
+          <h2 id="map-heading">Map</h2>
+          <ParticipantMap location={view.event.location} map={view.map} />
+        </section>
+      )}
     </CenterPage>
   );
 }

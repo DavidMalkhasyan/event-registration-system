@@ -31,7 +31,9 @@ Each PR branches from the latest `dev`, carries its tests and records, passes th
 6. **Media** is stored as files under a configurable directory outside the repository (local adapter), behind an interface for a later object-storage adapter; metadata in PostgreSQL.
 7. **Re-authentication** (FR-ORG-5) keeps its rule (a sign-in within 15 minutes for protected actions); with passwords, re-authentication can also be by password.
 
-## Open stakeholder decision: the participant map (K-714)
+## Stakeholder decision: the participant map (K-714)
+
+**Decided in prompt 33 (2026-10-13 16:46): option A** for local development and the assignment demonstration, under the OSM Tile Usage Policy. Implemented as an identified, bounded caching proxy (PD-96).
 
 A real map needs map data (tiles) and, unless organizers enter coordinates, geocoding. Participant pages allow only same-origin resources (FR-LNK-8), so any option serves tiles from our own origin; no participant token or page URL ever reaches a provider.
 
@@ -44,3 +46,19 @@ A real map needs map data (tiles) and, unless organizers enter coordinates, geoc
 **Coordinates:** without a geocoding provider, the organizer enters latitude and longitude (or none: then no map is shown and only the address and the directions link appear). A geocoder (for example Nominatim, rate-limited with attribution, or a commercial one) is a separate decision. **Coordinates are never fabricated.**
 
 **Recommendation:** A for development and the assignment demonstration, with manual coordinates; B or C before any real production use. Until decided, K-711 stores and validates coordinates and shows the address and a directions link; the map itself (K-714) waits.
+
+## Production readiness (prompt 33, S-20)
+
+**Source:** prompt 33, "EVENTFLOW — PRODUCTION READINESS & RELEASE CANDIDATE" (2026-10-13 16:46). No tag, release pull request, deployment, submission, paid account or new recurring cost without the stakeholder's explicit authorization.
+
+| PR | Cards | Content | External dependency |
+|---|---|---|---|
+| A | K-714 | Participant map (option A) | An operator contact for the tile User-Agent (`MAP_TILE_CONTACT`) |
+| B | K-717 | Real email provider behind the provider interface | A Resend account, a verified sending domain and an API key |
+| C | K-402 | Delivery webhooks, bounces and complaints, delivery facts | The provider's webhook signing secret |
+| D | K-718 | Authentication and Super Admin security audit and hardening; second-factor decision | A stakeholder decision on a second factor |
+| E | K-719 | Media reliability and orphan cleanup; malware-scanning assessment | — |
+| F | K-720, K-721 | Deployment architecture and templates; backups and a restore drill | A hosting decision (not needed for the templates) |
+| G | K-723, K-724 | Performance measurements; CI action versions | — |
+| H | K-722 | End-to-end audit findings and fixes | — |
+| I | K-725 | Documentation and the release candidate report | — |

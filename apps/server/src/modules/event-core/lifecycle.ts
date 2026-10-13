@@ -18,6 +18,7 @@ import { enqueue, type MessageType } from '../messaging/outbox.js';
 import { revokeInvitationsOnCancellation } from '../staff/staff.js';
 import { assertEventAccess } from '../organizations/access.js';
 import { LOCATION_COLUMNS, locationView } from './location.js';
+import { mapView } from '../maps/tiles.js';
 
 const DAY_MS = 24 * 3_600_000;
 export const TRANSFER_STATEMENT = 'This ticket can be transferred, but it admits one person, once.';
@@ -227,7 +228,7 @@ export async function managementView(ctx: AppContext, raw: string) {
   if (!found) throw new InvalidLinkError();
   const event = await ctx.db
     .selectFrom('app.events')
-    .select(['title', 'starts_at', 'time_zone', 'status', ...LOCATION_COLUMNS])
+    .select(['title', 'starts_at', 'time_zone', 'status', 'public_id', ...LOCATION_COLUMNS])
     .where('id', '=', found.registration.event_id)
     .executeTakeFirstOrThrow();
   const now = await decisionTime(ctx.db);
@@ -252,6 +253,8 @@ export async function managementView(ctx: AppContext, raw: string) {
     return {
       state: 'CONFIRMED' as const,
       event: summary,
+      // K-714: the venue map is for confirmed participants (amendment A-6).
+      map: mapView(ctx.config, event.public_id, summary.location),
       ticket: { code: ticket.code },
       checkedIn: !!ticket.check_in_id,
       transferStatement: TRANSFER_STATEMENT,
@@ -287,6 +290,7 @@ export async function shareView(ctx: AppContext, raw: string) {
       't.code',
       'c.id as check_in_id',
       ...LOCATION_COLUMNS.map((c) => `e.${c}` as const),
+      'e.public_id',
     ])
     .where('r.id', '=', token.registration_id)
     .executeTakeFirst();
@@ -304,6 +308,7 @@ export async function shareView(ctx: AppContext, raw: string) {
   return {
     state: 'valid' as const,
     event,
+    map: mapView(ctx.config, row.public_id, event.location),
     ticket: { code: row.code },
     transferStatement: TRANSFER_STATEMENT,
   };

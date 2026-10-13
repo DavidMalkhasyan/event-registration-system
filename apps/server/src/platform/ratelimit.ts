@@ -42,6 +42,8 @@ export const RULES = {
   imageUploadsPerAccount: { scope: 'image_upload_account', limit: 60, windowSeconds: 3600 },
   // K-716 (PD-94): invitations sent per organizer account.
   invitationsPerAccount: { scope: 'invitations_account', limit: 30, windowSeconds: 3600 },
+  // K-714 (PD-96): map tiles per client (a viewer looking around one venue needs a few hundred at most).
+  mapTilesPerIp: { scope: 'map_tiles_ip', limit: 600, windowSeconds: 600 },
 } satisfies Record<string, RateLimitRule>;
 
 export class RateLimiter {

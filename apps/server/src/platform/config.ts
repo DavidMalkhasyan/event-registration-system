@@ -24,6 +24,14 @@ const schema = z.object({
   CLIENT_DIST_DIR: z.string().min(1).optional(),
   // K-712: where event images are stored (outside the repository; `var/` is ignored by Git).
   MEDIA_DIR: z.string().min(1).default('var/media'),
+  // K-714: the participant map's tile source, the operator contact sent in the User-Agent (the map is
+  // off without it), and the tile cache (outside the repository).
+  MAP_TILE_URL: z
+    .url()
+    .refine((u) => ['{z}', '{x}', '{y}'].every((p) => u.includes(p)), 'needs {z}, {x} and {y}')
+    .default('https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
+  MAP_TILE_CONTACT: z.string().trim().min(3).max(200).optional(),
+  TILE_CACHE_DIR: z.string().min(1).default('var/tile-cache'),
 });
 
 export type Config = z.infer<typeof schema>;
@@ -45,6 +53,10 @@ export function parseConfig(env: Record<string, string | undefined>): Config {
   if (!isAbsolute(config.DEV_MAILBOX_DIR))
     config.DEV_MAILBOX_DIR = resolve(REPO_ROOT, config.DEV_MAILBOX_DIR);
   if (!isAbsolute(config.MEDIA_DIR)) config.MEDIA_DIR = resolve(REPO_ROOT, config.MEDIA_DIR);
+  if (!isAbsolute(config.TILE_CACHE_DIR)) config.TILE_CACHE_DIR = resolve(REPO_ROOT, config.TILE_CACHE_DIR);
+  if (config.NODE_ENV === 'production' && !config.MAP_TILE_URL.startsWith('https://')) {
+    throw new ConfigError(['MAP_TILE_URL (must be https in production)']);
+  }
   if (config.CLIENT_DIST_DIR && !isAbsolute(config.CLIENT_DIST_DIR))
     config.CLIENT_DIST_DIR = resolve(REPO_ROOT, config.CLIENT_DIST_DIR);
   if (config.NODE_ENV === 'production' && config.EMAIL_PROVIDER === 'fake') {

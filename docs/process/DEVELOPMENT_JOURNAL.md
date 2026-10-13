@@ -974,3 +974,27 @@ The last two rows were added in S-19 from GitHub's records.
 | 15:13:55–15:14:01 | Diff reviewed (staff self-end under the event lock with the device's anti-forgery token, audited; results revealed on the staff device only; phone layouts; the responsive test); `gh pr merge 33 --merge` | `bae328a` on `dev`; its tree equals the tested head `6dfd481`; `main` unchanged (`8e7f6c1`); no tag |
 | 15:14–15:20 | Records PR [#34](https://github.com/DavidMalkhasyan/event-registration-system/pull/34) (K-715 Done, these rows). Its first commit held only the Kanban change because the records script stopped at a table cell that Prettier had padded; completed in a second commit | — |
 | 15:20 | End of the implementable roadmap of prompt 29: K-706 to K-713, K-715 and K-716 are merged into `dev`. K-714 (the participant map) stays **Blocked** on the stakeholder's choice of map data provider (POST_RELEASE_PLAN.md options A, B, C); the question is put to the stakeholder in the final report | Nothing merged into `main`; no tag, submission or deployment |
+
+## S-20: Production readiness: the participant map (K-714)
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-13 16:46:16 +04:00 (prompt 33: "EVENTFLOW — PRODUCTION READINESS & RELEASE CANDIDATE") |
+| **Cards** | K-714 → Review; K-717 to K-725 (new); K-402 (webhooks) raised to P1 |
+| **Tools and model** | Claude Code, model `claude-opus-5-5`; the S-02 toolchain; Playwright with Edge |
+
+**Activity:**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 15:22:50 (S-19, after the records above) | [PR #34](https://github.com/DavidMalkhasyan/event-registration-system/pull/34) (records only) merged after CI [run 38388917334](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38388917334) passed | `a6c251e` on `dev` |
+| 16:46:27 | Prompt 33: state checked on GitHub and locally | `dev` `a6c251e`, `main` `8e7f6c1`, no tag, no open pull request, a clean working tree, PostgreSQL running (schema 15) |
+| 16:46:42 | Read the current OpenStreetMap Tile Usage Policy | Direct tile requests from participant pages would need a Referer (the pages send none, by design) and third-party images (the CSP forbids them), and would expose participants' IP addresses; a proxy is permitted with a contactable User-Agent, header-based caching and an accurate Referer (PD-96) |
+| 16:48:33 | `feature/participant-map` from `dev`; Leaflet 1.9.4 (BSD-2-Clause) chosen; the repository is public | — |
+| 16:49–16:51 | `maps/tiles.ts` (bounds of about 3 km and zoom 12 to 18, the disk cache with header-based freshness and conditional revalidation, single-flight, two parallel fetches, 60 per minute), the `/map-tiles/…` route, configuration (`MAP_TILE_URL`, `MAP_TILE_CONTACT`, `TILE_CACHE_DIR`), the per-client limit, the map in the management and shared-ticket views | Typecheck and lint pass. The public ID pattern first excluded `-` and `_` (base64url); corrected |
+| 16:52:08–16:53:08 | `maps.test.ts` (8) with a local stand-in tile service that records what reaches it | First run 6/8: a neighbouring tile is outside the 3 km area at zoom 12 (tiles of about 10 km; the test now checks neighbours from zoom 15), and the tile cache was not emptied between tests (the harness now does). **8/8**. **Mutation:** without the bounds check a tile in Paris is served; caught; restored |
+| 16:53–16:55 | Client: `ParticipantMap` (Leaflet bundled and loaded only with a map; attribution; zoom; no scroll-wheel trap; a CSS marker; fallbacks without coordinates or configuration; a message when tiles fail) on the management page and the shared ticket; the browser stack gets a stand-in tile service (failing in the southern hemisphere, for the error test) | Typecheck and lint pass |
+| 16:55:04–16:56:07 | `map.spec.ts` (3) and `token-bootstrap.spec.ts` | One test fault (a lower-case link name also matched "Get directions"); **3/3**, token bootstrap unchanged |
+| 16:56:48 | One live request to OpenStreetMap through the proxy (contact: the public repository URL) | 200 with a PNG; `Cache-Control: max-age=227713` honoured; the repeat served from the cache (one upstream request) |
+| 16:57–17:00:15 | Screenshot review at 390 px: **the marker was not on the map**. Measured: the pin's CSS `rotate` is applied before Leaflet's positioning transform, which rotated the offset and moved the marker about 350 px away. The drawing is now rotated on a `::before` layer; the map also re-measures itself when its container resizes; a new assertion checks that the marker's tip is at the map's centre at 1280 and 390 px | The first attempt (resizing only) still failed the new assertion; with the drawing fix **3/3** |
+| 17:00:51–17:10:00 | Full gates | `check:secrets`, `check:deps`, `format:check`, `lint`, `typecheck`, `migrate` (schema 15, nothing to apply; counts unchanged), `test` (server **215/215** in 25 files, client **37/37**), `build` and `e2e` (**43/43**, Edge) exit 0 |
