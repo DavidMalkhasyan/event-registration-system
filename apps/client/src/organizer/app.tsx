@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../shared/api';
 import { Empty, PageSkeleton, buttonClass } from '../shared/ui';
-import { SignInRequest } from './auth/SignInRequest';
+import {
+  ForgotPassword,
+  OrganizationStatus,
+  PasswordSignIn,
+  RegisterOrganization,
+  SignInLinkRequest,
+} from './auth/AuthPages';
 import { Overview } from './dashboard/Overview';
 import { EventWorkspace } from './event/EventWorkspace';
 import { CreateEvent } from './events/CreateEvent';
@@ -43,7 +49,24 @@ export function App() {
         <PageSkeleton />
       </div>
     );
-  if (session === null) return <SignInRequest />;
+  if (session === null) {
+    // K-709: organizer accounts sign in with a password; registration and resets are public pages.
+    if (path === '/organizer/register') return <RegisterOrganization />;
+    if (path === '/organizer/forgot-password') return <ForgotPassword />;
+    if (path === '/organizer/sign-in-link') return <SignInLinkRequest />;
+    return <PasswordSignIn />;
+  }
+  if (!session.organizations.some((o) => o.status === 'active'))
+    return (
+      <OrganizationStatus
+        session={session}
+        onSignOut={() =>
+          void api('/api/auth/sign-out', { method: 'POST', csrf: session.csrfToken })
+            .catch(() => undefined)
+            .then(() => window.location.assign('/organizer'))
+        }
+      />
+    );
 
   if (route.page === 'event') {
     const title = events?.find((e) => e.id === route.eventId)?.title ?? 'Event';

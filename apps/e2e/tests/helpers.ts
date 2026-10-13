@@ -1,6 +1,7 @@
 import { expect, type Browser, type Page, type BrowserContext } from '@playwright/test';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { seedOrganizer } from './db.js';
 import { E2E_MAILBOX, ORIGIN } from './env.js';
 
 interface Mail {
@@ -65,10 +66,15 @@ export function localIn(ms: number): string {
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
 }
 
-/** Organizer sign-in through the UI and the emailed link (passwordless). */
+/**
+ * Sign-in of an approved organizer (K-709): the organizer is prepared in the test database without a
+ * password, as organizers from before K-709 are, and signs in through the UI with the emailed link
+ * that such accounts keep. Password sign-in and registration have their own spec (accounts.spec.ts).
+ */
 export async function signIn(page: Page, email: string): Promise<void> {
+  await seedOrganizer(email);
   const before = mailFor(email, 'Your sign-in link').length;
-  await page.goto('/organizer');
+  await page.goto('/organizer/sign-in-link');
   await page.getByLabel('Email address').fill(email);
   await page.getByRole('button', { name: 'Send sign-in link' }).click();
   await expect(page.getByText('Check your email for a sign-in link')).toBeVisible();

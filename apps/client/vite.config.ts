@@ -11,7 +11,8 @@ const entryRouter = (): Plugin => ({
   configureServer(server) {
     server.middlewares.use((req, _res, next) => {
       const path = (req.url ?? '/').split('?')[0]!;
-      if (/^\/(e\/|verify$|manage$|ticket$|sign-in$|invite$)/.test(path)) req.url = '/public.html';
+      if (/^\/(e\/|verify$|manage$|ticket$|sign-in$|invite$|verify-account$|reset-password$)/.test(path))
+        req.url = '/public.html';
       else if (path === '/staff') req.url = '/staff.html';
       else if (path === '/' || path === '/organizer' || path.startsWith('/organizer/'))
         req.url = '/organizer.html';

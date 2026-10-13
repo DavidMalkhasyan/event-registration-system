@@ -4,6 +4,9 @@ export interface Session {
   csrfToken: string;
   /** Display only; the server decides inside the protected operation's transaction (FR-ORG-5). */
   recentAuthUntil: string;
+  /** K-709: the contact name and whether the account has a password (else: emailed-link sign-in). */
+  displayName: string | null;
+  hasPassword: boolean;
   /** The account's organizations (K-708); events belong to an organization. */
   organizations: Membership[];
 }
