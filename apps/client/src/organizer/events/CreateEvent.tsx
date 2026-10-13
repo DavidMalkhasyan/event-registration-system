@@ -4,7 +4,7 @@ import { ApiError, api, errorMessage } from '../../shared/api';
 import { CAPACITY_MAX, CAPACITY_MIN, normalizeCapacity, type CapacityCheck } from '../../shared/capacity';
 import { Alert, Button, Field, PageHeader, SectionHeading, buttonClass } from '../../shared/ui';
 import { Link, navigate } from '../router';
-import type { EventItem, Session } from '../types';
+import { activeOrganizations, type EventItem, type Session } from '../types';
 
 function defaultZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -20,7 +20,10 @@ export function CreateEvent({ session, onCreated }: { session: Session; onCreate
     timeZone: defaultZone(),
     capacity: '50',
     utcOffset: '',
+    organizationId: '',
   });
+  // K-708: an event belongs to an organization; with several active ones, the organizer chooses.
+  const organizations = activeOrganizations(session);
   const [offsets, setOffsets] = useState<string[]>([]);
   const [capacityCheck, setCapacityCheck] = useState<CapacityCheck>();
   const [error, setError] = useState<string>();
@@ -49,6 +52,7 @@ export function CreateEvent({ session, onCreated }: { session: Session; onCreate
       timeZone: form.timeZone,
       capacity: Number(form.capacity),
       ...(form.utcOffset ? { utcOffset: form.utcOffset } : {}),
+      ...(organizations.length > 1 && form.organizationId ? { organizationId: form.organizationId } : {}),
     };
     const key = JSON.stringify(payload);
     if (requestRef.current?.key !== key) requestRef.current = { key, id: crypto.randomUUID() };
@@ -85,6 +89,26 @@ export function CreateEvent({ session, onCreated }: { session: Session; onCreate
           description="Everything on this form appears on your registration page."
         />
         <div className="form-grid">
+          {organizations.length > 1 && (
+            <Field label="Organization">
+              {(id) => (
+                <select
+                  id={id}
+                  className="select"
+                  required
+                  value={form.organizationId}
+                  onChange={(e) => set({ organizationId: e.target.value })}
+                >
+                  <option value="">Choose…</option>
+                  {organizations.map((o) => (
+                    <option key={o.organizationId} value={o.organizationId}>
+                      {o.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </Field>
+          )}
           <Field label="Event title">
             {(id) => (
               <input
