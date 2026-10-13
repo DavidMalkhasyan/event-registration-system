@@ -7,6 +7,7 @@ The design documents in this folder describe the full designed system (27 tables
 | `0008_organizer_cancellation` | K-703 (PD-83, amendment A-1) | Widens `registrations_ck24` with the end reason `cancelled_by_organizer`, and `outbox_messages_ck48` with the required notice `organizer_cancellation` (class B, bulk lane). |
 | `0009_organizations` | K-708 (PD-88, ADR-022, amendment A-3) | New tables `organizations` and `organization_memberships`; `events.organization_id` (not null) with a backfill of existing data. |
 | `0010_organizer_accounts` | K-709 (PD-89, ADR-022, amendment A-3) | Password and verification columns on `accounts`; new sign-in request purposes and token types for verification and reset; password sessions; three new message types. |
+| `0011_platform_admins` | K-710 (PD-90, ADR-022, amendment A-3) | New tables `platform_admins` and `platform_admin_sessions`; who decided on an organization and why; audit actor `platform_admin`; message type `organization_decision`. |
 
 ## `organizations` (0009)
 
@@ -53,3 +54,15 @@ Run on the development database on 2026-10-13: 7 accounts became the owners of 7
 | `outbox_messages` | Types `account_verification` and `password_reset` (class A, priority lane) and `account_exists_notice` (class A, bulk lane) (ck48). |
 
 Run on the development database on 2026-10-13 (91 ms): schema 10; 7 accounts, all verified, none with a password; 7 organizations, 7 memberships, 34 events, 61 registrations, 7 sessions, 300 access tokens and 167 outbox messages. The migration adds columns and widens checks; it inserts and deletes no rows.
+
+## `0011_platform_admins`
+
+| Table | Change |
+|---|---|
+| `platform_admins` (new) | `email` (unique, normalized), `display_name`, `password_hash` (Argon2id PHC, checked), `created_at`, `password_changed_at`, `disabled_at`. Rows are created only by the operator command `pnpm admin:create`. |
+| `platform_admin_sessions` (new) | `admin_id`, `session_hash` (32-byte SHA-256 of the cookie value with its own domain), `created_at`, `last_seen_at`, `absolute_expires_at`, `revoked_at` with `revoke_reason` (`sign_out`, `admin_disabled`). |
+| `organizations` | `decided_by_admin_id` (references `platform_admins`) and `decision_reason` (up to 1000 characters); index on `(status, submitted_at)`. |
+| `audit_records` | `actor_admin_id`; actor kind `platform_admin`, which requires `actor_admin_id` (ck65); index on `(subject_id, occurred_at)` for an organization's history. |
+| `outbox_messages` | Type `organization_decision` (class A, bulk lane) (ck48). |
+
+The migration adds tables, columns and checks; it changes no existing row and grants no one the role.

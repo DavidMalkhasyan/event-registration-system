@@ -34,7 +34,7 @@ Where a Proposed ADR would only *record* an already-approved requirement, the re
 | 019 | Test architecture: Testcontainers, forced-order harness, fake provider, contract tests, load test | Proposed (would record ENG-TST, which is approved) | ENG-TST-1 to ENG-TST-9, NFR-QA-1, AC-145, AC-164, AC-169 |
 | 020 | Configuration and secrets; fail fast at startup | Proposed (would record ENG-DOC-2, which is approved) | ENG-DOC-2, ENG-DOC-3, AC-143 |
 | [021](ADR-021-read-only-cross-module-reporting.md) | `reporting` may read across module tables; never writes | **Approved** 2026-10-11 | FR-DSH-1 to FR-DSH-6, NFR-CON-6, AC-155 |
-| [022](ADR-022-organizations-and-organizer-accounts.md) | Organizations own events; membership of an active organization is the organizer authorization; Super Admin separate | **Approved** in principle 2026-10-13 (prompt 29, amendment A-3); data model (K-708) and password accounts (K-709) implemented | Amendment A-3, PD-88, PD-89 |
+| [022](ADR-022-organizations-and-organizer-accounts.md) | Organizations own events; membership of an active organization is the organizer authorization; Super Admin separate | **Approved** in principle 2026-10-13 (prompt 29, amendment A-3); data model (K-708), password accounts (K-709) and Super Admin area (K-710) implemented | Amendment A-3, PD-88, PD-89, PD-90 |
 
 ## 2. Other recorded decisions
 
