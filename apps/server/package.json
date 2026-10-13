@@ -7,6 +7,7 @@
     "dev:worker": "tsx watch --env-file-if-exists=../../.env src/entrypoints/worker.ts",
     "migrate": "tsx --env-file-if-exists=../../.env src/entrypoints/migrate.ts",
     "admin": "tsx --env-file-if-exists=../../.env src/entrypoints/admin.ts",
+    "media:sweep": "tsx --env-file-if-exists=../../.env src/entrypoints/media-sweep.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json"

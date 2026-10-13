@@ -122,7 +122,12 @@ async function limitUploads(ctx: AppContext, principal: OrganizerPrincipal) {
 async function intake(ctx: AppContext, data: Buffer) {
   const processed = await processImage(data);
   const key = newMediaKey();
-  await ctx.media.put(key, { full: processed.full, thumb: processed.thumb });
+  try {
+    await ctx.media.put(key, { full: processed.full, thumb: processed.thumb });
+  } catch {
+    // K-719: a full or failing disk is the server's problem, said plainly; nothing was recorded.
+    throw new AppError(503, 'media_storage_unavailable');
+  }
   return { key, processed };
 }
 
