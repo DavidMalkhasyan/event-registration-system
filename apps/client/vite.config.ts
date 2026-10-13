@@ -31,6 +31,7 @@ export default defineConfig({
       '/api': { target: 'http://127.0.0.1:3000' },
       '/dev': { target: 'http://127.0.0.1:3000' },
       '/healthz': { target: 'http://127.0.0.1:3000' },
+      '/media': 'http://localhost:3000',
     },
   },
   build: {
