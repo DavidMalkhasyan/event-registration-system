@@ -33,7 +33,7 @@ It is **not production-ready.** Real email delivery, a production tile provider,
 | [#41](https://github.com/DavidMalkhasyan/event-registration-system/pull/41) | CI action versions (K-724) | `a3210ad` |
 | [#42](https://github.com/DavidMalkhasyan/event-registration-system/pull/42) | Load measurements; paged participant list (K-723) | `87ab66b` |
 | [#43](https://github.com/DavidMalkhasyan/event-registration-system/pull/43) | End-to-end and device audit; tablet fixes (K-722) | `19692bf` |
-| This report (K-725) | Release candidate documentation | — |
+| [#44](https://github.com/DavidMalkhasyan/event-registration-system/pull/44) | This report and the documentation (K-725) | `d2b16f3` |
 
 ## 2. CI runs (each passed)
 
@@ -41,7 +41,7 @@ It is **not production-ready.** Real email delivery, a production tile provider,
 
 ## 3. Branches
 
-When this report was written: `dev` `19692bf`, `main` `8e7f6c1` (v1.0.0, unchanged). From `main` to `dev`: 90 commits (24 merges), 196 files, 20,798 lines added and 649 removed, schema 7 → 17.
+When this report was written: `dev` `19692bf`; the report itself was merged as `d2b16f3` (CI [run 38445465510](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38445465510)), followed by a records-only pull request. `main` `8e7f6c1` (v1.0.0, unchanged). From `main` to `dev`: 90 commits (24 merges), 196 files, 20,798 lines added and 649 removed, schema 7 → 17.
 
 ## 4. Database migrations
 
