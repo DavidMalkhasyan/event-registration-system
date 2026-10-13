@@ -34,6 +34,15 @@ export const organizationRegistrationSchema = z
   })
   .strict();
 
+/** K-716: an account without an organization, for people invited into one (PD-94). */
+export const accountRegistrationSchema = z
+  .object({
+    contactName: z.string().trim().min(1).max(200),
+    email: z.email().max(254),
+    password: passwordSchema,
+  })
+  .strict();
+
 export const passwordSignInSchema = z
   .object({ email: z.email().max(254), password: z.string().min(1).max(PASSWORD_MAX) })
   .strict();
@@ -58,7 +67,7 @@ async function limit(ctx: AppContext, rules: [rule: (typeof RULES)[keyof typeof 
  */
 export async function registerOrganization(
   ctx: AppContext,
-  input: z.infer<typeof organizationRegistrationSchema>,
+  input: z.infer<typeof organizationRegistrationSchema> | z.infer<typeof accountRegistrationSchema>,
   ip: string,
   correlationId: string,
 ): Promise<void> {
@@ -98,6 +107,24 @@ export async function registerOrganization(
       })
       .returning('id')
       .executeTakeFirstOrThrow();
+    // K-716: without an organization name, only the account is created (an invitee joins one later).
+    if (!('organizationName' in input)) {
+      await insertSignInRequest(trx, now, {
+        email,
+        accountId: account.id,
+        purpose: 'verify_email',
+        reauthSessionId: null,
+        correlationId,
+      });
+      await recordAudit(trx, {
+        now,
+        action: 'account_registered',
+        actorKind: 'account',
+        actorAccountId: account.id,
+        outcome: 'pending_verification',
+      });
+      return;
+    }
     const organization = await trx
       .insertInto('app.organizations')
       .values({

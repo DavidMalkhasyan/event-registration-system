@@ -10,6 +10,7 @@ import { registerHttpPlumbing } from '../platform/http.js';
 import { RateLimiter } from '../platform/ratelimit.js';
 import { LocalMediaStorage } from '../modules/media/storage.js';
 import { registerMediaRoutes } from '../modules/media/routes.js';
+import { registerOrganizationRoutes } from '../modules/organizations/routes.js';
 import { registerEventCoreRoutes } from '../modules/event-core/routes.js';
 import { registerIdentityRoutes } from '../modules/identity/routes.js';
 import { registerPlatformAdminRoutes } from '../modules/platform-admin/routes.js';
@@ -64,6 +65,7 @@ export async function buildWebApp(
   registerStaffRoutes(app, ctx);
   registerPlatformAdminRoutes(app, ctx);
   registerMediaRoutes(app, ctx);
+  registerOrganizationRoutes(app, ctx);
   if (options.liveHub) registerLiveRoutes(app, ctx, options.liveHub);
 
   app.get('/healthz', async () => {

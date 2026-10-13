@@ -589,7 +589,7 @@ const accountVerification: MessageHandler = {
   ...accountLink('account_verification'),
   async render(_db, _msg, tokens, origin) {
     return email('Confirm your email address: Event Registration', [
-      'Thank you for registering your organization. Confirm your email address to send the registration for approval.',
+      'Confirm your email address to finish creating your organizer account. If you registered an organization, it then goes to approval; if you were invited to one, sign in to accept the invitation.',
       { label: 'Confirm my email address', link: `${origin}/verify-account#t=${tokens.link}` },
       'The link works once and expires 15 minutes after it was sent. For a new one, use “Forgot your password?” on the sign-in page: setting a password also confirms the address.',
       'If you did not register, you can ignore this email.',
@@ -677,7 +677,30 @@ const organizationDecision: MessageHandler = {
   },
 };
 
+const ROLE_TEXT: Record<string, string> = { admin: 'an admin', member: 'a member' };
+
+const organizationInvitation: MessageHandler = {
+  // K-716: an invitation into an organization. No link grants access: the invitee signs in (or creates
+  // an account with this address) and accepts in the organizer area.
+  async freshness() {
+    return { fresh: true };
+  },
+  async issueTokens() {
+    return {};
+  },
+  async render(_db, msg, _tokens, origin) {
+    const p = msg.payload as { organizationName: string; role: string; invitedBy: string; expiresAt: string };
+    return email(`You are invited to join ${p.organizationName}: Event Registration`, [
+      `${p.invitedBy} invited you to join "${p.organizationName}" as ${ROLE_TEXT[p.role] ?? 'a member'}, to organize its events.`,
+      `If you have an organizer account with this email address, sign in at ${origin}/organizer and accept the invitation there.`,
+      `If not, create one at ${origin}/organizer/join with this email address, confirm it, then sign in and accept.`,
+      'The invitation expires in 14 days. If you did not expect it, you can ignore this email.',
+    ]);
+  },
+};
+
 export const HANDLERS: Record<string, MessageHandler> = {
+  organization_invitation: organizationInvitation,
   organization_decision: organizationDecision,
   account_verification: accountVerification,
   password_reset: passwordReset,

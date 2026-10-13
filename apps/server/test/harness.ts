@@ -72,7 +72,8 @@ export async function resetData(h: Harness): Promise<void> {
   await sql`TRUNCATE app.staff_sessions, app.staff_invitations, app.rotation_requests, app.deletion_markers, app.reminder_slots, app.scheduled_tasks, app.check_in_requests, app.check_ins, app.tickets,
     app.access_tokens, app.outbox_attempts, app.outbox_generations, app.outbox_messages, app.registrations, app.events,
     app.organizer_sessions, app.sign_in_requests, app.organization_memberships, app.organizations, app.accounts, app.audit_records, app.rate_limit_counters,
-    app.platform_admin_sessions, app.platform_admins, app.event_images`.execute(h.owner);
+    app.platform_admin_sessions, app.platform_admins, app.event_images,
+    app.organization_invitations`.execute(h.owner);
 }
 
 /** Runs the worker until there is nothing left to do (tasks first, then the outbox). */
