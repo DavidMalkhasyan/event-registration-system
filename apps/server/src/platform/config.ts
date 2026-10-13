@@ -19,7 +19,21 @@ const schema = z.object({
   PRESESSION_SECRET: secret,
   RATE_LIMIT_SECRET: secret,
   PREVIEW_SECRET: secret, // K_preview: event-deletion preview tokens (ADR-010 §7)
-  EMAIL_PROVIDER: z.enum(['fake']).default('fake'),
+  EMAIL_PROVIDER: z.enum(['fake', 'resend']).default('fake'),
+  // K-717: Resend. The key is a secret: never logged, never printed by the configuration check.
+  RESEND_API_KEY: z
+    .string()
+    .regex(/^re_[A-Za-z0-9_]{8,}$/, 'must be a Resend API key')
+    .optional(),
+  RESEND_API_URL: z.url().default('https://api.resend.com'),
+  EMAIL_FROM: z
+    .string()
+    .regex(
+      /^(?:[^<>@\r\n]{1,100} <[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+>|[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+)$/,
+      'an address, or "Name <address>"',
+    )
+    .optional(),
+  EMAIL_REPLY_TO: z.email().optional(),
   DEV_MAILBOX_DIR: z.string().min(1).default('var/mailbox'),
   CLIENT_DIST_DIR: z.string().min(1).optional(),
   // K-712: where event images are stored (outside the repository; `var/` is ignored by Git).
@@ -59,6 +73,16 @@ export function parseConfig(env: Record<string, string | undefined>): Config {
   }
   if (config.CLIENT_DIST_DIR && !isAbsolute(config.CLIENT_DIST_DIR))
     config.CLIENT_DIST_DIR = resolve(REPO_ROOT, config.CLIENT_DIST_DIR);
+  if (config.EMAIL_PROVIDER === 'resend') {
+    const missing = [
+      ...(config.RESEND_API_KEY ? [] : ['RESEND_API_KEY (required for EMAIL_PROVIDER=resend)']),
+      ...(config.EMAIL_FROM ? [] : ['EMAIL_FROM (required for EMAIL_PROVIDER=resend)']),
+      ...(config.NODE_ENV === 'production' && !config.RESEND_API_URL.startsWith('https://')
+        ? ['RESEND_API_URL (must be https in production)']
+        : []),
+    ];
+    if (missing.length) throw new ConfigError(missing);
+  }
   if (config.NODE_ENV === 'production' && config.EMAIL_PROVIDER === 'fake') {
     throw new ConfigError(['EMAIL_PROVIDER (the fake provider is not allowed in production)']);
   }
