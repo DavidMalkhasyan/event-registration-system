@@ -343,6 +343,14 @@ export async function listParticipants(ctx: AppContext, principal: OrganizerPrin
     .where('event_id', '=', eventId)
     .where('status', 'in', ['FAILED', 'UNCONFIRMED'])
     .execute();
+  // K-402: provider evidence after acceptance (bounced, complained), from the generations' facts.
+  const evidence = await ctx.db
+    .selectFrom('app.outbox_messages as m')
+    .innerJoin('app.outbox_generations as g', 'g.outbox_id', 'm.id')
+    .select(['m.registration_id', 'm.message_type', 'g.bounced_at', 'g.complained_at', 'g.failure_reason'])
+    .where('m.event_id', '=', eventId)
+    .where((eb) => eb.or([eb('g.bounced_at', 'is not', null), eb('g.complained_at', 'is not', null)]))
+    .execute();
   return {
     items: rows.rows.map((r) => ({
       registrationId: r.id,
@@ -361,7 +369,19 @@ export async function listParticipants(ctx: AppContext, principal: OrganizerPrin
           ...(i.last_error_code ? { reason: i.last_error_code } : {}),
           at: (i.settled_at ?? new Date()).toISOString(),
           anomaly: false,
-        })),
+        }))
+        .concat(
+          evidence
+            .filter((e) => e.registration_id === r.id)
+            .map((e) => ({
+              messageType: e.message_type,
+              sendState: 'ACCEPTED',
+              label: e.bounced_at ? 'bounced' : 'complained',
+              ...(e.failure_reason ? { reason: e.failure_reason } : {}),
+              at: (e.bounced_at ?? e.complained_at)!.toISOString(),
+              anomaly: false,
+            })),
+        ),
     })),
     nextCursor: null,
   };

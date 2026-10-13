@@ -83,6 +83,8 @@ export function registerHttpPlumbing(app: FastifyInstance, publicOrigin: string)
   // Exact Origin check on every state-changing API request (ADR-010 §6).
   app.addHook('onRequest', async (request, reply) => {
     if (!STATE_CHANGING.has(request.method) || !request.url.startsWith('/api/')) return;
+    // K-402: provider webhooks come from servers, without an Origin; their signature authenticates them.
+    if (request.url.startsWith('/api/webhooks/')) return;
     if (request.headers.origin !== publicOrigin) {
       const error = new AppError(403, 'origin_check_failed');
       await reply.code(403).type('application/problem+json').send(problemBody(error, request.id));

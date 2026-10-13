@@ -12,6 +12,7 @@ import { LocalMediaStorage } from '../modules/media/storage.js';
 import { registerMediaRoutes } from '../modules/media/routes.js';
 import { registerOrganizationRoutes } from '../modules/organizations/routes.js';
 import { registerMapRoutes } from '../modules/maps/routes.js';
+import { registerWebhookRoutes } from '../modules/messaging/webhook-routes.js';
 import { registerEventCoreRoutes } from '../modules/event-core/routes.js';
 import { registerIdentityRoutes } from '../modules/identity/routes.js';
 import { registerPlatformAdminRoutes } from '../modules/platform-admin/routes.js';
@@ -68,6 +69,7 @@ export async function buildWebApp(
   registerMediaRoutes(app, ctx);
   registerOrganizationRoutes(app, ctx);
   registerMapRoutes(app, ctx);
+  registerWebhookRoutes(app, ctx);
   if (options.liveHub) registerLiveRoutes(app, ctx, options.liveHub);
 
   app.get('/healthz', async () => {

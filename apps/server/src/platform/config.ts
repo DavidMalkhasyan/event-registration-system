@@ -34,6 +34,11 @@ const schema = z.object({
     )
     .optional(),
   EMAIL_REPLY_TO: z.email().optional(),
+  // K-402: the Svix signing secret of the Resend webhook endpoint; the endpoint is off without it.
+  RESEND_WEBHOOK_SECRET: z
+    .string()
+    .regex(/^whsec_[A-Za-z0-9+/=]{16,}$/, 'must be a Svix signing secret (whsec_...)')
+    .optional(),
   DEV_MAILBOX_DIR: z.string().min(1).default('var/mailbox'),
   CLIENT_DIST_DIR: z.string().min(1).optional(),
   // K-712: where event images are stored (outside the repository; `var/` is ignored by Git).
