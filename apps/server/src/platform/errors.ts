@@ -44,6 +44,7 @@ export type ProblemCode =
   | 'already_member'
   | 'last_owner'
   | 'map_tile_unavailable'
+  | 'second_factor_required'
   | 'nonexistent_local_time'
   | 'ambiguous_local_time'
   | 'start_not_in_future'
@@ -99,6 +100,8 @@ const TITLES: Record<ProblemCode, string> = {
   already_member: 'This person is already a member of the organization',
   last_owner: 'An organization needs at least one owner',
   map_tile_unavailable: 'The map could not be loaded right now',
+  second_factor_required:
+    'This Super Admin has no second factor yet; ask the operator to enrol one (pnpm admin:totp)',
   nonexistent_local_time: 'This local time does not exist in the time zone',
   ambiguous_local_time: 'This local time is ambiguous in the time zone',
   start_not_in_future: 'The start must be in the future',

@@ -136,8 +136,24 @@ describe('configuration', () => {
     PRESESSION_SECRET: 'b'.repeat(32),
     RATE_LIMIT_SECRET: 'c'.repeat(32),
     PREVIEW_SECRET: 'd'.repeat(32),
+    ADMIN_TOTP_KEY: Buffer.alloc(32, 7).toString('base64'), // K-718: required in production
   };
   it('refuses the fake provider in production, and Resend without its key and sender, naming only the variables', () => {
+    // K-718: and without the key for the Super Admins' second factor.
+    const { ADMIN_TOTP_KEY: _key, ...withoutKey } = base;
+    void _key;
+    expect(() =>
+      parseConfig({ ...withoutKey, EMAIL_PROVIDER: 'resend', RESEND_API_KEY: KEY, EMAIL_FROM: 'a@b.test' }),
+    ).toThrow(/ADMIN_TOTP_KEY/);
+    expect(() =>
+      parseConfig({
+        ...withoutKey,
+        EMAIL_PROVIDER: 'resend',
+        RESEND_API_KEY: KEY,
+        EMAIL_FROM: 'a@b.test',
+        ADMIN_REQUIRE_TOTP: 'false',
+      }),
+    ).not.toThrow(); // an explicit, documented opt-out
     expect(() => parseConfig({ ...base })).toThrow(/EMAIL_PROVIDER/);
     const missing = (() => {
       try {

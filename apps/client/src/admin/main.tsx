@@ -150,6 +150,7 @@ function Shell({
 function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const submit = async (e: FormEvent) => {
@@ -157,13 +158,18 @@ function SignIn() {
     setBusy(true);
     setError(undefined);
     try {
-      await api('/api/admin/sessions', { method: 'POST', body: { email, password } });
+      await api('/api/admin/sessions', {
+        method: 'POST',
+        body: { email, password, ...(code.trim() ? { code: code.trim() } : {}) },
+      });
       window.location.assign('/admin'); // a full load brings the session's anti-forgery token
     } catch (err) {
       setError(
         err instanceof ApiError && err.code === 'invalid_credentials'
-          ? 'The email address or password is not correct.'
-          : errorMessage(err),
+          ? 'The email address, password or authentication code is not correct.'
+          : err instanceof ApiError && err.code === 'second_factor_required'
+            ? 'This account has no second factor yet. Ask the operator to enrol one (pnpm admin:totp), then sign in with its code.'
+            : errorMessage(err),
       );
       setBusy(false);
     }
@@ -200,6 +206,21 @@ function SignIn() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
+              />
+            )}
+          </Field>
+          {/* K-718 (PD-99): the code from the Super Admin's authenticator app (required once enrolled). */}
+          <Field label="Authentication code" hint="The 6-digit code from your authenticator app.">
+            {(id) => (
+              <input
+                id={id}
+                className="input"
+                inputMode="numeric"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                autoComplete="one-time-code"
               />
             )}
           </Field>
