@@ -4,7 +4,7 @@
 |---|---|
 | **Columns** | Backlog → To Do → In Progress → Review → Done, plus **Deferred** for extended scope that was intentionally not built |
 | **Work-in-progress limits** | In Progress ≤ 2, Review ≤ 3 |
-| **Last updated** | 2026-10-13, session S-19 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
+| **Last updated** | 2026-10-14, session S-21 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
 | **Scope** | Re-planned in S-02 by the final delivery strategy (PD-15): P0 is mandatory, then P1, with P2 deferred. Requirement-level status is in [ASSIGNMENT_SCOPE.md](../../ASSIGNMENT_SCOPE.md). |
 
 ## Rules
@@ -65,7 +65,7 @@
 
 | Card | Milestone | Awaiting |
 |---|---|---|
-| — | | Nothing awaiting review |
+| K-726 Submission documentation for the `dev` release candidate: SUBMISSION_CHECKLIST.md rewritten (v1.0.0 version kept as history), ASSIGNMENT_SCOPE.md and AI_USAGE.md corrected (S-21) | M6 | Its pull request into `dev`; then the owner's decisions on the draft release pull request #47, a tag and the submission |
 
 ## In Progress
 

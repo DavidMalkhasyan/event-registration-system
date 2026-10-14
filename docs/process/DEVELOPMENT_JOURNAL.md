@@ -1088,3 +1088,28 @@ The last two rows were added in S-19 from GitHub's records.
 | 22:24:53 | Diff reviewed (documentation only: the report, README, scope, plan, amendments, AI usage, records); `gh pr merge 44 --merge` | `d2b16f3` on `dev`; `main` unchanged (`8e7f6c1`) |
 | 22:25 | `feature/rc-records`: K-725 Done, the report's own merge commit, the scope row (records only) | — |
 | 22:25:30–22:39:38 | Full gates | `check:secrets`, `check:deps`, `format:check`, `lint`, `typecheck`, `migrate` (schema 17; counts unchanged), `test` (server **249/249**, client **39/39**), `build` and `e2e` (**51/51**) exit 0 |
+
+## S-21: Submission documentation for the release candidate (K-726)
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-14; the first command ran at 11:43:07 +04:00 (prompt 36: "Finalize EventFlow documentation for MadDevs submission") |
+| **Cards** | K-726 (new) → Review |
+| **Tools and model** | Claude Code, model `claude-opus-5-5`; GitHub CLI; Python for exact text replacements; Prettier and the secret scan |
+
+**Found at the start (not recorded before this session):**
+
+- [PR #46](https://github.com/DavidMalkhasyan/event-registration-system/pull/46) (context files for new sessions: `CLAUDE.md`, `docs/ARCHITECTURE_INDEX.md`, `docs/PROJECT_SUMMARY.md`) was merged into `dev` as `07b3d0b` (CI [run 38469173870](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38469173870), `verify` and `container`).
+- `5f87fad` "fix(client): proxy media requests to backend in development" (2026-10-14 01:39:18 +04:00, one line in `apps/client/vite.config.ts`) was committed directly to `dev`, without a pull request.
+- The owner opened the **draft** release pull request [PR #47](https://github.com/DavidMalkhasyan/event-registration-system/pull/47) (`dev` → `main`) at 11:39:12 +04:00. `main` is unchanged (`8e7f6c1`); no tag.
+
+**Activity:**
+
+| Local time | Activity | Result |
+|---|---|---|
+| 11:43:07 | `git status`, `git fetch`; `feature/submission-docs` from `dev` (`5f87fad`); `main` → `dev` counted | 98 commits (27 merges), 200 files, +21,323 / −656 |
+| 11:43–11:47 | [SUBMISSION_CHECKLIST.md](SUBMISSION_CHECKLIST.md) rewritten for the release candidate: requirement rows, branches and PR #47, 17 migrations, test evidence, AI records, the final-submission list and the known limitations; the v1.0.0 checklist kept as §7 (only its section numbers changed) | — |
+| 11:47–11:49 | Material inaccuracies corrected in [ASSIGNMENT_SCOPE.md](../../ASSIGNMENT_SCOPE.md): the release state (it still said `dev` and `main` had the same content), the old test counts (135, 11, 22), the Resend, webhook, deployment and performance rows still marked Deferred, "only the fake email provider exists". [AI_USAGE.md](AI_USAGE.md): the model row extended to S-21; prompts 35 and 36. README and RELEASE_CANDIDATE.md checked: no material inaccuracy | — |
+| 11:48:18 | PR #47's CI on `5f87fad`, [run 38529731040](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38529731040), read from the job log | **Passed**: `verify` (no secrets in 287 tracked files, no known vulnerabilities, schema up to date, server **249/249**, client **39/39**, browser **51/51**) and `container` |
+| 11:49:35–11:50:04 | Prettier on the changed files; `pnpm format:check`; `pnpm check:secrets`; relative links in the changed files | Format: every tracked file passes (the only warning is the untracked, local `brag-output/` folder); "No secrets found in 287 tracked files"; 0 broken links |
+| 11:50:48–11:51:01 | Committed in two steps (documents `b841d88`, records `4d2af7f`); [PR #48](https://github.com/DavidMalkhasyan/event-registration-system/pull/48) opened into `dev` at 11:51:01 | Its CI result and merge are in the pull request; PR #47 and `main` untouched |
