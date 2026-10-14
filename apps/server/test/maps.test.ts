@@ -224,7 +224,11 @@ describe('the participant map', () => {
     behaviour = 'fail';
     const stale = await tile(event.publicId, 14, a.x, a.y);
     expect(stale.statusCode).toBe(200);
-    expect(stale.headers['cache-control']).toBe('public, max-age=59');
+    // A stale copy is reused for 60 s counted from the request's start; the header gives the whole
+    // seconds left when the reply is sent: 60, or 59 once the clock has ticked in between.
+    const maxAge = Number(/^public, max-age=(\d+)$/.exec(String(stale.headers['cache-control']))?.[1]);
+    expect(maxAge).toBeGreaterThanOrEqual(50);
+    expect(maxAge).toBeLessThanOrEqual(60);
   });
 
   it('limits each client', async () => {
