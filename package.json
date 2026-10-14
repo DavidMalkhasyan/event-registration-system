@@ -17,6 +17,7 @@
     "admin:create": "pnpm --filter @ers/server admin create",
     "admin:disable": "pnpm --filter @ers/server admin disable",
     "admin:totp": "pnpm --filter @ers/server admin totp",
+    "seed:demo": "pnpm --filter @ers/server seed:demo",
     "media:sweep": "pnpm --filter @ers/server media:sweep",
     "ops:backup": "pnpm --filter @ers/server ops backup",
     "ops:restore-drill": "pnpm --filter @ers/server ops restore-drill",
