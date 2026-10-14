@@ -6,7 +6,7 @@
 |---|---|---|
 | AI agent | **Claude Code**, in the VS Code extension | Session environment |
 | Claude Code version | 2.1.295, then 2.1.296 (from S-02 to S-15) | Version metadata in the local session transcript; no other version appears in it (checked in S-15) |
-| Model | **Claude Opus 5.5** (`claude-opus-5-5`), for every session S-01 to S-15 | Model ID on every assistant message in the transcript: 581 by the end of S-01, and every later message as well |
+| Model | **Claude Opus 5.5** (`claude-opus-5-5`), for every session S-01 to S-21 | Model ID on every assistant message in the transcript: 581 by the end of S-01, and every later message as well (checked in S-15); from S-16, the model in each journal entry |
 | Operating system | Windows 10 Enterprise 10.0.19045 | Session environment |
 | Shells | Git Bash, Windows PowerShell 5.1 | Session environment |
 | Git | 2.55.0.windows.3 | `git --version` (S-01) |
@@ -84,6 +84,8 @@ Significant prompts, summarized in order. The stakeholder's own instructions are
 | 32 | "continue" (14:42:26) | S-19: PostgreSQL restarted, PR #32 merged, PR J (staff review and final review) implemented |
 | 33 | "EVENTFLOW — PRODUCTION READINESS & RELEASE CANDIDATE" (2026-10-13 16:46): map provider option A, real email provider, security audit, media reliability, deployment, backups, end-to-end audit, performance, CI, release candidate report; no tag, release, deployment, submission or paid service without authorization | S-20: plan in POST_RELEASE_PLAN.md; cards K-717 to K-725; PRs #35 to #43 merged into `dev` after green CI (map, email, webhooks, Super Admin TOTP, media, deployment and backups, CI versions, measurements, end-to-end audit); release candidate report (PR I); no tag, release or deployment |
 | 34 | "сштештгу" ("continue" typed with a Russian keyboard layout, after the session was summarized) | S-20: PR F resumed from the uncommitted branch and finished; nothing was lost |
+| 35 | Context files for new sessions (2026-10-14, before S-21; wording not recorded here) | `CLAUDE.md`, `docs/ARCHITECTURE_INDEX.md`, `docs/PROJECT_SUMMARY.md`; [PR #46](https://github.com/DavidMalkhasyan/event-registration-system/pull/46) merged into `dev` as `07b3d0b` |
+| 36 | "Finalize EventFlow documentation for MadDevs submission" (2026-10-14; the session's first command ran at 11:43:07 +04:00): update SUBMISSION_CHECKLIST.md for the `dev` release candidate (17 migrations, current test evidence, AI records, known limitations, pending submission); correct other submission-facing documents only for material inaccuracies; preserve history and timestamps; do not invent results; documentation, format and secret checks; a feature branch into `dev`; do not merge PR #47, modify `main`, deploy or tag | S-21 |
 
 **Context management:** Claude Code summarized earlier parts of the long session automatically to stay within the context window. Decisions taken before a summary were re-read from the documents and the transcript whenever exact wording mattered.
 
