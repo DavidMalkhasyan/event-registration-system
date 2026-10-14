@@ -14,6 +14,7 @@ import {
   getPublicEvent,
   listEvents,
   listParticipants,
+  participantPageSchema,
 } from './events.js';
 import {
   cancelByManagementLink,
@@ -23,6 +24,7 @@ import {
   eventDetailsSchema,
   managementView,
   removeFromWaitlist,
+  cancelRegistrationByOrganizer,
   rescheduleEvent,
   rescheduleSchema,
   setCapacity,
@@ -32,6 +34,7 @@ import {
 } from './lifecycle.js';
 import { deleteEvent, deleteEventSchema, getDeletionPreview } from './deletion.js';
 import { confirmVerification, resolveVerification, submitRegistration } from './registrations.js';
+import { setLocation, setLocationSchema } from './location.js';
 
 const registrationSchema = z.object({ email: z.email().max(254) }).strict();
 const params = z.object({ eventId: z.string() });
@@ -98,7 +101,12 @@ export function registerEventCoreRoutes(app: FastifyInstance, ctx: AppContext): 
 
   app.get('/api/events/:eventId/participants', async (request) => {
     const principal = await requireOrganizer(ctx, request, { csrf: false });
-    return listParticipants(ctx, principal, params.parse(request.params).eventId);
+    return listParticipants(
+      ctx,
+      principal,
+      params.parse(request.params).eventId,
+      participantPageSchema.parse(request.query),
+    );
   });
 
   app.post('/api/events/:eventId/reschedule', async (request) => {
@@ -139,6 +147,20 @@ export function registerEventCoreRoutes(app: FastifyInstance, ctx: AppContext): 
   });
 
   // setCapacity (API catalogue #34): absolute value; retries are idempotent.
+  // K-711 (PD-91): the venue; a change after people registered queues a notice to each of them.
+  app.put('/api/events/:eventId/location', async (request) => {
+    const principal = await requireOrganizer(ctx, request, { csrf: true });
+    const { eventId } = params.parse(request.params);
+    const result = await setLocation(
+      ctx,
+      principal,
+      eventId,
+      setLocationSchema.parse(request.body),
+      request.id,
+    );
+    return { ...result, event: await getOwnedEvent(ctx, principal, eventId) };
+  });
+
   app.put('/api/events/:eventId/capacity', async (request) => {
     const principal = await requireOrganizer(ctx, request, { csrf: true });
     const eventId = params.parse(request.params).eventId;
@@ -161,6 +183,16 @@ export function registerEventCoreRoutes(app: FastifyInstance, ctx: AppContext): 
       .parse(request.params);
     const input = waitlistRemovalSchema.parse(request.body ?? {});
     return removeFromWaitlist(ctx, principal, eventId, registrationId, input, request.id);
+  });
+
+  // K-703 (PD-83): owner only, explicitly confirmed; cancels one CONFIRMED registration and promotes FIFO.
+  app.post('/api/events/:eventId/registrations/:registrationId/organizer-cancellation', async (request) => {
+    const principal = await requireOrganizer(ctx, request, { csrf: true });
+    const { eventId, registrationId } = z
+      .object({ eventId: z.string(), registrationId: z.string() })
+      .parse(request.params);
+    confirmedActionSchema.parse(request.body ?? {});
+    return cancelRegistrationByOrganizer(ctx, principal, eventId, registrationId, request.id);
   });
 
   // undoCheckIn (API #44): owner only; staff get 403 from requireOrganizer (AC-26, PD-56). TX-C02.

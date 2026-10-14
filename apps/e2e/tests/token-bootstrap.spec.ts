@@ -1,5 +1,15 @@
 import { expect, test, type Browser, type Page } from './fixtures.js';
-import { HOUR, address, createEvent, linkIn, openSection, signIn, waitForMail } from './helpers.js';
+import { seedOrganizer } from './db.js';
+import {
+  HOUR,
+  REGISTER_BUTTON,
+  address,
+  createEvent,
+  linkIn,
+  openSection,
+  signIn,
+  waitForMail,
+} from './helpers.js';
 
 // PD-71, FR-LNK-10 (b), ADR-011 — against the PRODUCTION build served by the real web server.
 // Every JavaScript chunk except the HTML entry is instrumented on the wire: one statement is prepended
@@ -87,7 +97,7 @@ test('production bundle: the link token is captured before any application modul
   const helper = await (await browser.newContext()).newPage();
   await helper.goto(publicUrl);
   await helper.getByLabel('Email address').fill(guest);
-  await helper.getByRole('button', { name: 'Register' }).click();
+  await helper.getByRole('button', REGISTER_BUTTON).click();
   await expect(helper.getByText('Check your email.')).toBeVisible();
   const verifyUrl = linkIn((await waitForMail(guest, 'Confirm your registration'))[0]!, 'verify');
 
@@ -114,6 +124,7 @@ test('production bundle: the link token is captured before any application modul
 
   // Sign-in confirmation page (not confirmed here).
   const other = address('other-organizer');
+  await seedOrganizer(other); // K-709: links go only to existing accounts without a password
   await page.request.post('/api/auth/sign-in-requests', {
     headers: { origin: new URL(publicUrl).origin },
     data: { email: other },

@@ -1,15 +1,24 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { constants, existsSync } from 'node:fs';
+import { access, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import fastifyCookie from '@fastify/cookie';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { sql } from 'kysely';
 import type { Config } from '../platform/config.js';
 import type { Database } from '../platform/db.js';
 import { registerHttpPlumbing } from '../platform/http.js';
+import { expectedSchemaVersion } from '../platform/migrations.js';
 import { RateLimiter } from '../platform/ratelimit.js';
+import { LocalMediaStorage } from '../modules/media/storage.js';
+import { registerMediaRoutes } from '../modules/media/routes.js';
+import { registerOrganizationRoutes } from '../modules/organizations/routes.js';
+import { registerMapRoutes } from '../modules/maps/routes.js';
+import { registerWebhookRoutes } from '../modules/messaging/webhook-routes.js';
 import { registerEventCoreRoutes } from '../modules/event-core/routes.js';
 import { registerIdentityRoutes } from '../modules/identity/routes.js';
+import { registerPlatformAdminRoutes } from '../modules/platform-admin/routes.js';
 import { registerParticipantPortalRoutes } from '../modules/participant-portal/routes.js';
 import { registerStaffRoutes } from '../modules/staff/routes.js';
 import { registerLiveRoutes, type LiveHub } from '../modules/reporting/live.js';
@@ -31,6 +40,9 @@ export async function buildWebApp(
 ): Promise<FastifyInstance> {
   const app = Fastify({
     genReqId: () => randomUUID(),
+    // K-720: the client address behind a reverse proxy (only the configured number of hops is trusted).
+    // hop 0 is the direct peer; with N trusted hops the client is the address after them.
+    trustProxy: (_address: string, hop: number) => hop < config.TRUST_PROXY_HOPS,
     logger:
       options.logger === false
         ? false
@@ -49,11 +61,21 @@ export async function buildWebApp(
   await app.register(fastifyCookie);
   registerHttpPlumbing(app, config.PUBLIC_ORIGIN);
 
-  const ctx: AppContext = { db, config, limiter: new RateLimiter(db, config.RATE_LIMIT_SECRET) };
+  const ctx: AppContext = {
+    db,
+    config,
+    limiter: new RateLimiter(db, config.RATE_LIMIT_SECRET),
+    media: new LocalMediaStorage(config.MEDIA_DIR),
+  };
   registerIdentityRoutes(app, ctx);
   registerEventCoreRoutes(app, ctx);
   registerParticipantPortalRoutes(app, ctx);
   registerStaffRoutes(app, ctx);
+  registerPlatformAdminRoutes(app, ctx);
+  registerMediaRoutes(app, ctx);
+  registerOrganizationRoutes(app, ctx);
+  registerMapRoutes(app, ctx);
+  registerWebhookRoutes(app, ctx);
   if (options.liveHub) registerLiveRoutes(app, ctx, options.liveHub);
 
   app.get('/healthz', async () => {
@@ -62,6 +84,46 @@ export async function buildWebApp(
       .select((eb) => eb.fn.max('version').as('v'))
       .executeTakeFirst();
     return { schemaVersion: Number(row?.v ?? 0), database: 'ok' };
+  });
+
+  // K-720 (PD-101): readiness for a load balancer or orchestrator. Ready when the database answers, its
+  // schema is the one this build expects and the media directory is writable. The age of the oldest
+  // overdue email is reported for monitoring (a stopped worker shows here first); it does not make the
+  // web process unready, because the web process can serve without the worker.
+  app.get('/readyz', async (_request, reply) => {
+    const expected = expectedSchemaVersion();
+    let schemaVersion = -1;
+    let oldestDueEmailSeconds: number | null = null;
+    let database = 'ok';
+    try {
+      const row = await db
+        .selectFrom('app.schema_migrations')
+        .select((eb) => eb.fn.max('version').as('v'))
+        .executeTakeFirst();
+      schemaVersion = Number(row?.v ?? 0);
+      const lag = await sql<{ s: number | null }>`
+        SELECT extract(epoch FROM now() - min(next_attempt_at))::int AS s FROM app.outbox_messages
+        WHERE status IN ('QUEUED', 'WAITING_RETRY') AND next_attempt_at <= now()`.execute(db);
+      oldestDueEmailSeconds = lag.rows[0]?.s ?? null;
+    } catch {
+      database = 'unavailable';
+    }
+    let media = 'ok';
+    try {
+      await mkdir(config.MEDIA_DIR, { recursive: true });
+      await access(config.MEDIA_DIR, constants.W_OK);
+    } catch {
+      media = 'not writable';
+    }
+    const ready = database === 'ok' && schemaVersion === expected && media === 'ok';
+    return reply.code(ready ? 200 : 503).send({
+      ready,
+      database,
+      schemaVersion,
+      expectedSchemaVersion: expected,
+      media,
+      oldestDueEmailSeconds,
+    });
   });
 
   if (config.NODE_ENV !== 'production' && config.EMAIL_PROVIDER === 'fake')
@@ -76,10 +138,20 @@ export async function buildWebApp(
     });
     const entry = (file: string) => async (_req: unknown, reply: { sendFile: (f: string) => unknown }) =>
       reply.sendFile(file);
-    for (const path of ['/e/*', '/verify', '/manage', '/ticket', '/sign-in', '/invite'])
+    for (const path of [
+      '/e/*',
+      '/verify',
+      '/manage',
+      '/ticket',
+      '/sign-in',
+      '/invite',
+      '/verify-account',
+      '/reset-password',
+    ])
       app.get(path, entry('public.html'));
     for (const path of ['/', '/organizer', '/organizer/*']) app.get(path, entry('organizer.html'));
     app.get('/staff', entry('staff.html')); // dedicated staff entry (PD-69)
+    for (const path of ['/admin', '/admin/*']) app.get(path, entry('admin.html')); // Super Admin area (K-710)
     app.get('/assets/*', async (request, reply) =>
       reply.sendFile((request.params as { '*': string })['*'], resolve(config.CLIENT_DIST_DIR!, 'assets')),
     );

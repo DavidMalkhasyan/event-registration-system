@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { EventPage } from './EventPage';
 import { InvitePage, SignInPage, TicketPage, VerifyPage } from './LinkPages';
 import { ManagePage } from './ManagePage';
+import { AccountVerificationPage, PasswordResetPage } from './AccountPages';
 import { InvalidLinkPage } from './shell';
 
 // The participant and link entry (ADR-013). Routing by path only; tokens never come from the router.
@@ -17,6 +18,8 @@ function App() {
   if (path === '/ticket') return <TicketPage />;
   if (path === '/sign-in') return <SignInPage />;
   if (path === '/invite') return <InvitePage />;
+  if (path === '/verify-account') return <AccountVerificationPage />;
+  if (path === '/reset-password') return <PasswordResetPage />;
   return <InvalidLinkPage />;
 }
 

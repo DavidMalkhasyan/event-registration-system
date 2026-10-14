@@ -6,6 +6,10 @@
     "dev:web": "tsx watch --env-file-if-exists=../../.env src/entrypoints/web.ts",
     "dev:worker": "tsx watch --env-file-if-exists=../../.env src/entrypoints/worker.ts",
     "migrate": "tsx --env-file-if-exists=../../.env src/entrypoints/migrate.ts",
+    "admin": "tsx --env-file-if-exists=../../.env src/entrypoints/admin.ts",
+    "media:sweep": "tsx --env-file-if-exists=../../.env src/entrypoints/media-sweep.ts",
+    "ops": "tsx --env-file-if-exists=../../.env src/entrypoints/ops.ts",
+    "bench": "tsx --env-file-if-exists=../../.env bench/load.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json"
@@ -17,6 +21,7 @@
     "kysely": "^0.29.6",
     "luxon": "^3.7.2",
     "pg": "^8.23.1",
+    "sharp": "^0.35.5",
     "zod": "^4.6.5"
   },
   "devDependencies": {

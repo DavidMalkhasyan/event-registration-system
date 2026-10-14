@@ -240,6 +240,8 @@ The owner therefore always deletes exactly what the confirmation step showed (FR
 
 ### 7.8 Participant list and delivery labels (owner only)
 
+The list is paged in registration order (K-723, PD-102): `?limit=` 1 to 1,000 (default 1,000) and `?cursor=` from the previous page's `nextCursor`, which is `null` on the last page. Waiting-list positions are counted over the whole event.
+
 Each `emailIssue` has `messageType`, `sendState`, `label`, `providerOutcome?`, `reason?`, `at` and `anomaly`.
 
 | `label` | Displayed text (NFR-REL-11) |

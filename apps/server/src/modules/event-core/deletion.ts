@@ -6,6 +6,8 @@ import { AppError } from '../../platform/errors.js';
 import { withEventLock, type LockedEvent, type Tx } from '../../platform/tx.js';
 import { recordAudit } from '../audit/audit.js';
 import { requireRecentAuthentication, type OrganizerPrincipal } from '../identity/sessions.js';
+import { assertEventAccess } from '../organizations/access.js';
+import { deleteEventImages } from '../media/images.js';
 
 // Event deletion (K-304d): FR-EVT-10, FR-EVT-11, FR-EVT-13, FR-EVT-14, BR-26, BR-29; TX-E06;
 // API #37 getDeletionPreview and #38 deleteEvent; API_DESIGN §7.4; PD-43 to PD-46.
@@ -112,7 +114,7 @@ const LABEL = { FAILED: 'failed', UNCONFIRMED: 'delivery_outcome_unknown' } as c
 export async function getDeletionPreview(ctx: AppContext, principal: OrganizerPrincipal, eventId: string) {
   if (!z.uuid().safeParse(eventId).success) throw new AppError(404, 'not_found');
   const result = await withEventLock(ctx.db, eventId, 'shared', async ({ trx, now, event }) => {
-    if (event.owner_account_id !== principal.accountId) return null;
+    await assertEventAccess(trx, principal.accountId, event);
     await requireRecentAuthentication(trx, principal.sessionId, now);
     const snapshot = await snapshotOf(trx, event);
     const exp = Math.floor((now.getTime() + PREVIEW_TTL_MS) / 1000);
@@ -152,7 +154,7 @@ export async function deleteEvent(
 ): Promise<void> {
   if (!z.uuid().safeParse(eventId).success) throw new AppError(404, 'not_found');
   const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
-    if (event.owner_account_id !== principal.accountId) return { error: new AppError(404, 'not_found') };
+    await assertEventAccess(trx, principal.accountId, event);
     await requireRecentAuthentication(trx, principal.sessionId, now);
     if (event.status === 'CANCELLED') return { error: new AppError(409, 'cancelled_event_not_deletable') };
 
@@ -228,9 +230,12 @@ export async function deleteEvent(
     // FR-STAFF-4: staff access ends with the event (§8.4 steps 8 and 9).
     await trx.deleteFrom('app.staff_sessions').where('event_id', '=', eventId).execute();
     await trx.deleteFrom('app.staff_invitations').where('event_id', '=', eventId).execute();
+    // K-712: image rows go with the event; their files are removed after the commit.
+    const imageKeys = await deleteEventImages(trx, eventId);
     await trx.deleteFrom('app.events').where('id', '=', eventId).execute();
-    return { error: null };
+    return { error: null, imageKeys };
   });
   if (result === null) throw new AppError(404, 'not_found'); // already deleted: a repeat gets 404
   if (result.error) throw result.error;
+  await Promise.all((result.imageKeys ?? []).map((k) => ctx.media.remove(k).catch(() => undefined)));
 }

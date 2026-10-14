@@ -10,6 +10,7 @@ import { recordAudit } from '../audit/audit.js';
 import { csrfTokenFor, sessionStillValid, type OrganizerPrincipal } from '../identity/sessions.js';
 import { STAFF_SESSION_ABSOLUTE_MS, type StaffPrincipal } from '../identity/staff-sessions.js';
 import { enqueue } from '../messaging/outbox.js';
+import { assertEventAccess, manageableOrganizationIds } from '../organizations/access.js';
 
 // Staff invitations and sessions (K-406): FR-STAFF-1 to FR-STAFF-7, TX-S01 to TX-S03, API #14 to #16
 // and #46 to #50, decisions PD-53 to PD-58. Every state change runs under the exclusive event lock,
@@ -31,7 +32,7 @@ async function ownerTransaction<T>(
 ): Promise<T> {
   if (!z.uuid().safeParse(eventId).success) throw new AppError(404, 'not_found');
   const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
-    if (event.owner_account_id !== principal.accountId) return { error: new AppError(404, 'not_found') };
+    await assertEventAccess(trx, principal.accountId, event);
     if (!(await sessionStillValid(trx, principal.sessionId, now)))
       return { error: new AppError(401, 'unauthenticated') };
     return { value: await fn({ trx, now, event }) };
@@ -174,7 +175,7 @@ export async function staffOverview(ctx: AppContext, principal: OrganizerPrincip
     .selectFrom('app.events')
     .select(['status', 'starts_at'])
     .where('id', '=', eventId)
-    .where('owner_account_id', '=', principal.accountId)
+    .where('organization_id', 'in', manageableOrganizationIds(ctx.db, principal.accountId))
     .executeTakeFirst();
   if (!event) throw new AppError(404, 'not_found');
   const now = await decisionTime(ctx.db);
@@ -273,6 +274,31 @@ export async function revokeStaffSession(
       actorAccountId: principal.accountId,
       eventId,
       subjectId: staffSessionId,
+      outcome: 'success',
+    });
+  });
+}
+
+/**
+ * POST /api/staff/sign-out (K-715, PD-95): the staff device ends its own access. Under the exclusive
+ * event lock, like the owner's revocation, so no check-in from this device commits after it.
+ */
+export async function endStaffSession(ctx: AppContext, principal: StaffPrincipal): Promise<void> {
+  await withEventLock(ctx.db, principal.eventId, 'exclusive', async ({ trx, now }) => {
+    const ended = await trx
+      .updateTable('app.staff_sessions')
+      .set({ revoked_at: now, revoke_reason: 'staff_ended' })
+      .where('id', '=', principal.staffSessionId)
+      .where('revoked_at', 'is', null)
+      .executeTakeFirst();
+    if (!ended.numUpdatedRows) return;
+    await recordAudit(trx, {
+      now,
+      action: 'staff_session_ended',
+      actorKind: 'staff',
+      actorStaffSessionId: principal.staffSessionId,
+      eventId: principal.eventId,
+      subjectId: principal.staffSessionId,
       outcome: 'success',
     });
   });

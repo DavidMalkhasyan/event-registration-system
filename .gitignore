@@ -8,3 +8,5 @@ coverage/
 var/
 .vite/
 *.tsbuildinfo
+deploy/.env.production
+.claude/SESSION_HANDOFF.md

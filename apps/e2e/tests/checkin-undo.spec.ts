@@ -8,6 +8,7 @@ import {
   localIn,
   openSection,
   registerParticipant,
+  reschedule,
   signIn,
   stat,
   waitForMail,
@@ -27,9 +28,7 @@ test('owner undoes a check-in after confirming; the share view shows the ticket 
   const shareUrl = linkIn(ticketMail!, 'ticket');
   // Into the check-in window (opens 2 hours before the start).
   await openSection(page, 'Settings');
-  await page.getByLabel(/New date and time/).fill(localIn(1 * HOUR));
-  await page.getByRole('button', { name: 'Reschedule and notify' }).click();
-  await expect(page.getByText('Rescheduled.')).toBeVisible();
+  await reschedule(page, localIn(1 * HOUR));
 
   const checkInOnce = async () => {
     await openSection(page, 'Check-in');

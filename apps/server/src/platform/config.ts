@@ -19,9 +19,48 @@ const schema = z.object({
   PRESESSION_SECRET: secret,
   RATE_LIMIT_SECRET: secret,
   PREVIEW_SECRET: secret, // K_preview: event-deletion preview tokens (ADR-010 §7)
-  EMAIL_PROVIDER: z.enum(['fake']).default('fake'),
+  EMAIL_PROVIDER: z.enum(['fake', 'resend']).default('fake'),
+  // K-717: Resend. The key is a secret: never logged, never printed by the configuration check.
+  RESEND_API_KEY: z
+    .string()
+    .regex(/^re_[A-Za-z0-9_]{8,}$/, 'must be a Resend API key')
+    .optional(),
+  RESEND_API_URL: z.url().default('https://api.resend.com'),
+  EMAIL_FROM: z
+    .string()
+    .regex(
+      /^(?:[^<>@\r\n]{1,100} <[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+>|[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+)$/,
+      'an address, or "Name <address>"',
+    )
+    .optional(),
+  EMAIL_REPLY_TO: z.email().optional(),
+  // K-718: the key that encrypts Super Admins' TOTP secrets (32 bytes, base64), and whether Super Admins
+  // must use a second factor (default: in production yes, elsewhere no).
+  ADMIN_TOTP_KEY: z
+    .string()
+    .regex(/^[A-Za-z0-9+/]{43}=$/, 'must be 32 random bytes, base64-encoded')
+    .optional(),
+  ADMIN_REQUIRE_TOTP: z.enum(['true', 'false']).optional(),
+  // K-402: the Svix signing secret of the Resend webhook endpoint; the endpoint is off without it.
+  RESEND_WEBHOOK_SECRET: z
+    .string()
+    .regex(/^whsec_[A-Za-z0-9+/=]{16,}$/, 'must be a Svix signing secret (whsec_...)')
+    .optional(),
   DEV_MAILBOX_DIR: z.string().min(1).default('var/mailbox'),
   CLIENT_DIST_DIR: z.string().min(1).optional(),
+  // K-720: how many reverse proxies in front of the web process may set X-Forwarded-For (0: none, the
+  // default; 1 behind one proxy such as Caddy). Per-IP rate limits depend on it.
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
+  // K-712: where event images are stored (outside the repository; `var/` is ignored by Git).
+  MEDIA_DIR: z.string().min(1).default('var/media'),
+  // K-714: the participant map's tile source, the operator contact sent in the User-Agent (the map is
+  // off without it), and the tile cache (outside the repository).
+  MAP_TILE_URL: z
+    .url()
+    .refine((u) => ['{z}', '{x}', '{y}'].every((p) => u.includes(p)), 'needs {z}, {x} and {y}')
+    .default('https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
+  MAP_TILE_CONTACT: z.string().trim().min(3).max(200).optional(),
+  TILE_CACHE_DIR: z.string().min(1).default('var/tile-cache'),
 });
 
 export type Config = z.infer<typeof schema>;
@@ -42,8 +81,26 @@ export function parseConfig(env: Record<string, string | undefined>): Config {
   // Relative paths are relative to the repository root, whichever package directory a process runs from.
   if (!isAbsolute(config.DEV_MAILBOX_DIR))
     config.DEV_MAILBOX_DIR = resolve(REPO_ROOT, config.DEV_MAILBOX_DIR);
+  if (!isAbsolute(config.MEDIA_DIR)) config.MEDIA_DIR = resolve(REPO_ROOT, config.MEDIA_DIR);
+  if (!isAbsolute(config.TILE_CACHE_DIR)) config.TILE_CACHE_DIR = resolve(REPO_ROOT, config.TILE_CACHE_DIR);
+  if (config.NODE_ENV === 'production' && !config.MAP_TILE_URL.startsWith('https://')) {
+    throw new ConfigError(['MAP_TILE_URL (must be https in production)']);
+  }
   if (config.CLIENT_DIST_DIR && !isAbsolute(config.CLIENT_DIST_DIR))
     config.CLIENT_DIST_DIR = resolve(REPO_ROOT, config.CLIENT_DIST_DIR);
+  if (config.EMAIL_PROVIDER === 'resend') {
+    const missing = [
+      ...(config.RESEND_API_KEY ? [] : ['RESEND_API_KEY (required for EMAIL_PROVIDER=resend)']),
+      ...(config.EMAIL_FROM ? [] : ['EMAIL_FROM (required for EMAIL_PROVIDER=resend)']),
+      ...(config.NODE_ENV === 'production' && !config.RESEND_API_URL.startsWith('https://')
+        ? ['RESEND_API_URL (must be https in production)']
+        : []),
+    ];
+    if (missing.length) throw new ConfigError(missing);
+  }
+  if (config.NODE_ENV === 'production' && !config.ADMIN_TOTP_KEY && config.ADMIN_REQUIRE_TOTP !== 'false') {
+    throw new ConfigError(['ADMIN_TOTP_KEY (Super Admins need a second factor in production)']);
+  }
   if (config.NODE_ENV === 'production' && config.EMAIL_PROVIDER === 'fake') {
     throw new ConfigError(['EMAIL_PROVIDER (the fake provider is not allowed in production)']);
   }

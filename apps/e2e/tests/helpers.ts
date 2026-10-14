@@ -1,6 +1,7 @@
 import { expect, type Browser, type Page, type BrowserContext } from '@playwright/test';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { seedOrganizer } from './db.js';
 import { E2E_MAILBOX, ORIGIN } from './env.js';
 
 interface Mail {
@@ -65,10 +66,15 @@ export function localIn(ms: number): string {
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
 }
 
-/** Organizer sign-in through the UI and the emailed link (passwordless). */
+/**
+ * Sign-in of an approved organizer (K-709): the organizer is prepared in the test database without a
+ * password, as organizers from before K-709 are, and signs in through the UI with the emailed link
+ * that such accounts keep. Password sign-in and registration have their own spec (accounts.spec.ts).
+ */
 export async function signIn(page: Page, email: string): Promise<void> {
+  await seedOrganizer(email);
   const before = mailFor(email, 'Your sign-in link').length;
-  await page.goto('/organizer');
+  await page.goto('/organizer/sign-in-link');
   await page.getByLabel('Email address').fill(email);
   await page.getByRole('button', { name: 'Send sign-in link' }).click();
   await expect(page.getByText('Check your email for a sign-in link')).toBeVisible();
@@ -102,11 +108,25 @@ export async function createEvent(
   return { eventId, publicUrl };
 }
 
+/**
+ * Reschedules from the event's Settings (K-702): the field holds the current start in the event's time
+ * zone; a real change is confirmed in a dialog, because every confirmed and waiting participant is emailed.
+ */
+export async function reschedule(page: Page, localStart: string): Promise<void> {
+  await page.getByLabel(/Start date and time/).fill(localStart);
+  await page.getByRole('button', { name: 'Save new date' }).click();
+  await page.getByRole('button', { name: 'Yes, reschedule and notify' }).click();
+  await expect(page.getByText(/^Rescheduled to /)).toBeVisible();
+}
+
+/** The public page's registration button: its label follows availability (PD-81), the action does not. */
+export const REGISTER_BUTTON = { name: /^(Register for event|Join waiting list)$/ };
+
 /** Registers on the public page and opens the emailed verification link, up to the confirm button. */
 export async function openVerification(page: Page, publicUrl: string, email: string): Promise<void> {
   await page.goto(publicUrl);
   await page.getByLabel('Email address').fill(email);
-  await page.getByRole('button', { name: 'Register' }).click();
+  await page.getByRole('button', REGISTER_BUTTON).click();
   await expect(page.getByText('Check your email.')).toBeVisible();
   const [mail] = await waitForMail(email, 'Confirm your registration');
   await page.goto(linkIn(mail!, 'verify'));

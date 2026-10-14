@@ -12,6 +12,7 @@ import { parseConfig, type Config } from '../src/platform/config.js';
 import { createDatabase, type Database } from '../src/platform/db.js';
 import { setTestClockOffset } from '../src/platform/tx.js';
 import { loadTestEnv } from './env.js';
+import { hashPassword } from '../src/platform/passwords.js';
 
 export const ORIGIN = 'http://localhost:5173';
 
@@ -25,7 +26,8 @@ export interface Harness {
   close(): Promise<void>;
 }
 
-export async function createHarness(): Promise<Harness> {
+/** `env` overrides configuration for a test file (for example K-714's map tile source). */
+export async function createHarness(env: Record<string, string> = {}): Promise<Harness> {
   loadTestEnv();
   const mailboxDir = mkdtempSync(join(tmpdir(), 'ers-mailbox-'));
   const secret = () => randomBytes(32).toString('base64url');
@@ -39,6 +41,9 @@ export async function createHarness(): Promise<Harness> {
     PREVIEW_SECRET: process.env.PREVIEW_SECRET ?? secret(),
     EMAIL_PROVIDER: 'fake',
     DEV_MAILBOX_DIR: mailboxDir,
+    MEDIA_DIR: mkdtempSync(join(tmpdir(), 'ers-media-')),
+    TILE_CACHE_DIR: mkdtempSync(join(tmpdir(), 'ers-tiles-')),
+    ...env,
   });
   const db = createDatabase(config.DATABASE_URL, 40);
   const owner = createDatabase(process.env.TEST_MIGRATION_DATABASE_URL!, 2);
@@ -66,11 +71,13 @@ export async function resetData(h: Harness): Promise<void> {
   // Empty the fake mailbox too, so emails from an earlier test are never counted again.
   for (const entry of readdirSync(h.mailboxDir))
     rmSync(join(h.mailboxDir, entry), { recursive: true, force: true });
+  rmSync(h.config.MEDIA_DIR, { recursive: true, force: true }); // K-712: image files go with their rows
+  rmSync(h.config.TILE_CACHE_DIR, { recursive: true, force: true }); // K-714: each test starts uncached
   await sql`TRUNCATE app.staff_sessions, app.staff_invitations, app.rotation_requests, app.deletion_markers, app.reminder_slots, app.scheduled_tasks, app.check_in_requests, app.check_ins, app.tickets,
     app.access_tokens, app.outbox_attempts, app.outbox_generations, app.outbox_messages, app.registrations, app.events,
-    app.organizer_sessions, app.sign_in_requests, app.accounts, app.audit_records, app.rate_limit_counters`.execute(
-    h.owner,
-  );
+    app.organizer_sessions, app.sign_in_requests, app.organization_memberships, app.organizations, app.accounts, app.audit_records, app.rate_limit_counters,
+    app.platform_admin_sessions, app.platform_admins, app.event_images,
+    app.organization_invitations, app.provider_event_matches, app.provider_events`.execute(h.owner);
 }
 
 /** Runs the worker until there is nothing left to do (tasks first, then the outbox). */
@@ -102,8 +109,56 @@ export interface Session {
   accountId: string;
 }
 
-/** Full passwordless sign-in through the API and the fake mailbox (FR-ORG-3, ADR-010). */
+/**
+ * Test setup (K-709): an approved organizer, as an approved registration or a migrated organizer would
+ * be: a verified account (with a password if given), owner of an active organization. Written with the
+ * owner role in the test database; the application has no endpoint for this.
+ */
+export async function ensureOrganizer(h: Harness, email: string, password?: string): Promise<string> {
+  const existing = await h.owner
+    .selectFrom('app.accounts')
+    .select('id')
+    .where('email', '=', email)
+    .executeTakeFirst();
+  if (existing) return existing.id;
+  const now = new Date();
+  const account = await h.owner
+    .insertInto('app.accounts')
+    .values({
+      email,
+      created_at: now,
+      email_verified_at: now,
+      password_hash: password ? await hashPassword(password) : null,
+      password_changed_at: password ? now : null,
+    })
+    .returning('id')
+    .executeTakeFirstOrThrow();
+  const org = await h.owner
+    .insertInto('app.organizations')
+    .values({
+      name: email,
+      status: 'active',
+      created_at: now,
+      updated_at: now,
+      email_verified_at: now,
+      submitted_at: now,
+      decided_at: now,
+    })
+    .returning('id')
+    .executeTakeFirstOrThrow();
+  await h.owner
+    .insertInto('app.organization_memberships')
+    .values({ organization_id: org.id, account_id: account.id, role: 'owner', created_at: now })
+    .execute();
+  return account.id;
+}
+
+/**
+ * Sign-in of an approved organizer through the emailed-link fallback for accounts without a password
+ * (FR-ORG-3, ADR-010; K-709 keeps it for them). Password sign-in has its own tests (accounts.test.ts).
+ */
 export async function signIn(h: Harness, email: string): Promise<Session> {
+  await ensureOrganizer(h, email);
   const request = await h.app.inject({
     method: 'POST',
     url: '/api/auth/sign-in-requests',

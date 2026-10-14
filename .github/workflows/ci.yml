@@ -28,9 +28,9 @@ jobs:
       PUBLIC_ORIGIN: http://localhost:5173
       EMAIL_PROVIDER: fake
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -73,6 +73,16 @@ jobs:
         run: pnpm migrate
       - name: Migrations are idempotent (a second run applies nothing)
         run: pnpm migrate | tee /dev/stderr | grep -q 'schema is up to date'
+      # K-721: the backup and restore drill test needs pg_dump/pg_restore 18 and a role that may create databases.
+      - name: PostgreSQL 18 client tools
+        env:
+          SUPERUSER_PW: ci-superuser-only
+        run: |
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-18
+          echo "PG_BIN=/usr/lib/postgresql/18/bin" >> "$GITHUB_ENV"
+          echo "RESTORE_ADMIN_URL=postgres://postgres:$SUPERUSER_PW@localhost:5432/postgres" >> "$GITHUB_ENV"
       - name: Tests (integration tests use the real PostgreSQL service)
         run: pnpm test
       - run: pnpm build
@@ -80,10 +90,75 @@ jobs:
         run: pnpm --filter @ers/e2e exec playwright install --with-deps chromium
       - name: Browser end-to-end tests (built client, web and worker processes, real PostgreSQL)
         run: pnpm e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: e2e-report
           path: |
             var/e2e-report
             var/e2e-results
+
+  # K-720 (PD-101): the production image and the Compose stack, run for real: build, start (PostgreSQL 18,
+  # migration, web, worker, Caddy with HTTPS on localhost), then check health, headers and the operator
+  # commands inside the containers. Throwaway secrets; nothing leaves the runner.
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: Throwaway production configuration
+        run: |
+          {
+            echo "EVENTFLOW_VERSION=ci"
+            echo "EVENTFLOW_DOMAIN=localhost"
+            echo "PUBLIC_ORIGIN=https://localhost"
+            echo "NODE_ENV=production"
+            echo "TRUST_PROXY_HOPS=1"
+            echo "POSTGRES_SUPERUSER_PASSWORD=$(openssl rand -hex 16)"
+            echo "APP_OWNER_PASSWORD=$(openssl rand -hex 16)"
+            echo "APP_RUNTIME_PASSWORD=$(openssl rand -hex 16)"
+            echo "CSRF_SECRET=$(openssl rand -hex 32)"
+            echo "PRESESSION_SECRET=$(openssl rand -hex 32)"
+            echo "RATE_LIMIT_SECRET=$(openssl rand -hex 32)"
+            echo "PREVIEW_SECRET=$(openssl rand -hex 32)"
+            echo "ADMIN_TOTP_KEY=$(openssl rand -base64 32)"
+            echo "EMAIL_PROVIDER=resend"
+            echo "RESEND_API_KEY=re_ci_placeholder_not_a_key"
+            echo "RESEND_API_URL=https://127.0.0.1:9"
+            echo "EMAIL_FROM=EventFlow <events@example.invalid>"
+          } > deploy/.env.production
+      - name: Build and start the stack
+        run: docker compose -f deploy/compose.yaml --env-file deploy/.env.production up -d --build
+      - name: Wait for readiness through Caddy (HTTPS)
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsk https://localhost/readyz > /tmp/ready.json; then cat /tmp/ready.json; exit 0; fi
+            sleep 3
+          done
+          docker compose -f deploy/compose.yaml --env-file deploy/.env.production ps
+          exit 1
+      - name: Health, readiness and security headers
+        run: |
+          curl -fsk https://localhost/healthz
+          grep -q '"ready":true' /tmp/ready.json
+          curl -sk -D /tmp/h.txt -o /dev/null https://localhost/organizer
+          grep -qi "content-security-policy: default-src 'self'" /tmp/h.txt
+          grep -qi 'x-frame-options: DENY' /tmp/h.txt
+          grep -qi 'referrer-policy: no-referrer' /tmp/h.txt
+          ! grep -qi '^server:' /tmp/h.txt
+      - name: Operator commands inside the containers
+        run: |
+          C="docker compose -f deploy/compose.yaml --env-file deploy/.env.production"
+          echo "$(openssl rand -hex 16)" | $C exec -T web node apps/server/dist/entrypoints/admin.js create --email ops@example.invalid --name "CI operator"
+          $C exec -T web node apps/server/dist/entrypoints/media-sweep.js
+          $C exec -T web node apps/server/dist/entrypoints/ops.js backup --out /data/backups/ci
+          # The environment file is read by Compose, not by a shell (values such as EMAIL_FROM contain <>).
+          SUPERUSER_PW=$(grep '^POSTGRES_SUPERUSER_PASSWORD=' deploy/.env.production | cut -d= -f2-)
+          $C exec -T -e RESTORE_ADMIN_URL="postgres://postgres:${SUPERUSER_PW}@postgres:5432/postgres" web             node apps/server/dist/entrypoints/ops.js restore-drill --from /data/backups/ci | tee /tmp/drill.json
+          grep -q '"ok": true' /tmp/drill.json
+      - name: Logs on failure
+        if: failure()
+        run: docker compose -f deploy/compose.yaml --env-file deploy/.env.production logs --no-color | tail -300
+      - name: Stop
+        if: always()
+        run: docker compose -f deploy/compose.yaml --env-file deploy/.env.production down -v

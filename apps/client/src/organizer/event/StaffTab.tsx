@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { MailPlus, MonitorSmartphone, ShieldCheck } from 'lucide-react';
 import { api, errorMessage } from '../../shared/api';
 import { Alert, Button, Empty, Field, SectionHeading, Status } from '../../shared/ui';
+import { RefreshControl } from '../RefreshControl';
 import type { EventItem, Notice, Session } from '../types';
+import { useAutoRefresh } from '../use-auto-refresh';
 
 interface StaffOverview {
   invitations: {
@@ -26,16 +28,30 @@ const INVITATION_STATUS: Record<string, { label: string; tone: string }> = {
 };
 
 /** Staff invitations and device sessions of this event (FR-STAFF-1, FR-STAFF-3, FR-STAFF-5 to FR-STAFF-7). */
-export function StaffTab({ session, event }: { session: Session; event: EventItem }) {
+export function StaffTab({
+  session,
+  event,
+  active,
+}: {
+  session: Session;
+  event: EventItem;
+  active: boolean;
+}) {
   const [overview, setOverview] = useState<StaffOverview>();
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState<Notice>();
-  const load = useCallback(() => {
-    api<StaffOverview>(`/api/events/${event.id}/staff`)
-      .then(setOverview)
-      .catch(() => undefined);
-  }, [event.id]);
-  useEffect(load, [load]);
+  // K-704: invitations and device sessions refresh in place, every 15 s while this section is shown.
+  const fetchStaff = useCallback(
+    async (signal: AbortSignal) =>
+      setOverview(await api<StaffOverview>(`/api/events/${event.id}/staff`, { signal })),
+    [event.id],
+  );
+  // Polls only while the section is shown (K-706 keeps it mounted when hidden); refreshed when shown again.
+  const refresher = useAutoRefresh(fetchStaff, event.status === 'SCHEDULED' && active);
+  const load = refresher.refresh;
+  useEffect(() => {
+    if (active) load();
+  }, [active, load]);
   if (event.status !== 'SCHEDULED')
     return <Alert kind="info">Staff access ended when this event was cancelled.</Alert>;
 
@@ -54,6 +70,9 @@ export function StaffTab({ session, event }: { session: Session; event: EventIte
 
   return (
     <div>
+      <div className="tab-toolbar">
+        <RefreshControl state={refresher} label="Refresh staff" />
+      </div>
       <SectionHeading
         title="Event staff"
         description="Staff can only check tickets in and see the checked-in count, for this event, during the check-in window. Each invitation link works once, on one device, and expires after 7 days."

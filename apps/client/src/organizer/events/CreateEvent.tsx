@@ -1,9 +1,11 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { ApiError, api, errorMessage } from '../../shared/api';
+import { CAPACITY_MAX, CAPACITY_MIN, normalizeCapacity, type CapacityCheck } from '../../shared/capacity';
 import { Alert, Button, Field, PageHeader, SectionHeading, buttonClass } from '../../shared/ui';
+import { EMPTY_LOCATION, LocationFields, payloadOf, type LocationDraft } from '../../shared/location';
 import { Link, navigate } from '../router';
-import type { EventItem, Session } from '../types';
+import { activeOrganizations, type EventItem, type Session } from '../types';
 
 function defaultZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -19,16 +21,32 @@ export function CreateEvent({ session, onCreated }: { session: Session; onCreate
     timeZone: defaultZone(),
     capacity: '50',
     utcOffset: '',
+    organizationId: '',
   });
+  // K-708: an event belongs to an organization; with several active ones, the organizer chooses.
+  const organizations = activeOrganizations(session);
   const [offsets, setOffsets] = useState<string[]>([]);
+  const [capacityCheck, setCapacityCheck] = useState<CapacityCheck>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const [location, setLocation] = useState<LocationDraft>(EMPTY_LOCATION);
   // One request ID per distinct payload: retries of the same submission are idempotent (D-17).
   const requestRef = useRef<{ key: string; id: string } | null>(null);
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
 
+  /** Corrects the capacity on leaving the field or submitting (K-707); returns whether it can be sent as is. */
+  const commitCapacity = () => {
+    const check = normalizeCapacity(form.capacity);
+    setCapacityCheck(check.note || check.error ? check : undefined);
+    if (check.value !== form.capacity) set({ capacity: check.value });
+    return !check.error && check.value === form.capacity;
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!commitCapacity()) return; // corrected or invalid: shown to the organizer before anything is sent
+    const venue = payloadOf(location);
+    if ('error' in venue) return setError(venue.error);
     setBusy(true);
     setError(undefined);
     const payload = {
@@ -38,6 +56,8 @@ export function CreateEvent({ session, onCreated }: { session: Session; onCreate
       timeZone: form.timeZone,
       capacity: Number(form.capacity),
       ...(form.utcOffset ? { utcOffset: form.utcOffset } : {}),
+      ...(organizations.length > 1 && form.organizationId ? { organizationId: form.organizationId } : {}),
+      ...(venue.payload ? { location: venue.payload } : {}),
     };
     const key = JSON.stringify(payload);
     if (requestRef.current?.key !== key) requestRef.current = { key, id: crypto.randomUUID() };
@@ -74,6 +94,26 @@ export function CreateEvent({ session, onCreated }: { session: Session; onCreate
           description="Everything on this form appears on your registration page."
         />
         <div className="form-grid">
+          {organizations.length > 1 && (
+            <Field label="Organization">
+              {(id) => (
+                <select
+                  id={id}
+                  className="select"
+                  required
+                  value={form.organizationId}
+                  onChange={(e) => set({ organizationId: e.target.value })}
+                >
+                  <option value="">Choose…</option>
+                  {organizations.map((o) => (
+                    <option key={o.organizationId} value={o.organizationId}>
+                      {o.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </Field>
+          )}
           <Field label="Event title">
             {(id) => (
               <input
@@ -142,20 +182,34 @@ export function CreateEvent({ session, onCreated }: { session: Session; onCreate
               )}
             </Field>
             <Field
-              label="Capacity"
-              hint="When the event is full, new registrations join the waiting list in order."
+              label="Capacity (1 to 100,000 seats)"
+              hint="When the event is full, new registrations join the waiting list in order. After creation, capacity can only be increased."
             >
               {(id) => (
-                <input
-                  id={id}
-                  className="input"
-                  type="number"
-                  min={1}
-                  max={100000}
-                  required
-                  value={form.capacity}
-                  onChange={(e) => set({ capacity: e.target.value })}
-                />
+                <>
+                  <input
+                    id={id}
+                    className="input"
+                    type="number"
+                    inputMode="numeric"
+                    min={CAPACITY_MIN}
+                    max={CAPACITY_MAX}
+                    step={1}
+                    required
+                    aria-invalid={capacityCheck?.error ? true : undefined}
+                    value={form.capacity}
+                    onChange={(e) => {
+                      set({ capacity: e.target.value });
+                      setCapacityCheck(undefined);
+                    }}
+                    onBlur={commitCapacity}
+                  />
+                  {capacityCheck && (
+                    <p className={capacityCheck.error ? 'field-error' : 'field-note'} role="status">
+                      {capacityCheck.error ?? capacityCheck.note}
+                    </p>
+                  )}
+                </>
               )}
             </Field>
           </div>
@@ -176,6 +230,13 @@ export function CreateEvent({ session, onCreated }: { session: Session; onCreate
               )}
             </Field>
           )}
+        </div>
+        <div className="form-section">
+          <SectionHeading
+            title="Location (optional)"
+            description="Shown on the registration page and tickets, with a directions link. You can add or change it later; participants are emailed when it changes."
+          />
+          <LocationFields value={location} onChange={setLocation} />
         </div>
         {error && <Alert>{error}</Alert>}
         <div className="form-footer">

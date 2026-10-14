@@ -83,6 +83,8 @@ export function registerHttpPlumbing(app: FastifyInstance, publicOrigin: string)
   // Exact Origin check on every state-changing API request (ADR-010 §6).
   app.addHook('onRequest', async (request, reply) => {
     if (!STATE_CHANGING.has(request.method) || !request.url.startsWith('/api/')) return;
+    // K-402: provider webhooks come from servers, without an Origin; their signature authenticates them.
+    if (request.url.startsWith('/api/webhooks/')) return;
     if (request.headers.origin !== publicOrigin) {
       const error = new AppError(403, 'origin_check_failed');
       await reply.code(403).type('application/problem+json').send(problemBody(error, request.id));
@@ -102,6 +104,13 @@ export function registerHttpPlumbing(app: FastifyInstance, publicOrigin: string)
       return reply.code(422).type('application/problem+json').send(problemBody(problem, request.id));
     }
     const statusCode = (error as FastifyError).statusCode;
+    if (statusCode === 413 || statusCode === 415) {
+      const problem = new AppError(
+        statusCode,
+        statusCode === 413 ? 'image_too_large' : 'unsupported_media_type',
+      );
+      return reply.code(statusCode).type('application/problem+json').send(problemBody(problem, request.id));
+    }
     if (statusCode && statusCode >= 400 && statusCode < 500) {
       const problem = new AppError(400, 'bad_request');
       return reply.code(400).type('application/problem+json').send(problemBody(problem, request.id));

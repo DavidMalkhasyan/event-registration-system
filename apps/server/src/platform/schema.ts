@@ -14,13 +14,18 @@ export interface AccountsTable {
   email: string;
   created_at: Timestamp;
   email_changed_at: Timestamp | null;
+  /** Migration 0010 (K-709). */
+  display_name: string | null;
+  password_hash: string | null;
+  password_changed_at: Timestamp | null;
+  email_verified_at: Timestamp | null;
 }
 
 export interface SignInRequestsTable {
   id: Generated<string>;
   email: string;
   account_id: string | null;
-  purpose: 'sign_in' | 'reauth';
+  purpose: 'sign_in' | 'reauth' | 'verify_email' | 'reset_password';
   reauth_session_id: string | null;
   status: Generated<'active' | 'used' | 'replaced' | 'revoked'>;
   created_at: Timestamp;
@@ -34,7 +39,8 @@ export interface OrganizerSessionsTable {
   account_id: string;
   session_hash: Buffer;
   hash_alg: Generated<number>;
-  created_from_request_id: string;
+  created_from_request_id: string | null;
+  auth_method: Generated<'email_link' | 'password'>;
   created_at: Timestamp;
   authenticated_at: Timestamp;
   last_seen_at: Timestamp;
@@ -43,10 +49,118 @@ export interface OrganizerSessionsTable {
   revoke_reason: string | null;
 }
 
+export type OrganizationStatus =
+  'pending_verification' | 'pending_approval' | 'active' | 'rejected' | 'suspended';
+export type OrganizationRole = 'owner' | 'admin' | 'member';
+
+/** Migration 0009 (K-708). */
+export interface OrganizationsTable {
+  id: Generated<string>;
+  name: string;
+  description: string | null;
+  status: OrganizationStatus;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+  email_verified_at: Timestamp | null;
+  submitted_at: Timestamp | null;
+  decided_at: Timestamp | null;
+  migrated_from_account_id: string | null;
+  /** Migration 0011 (K-710). */
+  decided_by_admin_id: string | null;
+  decision_reason: string | null;
+}
+
+/** Migration 0016 (K-402): verified provider webhook events and their matches to generations. */
+export interface ProviderEventsTable {
+  id: Generated<string>;
+  svix_id: string;
+  event_type: string;
+  provider_email_id: string | null;
+  tag_outbox_id: string | null;
+  tag_generation: number | null;
+  provider_created_at: Timestamp | null;
+  received_at: Timestamp;
+  bounce_kind: string | null;
+  reason_masked: string | null;
+  payload_masked: Json;
+}
+
+export interface ProviderEventMatchesTable {
+  provider_event_id: string;
+  outbox_id: string;
+  generation: number;
+  method: 'tag' | 'provider_id';
+  matched_at: Timestamp;
+}
+
+/** Migration 0014 (K-716). */
+export interface OrganizationInvitationsTable {
+  id: Generated<string>;
+  organization_id: string;
+  email: string;
+  role: 'admin' | 'member';
+  invited_by_account_id: string;
+  created_at: Timestamp;
+  expires_at: Timestamp;
+  status: Generated<'pending' | 'accepted' | 'declined' | 'revoked'>;
+  decided_at: Timestamp | null;
+}
+
+/** Migration 0013 (K-712): event image metadata; the files are in the media storage. */
+export interface EventImagesTable {
+  id: Generated<string>;
+  event_id: string;
+  role: 'cover' | 'gallery';
+  position: number;
+  storage_key: string;
+  width: number;
+  height: number;
+  byte_size: number;
+  thumb_byte_size: number;
+  alt_text: string | null;
+  created_at: Timestamp;
+  created_by_account_id: string;
+}
+
+/** Migration 0011 (K-710): Super Admins, separate from organizer accounts. */
+export interface PlatformAdminsTable {
+  id: Generated<string>;
+  email: string;
+  display_name: string;
+  password_hash: string;
+  created_at: Timestamp;
+  password_changed_at: Timestamp;
+  disabled_at: Timestamp | null;
+  /** Migration 0017 (K-718): the sealed TOTP secret, when enrolled, and the last step used. */
+  totp_secret_sealed: Buffer | null;
+  totp_enrolled_at: Timestamp | null;
+  totp_last_step: ColumnType<string | null, string | number | null, string | number | null>; // bigint
+}
+
+export interface PlatformAdminSessionsTable {
+  id: Generated<string>;
+  admin_id: string;
+  session_hash: Buffer;
+  created_at: Timestamp;
+  last_seen_at: Timestamp;
+  absolute_expires_at: Timestamp;
+  revoked_at: Timestamp | null;
+  revoke_reason: 'sign_out' | 'admin_disabled' | null;
+}
+
+export interface OrganizationMembershipsTable {
+  organization_id: string;
+  account_id: string;
+  role: OrganizationRole;
+  created_at: Timestamp;
+}
+
 export type EventStatus = 'SCHEDULED' | 'CANCELLED';
 export interface EventsTable {
   id: Generated<string>;
+  /** The account that created the event (history, D-17); access goes through organization_id (K-708). */
   owner_account_id: string;
+  organization_id: string;
   creation_request_id: string;
   creation_fingerprint: Buffer;
   public_id: string;
@@ -62,6 +176,18 @@ export interface EventsTable {
   created_at: Timestamp;
   updated_at: Timestamp;
   cancelled_at: Timestamp | null;
+  /** Migration 0012 (K-711): the venue; all address fields are set together or not at all. */
+  venue_name: string | null;
+  street_address: string | null;
+  city: string | null;
+  region: string | null;
+  postal_code: string | null;
+  country: string | null;
+  arrival_instructions: string | null;
+  /** numeric: read as strings. */
+  latitude: string | null;
+  longitude: string | null;
+  location_version: Generated<number>;
 }
 
 export type RegistrationState = 'PENDING_VERIFICATION' | 'CONFIRMED' | 'WAITLISTED' | 'CANCELLED' | 'EXPIRED';
@@ -123,7 +249,14 @@ export interface CheckInRequestsTable {
 }
 
 export type TokenType =
-  'verification' | 'management' | 'share' | 'staff_invitation' | 'sign_in' | 'email_change';
+  | 'verification'
+  | 'management'
+  | 'share'
+  | 'staff_invitation'
+  | 'sign_in'
+  | 'email_change'
+  | 'account_verification'
+  | 'password_reset';
 export interface AccessTokensTable {
   id: Generated<string>;
   token_type: TokenType;
@@ -226,8 +359,10 @@ export interface AuditRecordsTable {
   id: Generated<string>;
   occurred_at: Timestamp;
   action: string;
-  actor_kind: 'owner' | 'staff' | 'participant_link' | 'system' | 'account';
+  actor_kind: 'owner' | 'staff' | 'participant_link' | 'system' | 'account' | 'platform_admin';
   actor_account_id: string | null;
+  /** Migration 0011 (K-710). */
+  actor_admin_id: Generated<string | null>;
   actor_staff_session_id: string | null;
   event_id: string | null;
   registration_id: string | null;
@@ -285,7 +420,7 @@ export interface StaffSessionsTable {
   last_seen_at: Timestamp;
   absolute_expires_at: Timestamp;
   revoked_at: Timestamp | null;
-  revoke_reason: 'owner_revoked' | null;
+  revoke_reason: 'owner_revoked' | 'staff_ended' | null; // 'staff_ended': migration 0015 (K-715)
 }
 
 export interface RotationRequestsTable {
@@ -350,4 +485,12 @@ export interface DB {
   'app.rotation_requests': RotationRequestsTable;
   'app.staff_invitations': StaffInvitationsTable;
   'app.staff_sessions': StaffSessionsTable;
+  'app.organizations': OrganizationsTable;
+  'app.organization_memberships': OrganizationMembershipsTable;
+  'app.platform_admins': PlatformAdminsTable;
+  'app.platform_admin_sessions': PlatformAdminSessionsTable;
+  'app.event_images': EventImagesTable;
+  'app.organization_invitations': OrganizationInvitationsTable;
+  'app.provider_events': ProviderEventsTable;
+  'app.provider_event_matches': ProviderEventMatchesTable;
 }

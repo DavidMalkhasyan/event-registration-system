@@ -4,6 +4,26 @@ import { ApiError, api, errorMessage } from '../shared/api';
 import { Button, formatLocal } from '../shared/ui';
 import { useLiveCount } from './use-live-count';
 
+/**
+ * The check-in window in the event's time zone (K-715): one date when both ends fall on the same day
+ * ("Tuesday, 13 October 2026, 08:47–22:47 (Europe/Berlin)"), otherwise both full dates.
+ */
+export function formatWindow(opensAt: string, closesAt: string, timeZone: string): string {
+  const day = (iso: string) =>
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone,
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(new Date(iso));
+  const time = (iso: string) =>
+    new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+  if (day(opensAt) === day(closesAt))
+    return `${day(opensAt)}, ${time(opensAt)}–${time(closesAt)} (${timeZone})`;
+  return `${formatLocal(opensAt, timeZone)} to ${formatLocal(closesAt, timeZone)}`;
+}
+
 // Entrance check-in (FR-CHK), shared by the owner's Check-in tab and the staff entry (PD-69). The
 // caller decides who calls it; this module only uses the check-in, count and live endpoints, which
 // both principals may use. Success is shown only for a server answer (FR-CHK-6).
@@ -77,6 +97,16 @@ export function CheckInPanel({
   const [cameraError, setCameraError] = useState<string>();
   const videoRef = useRef<HTMLVideoElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
+  // K-715: on the staff device (often a phone with the keyboard open) each result is brought into view
+  // when it is not visible; `nearest` moves nothing when it already is, so the screen does not jump.
+  useEffect(() => {
+    if (mode === 'staff' && result) resultRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [mode, result]);
+  // Ready for the next code at the door, without scrolling the page to the field (K-706).
+  useEffect(() => {
+    inputRef.current?.focus({ preventScroll: true });
+  }, []);
   const live = useLiveCount(eventId);
   const canScan = typeof window !== 'undefined' && !!window.BarcodeDetector && !!navigator.mediaDevices;
 
@@ -99,7 +129,7 @@ export function CheckInPanel({
           setResult({ kind: 'outcome', ...r });
           setCode('');
           setBusy(false);
-          inputRef.current?.focus();
+          inputRef.current?.focus({ preventScroll: true });
           return;
         } catch (err) {
           if (!(err instanceof ApiError) || err.code !== 'network_error') {
@@ -162,10 +192,7 @@ export function CheckInPanel({
             <span className="sr-only">Check-in: </span>
             {event.title}
           </Heading>
-          <p>
-            Check-in window: {formatLocal(event.opensAt, event.timeZone)} to{' '}
-            {formatLocal(event.closesAt, event.timeZone)}.
-          </p>
+          <p>Check-in window: {formatWindow(event.opensAt, event.closesAt, event.timeZone)}.</p>
         </div>
         <div className="check-in-total stat" aria-live="polite">
           <strong>{live.count ?? '–'}</strong>
@@ -221,7 +248,6 @@ export function CheckInPanel({
                 id="ticket-code"
                 ref={inputRef}
                 className="input"
-                autoFocus
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 placeholder="Ticket code, e.g. 7K3QX9M2B4TW"
@@ -241,6 +267,7 @@ export function CheckInPanel({
           </div>
           {result && (
             <div
+              ref={resultRef}
               role="status"
               aria-label="Check-in result"
               className={`scan-result ${

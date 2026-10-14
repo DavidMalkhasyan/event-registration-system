@@ -13,6 +13,15 @@ import {
 } from '../../platform/time.js';
 import type { OrganizerPrincipal } from '../identity/sessions.js';
 import { scheduleCutoffTask, scheduleReminderTask } from './lifecycle.js';
+import { manageableOrganizationIds, organizationForNewEvent } from '../organizations/access.js';
+import {
+  LOCATION_COLUMNS,
+  locationColumns,
+  locationSchema,
+  locationView,
+  type LocationRow,
+} from './location.js';
+import { imagesOf, publicImages } from '../media/images.js';
 
 export const eventCreateSchema = z
   .object({
@@ -26,11 +35,14 @@ export const eventCreateSchema = z
       .regex(/^[+-]\d{2}:\d{2}$/)
       .optional(),
     capacity: z.number().int().min(1).max(100_000),
+    organizationId: z.uuid().optional(),
+    /** K-711: optional venue. */
+    location: locationSchema.nullable().optional(),
   })
   .strict();
 export type EventCreateInput = z.infer<typeof eventCreateSchema>;
 
-interface EventRow {
+interface EventRow extends LocationRow {
   id: string;
   public_id: string;
   title: string;
@@ -58,6 +70,7 @@ const EVENT_COLUMNS = [
   'schedule_version',
   'created_at',
   'cancelled_at',
+  ...LOCATION_COLUMNS,
 ] as const;
 
 export function eventView(ctx: AppContext, row: EventRow, now: Date) {
@@ -80,6 +93,8 @@ export function eventView(ctx: AppContext, row: EventRow, now: Date) {
     checkInClosesAt: window.closes.toISOString(),
     createdAt: row.created_at.toISOString(),
     cancelledAt: row.cancelled_at ? row.cancelled_at.toISOString() : null,
+    location: locationView(row),
+    locationVersion: row.location_version,
   };
 }
 
@@ -102,15 +117,19 @@ export async function createEvent(ctx: AppContext, principal: OrganizerPrincipal
     timeZone: input.timeZone,
     utcOffset: input.utcOffset ?? null,
     capacity: input.capacity,
+    ...(input.location ? { location: input.location } : {}),
   };
   const fingerprint = sha256(canonicalJson(normalized));
 
   return withTransaction(ctx.db, async ({ trx, now }) => {
     if (resolved.instant <= now) throw new AppError(422, 'start_not_in_future');
+    // K-708: the event belongs to an active organization of which the creator is a member.
+    const organizationId = await organizationForNewEvent(trx, principal.accountId, input.organizationId);
     const inserted = await trx
       .insertInto('app.events')
       .values({
         owner_account_id: principal.accountId,
+        organization_id: organizationId,
         creation_request_id: input.requestId,
         creation_fingerprint: fingerprint,
         public_id: publicId(),
@@ -119,6 +138,7 @@ export async function createEvent(ctx: AppContext, principal: OrganizerPrincipal
         starts_at: resolved.instant,
         time_zone: input.timeZone,
         capacity: input.capacity,
+        ...locationColumns(input.location ?? null),
         created_at: now,
         updated_at: now,
       })
@@ -148,7 +168,7 @@ export async function listEvents(ctx: AppContext, principal: OrganizerPrincipal)
   const rows = await ctx.db
     .selectFrom('app.events')
     .select(EVENT_COLUMNS)
-    .where('owner_account_id', '=', principal.accountId)
+    .where('organization_id', 'in', manageableOrganizationIds(ctx.db, principal.accountId))
     .orderBy('starts_at', 'desc')
     .limit(200)
     .execute();
@@ -167,9 +187,11 @@ export async function listEvents(ctx: AppContext, principal: OrganizerPrincipal)
     for (const r of waiting.rows) counts.get(r.event_id)!.waitlisted = r.n;
     for (const r of checked.rows) counts.get(r.event_id)!.checkedIn = r.n;
   }
+  const images = await imagesOf(ctx.db, ids);
   return {
     items: rows.map((r) => ({
       ...eventView(ctx, r, now),
+      coverThumbnailUrl: images.get(r.id)!.find((i) => i.role === 'cover')?.thumbnailUrl ?? null,
       waitlistedCount: counts.get(r.id)!.waitlisted,
       checkedInCount: counts.get(r.id)!.checkedIn,
     })),
@@ -177,33 +199,91 @@ export async function listEvents(ctx: AppContext, principal: OrganizerPrincipal)
   };
 }
 
-/** Another owner's event and an unknown event look the same: 404 (AC-155). */
+/** Another organization's event and an unknown event look the same: 404 (AC-155, K-708). */
 export async function getOwnedEvent(ctx: AppContext, principal: OrganizerPrincipal, eventId: string) {
   if (!z.uuid().safeParse(eventId).success) throw new AppError(404, 'not_found');
   const row = await ctx.db
     .selectFrom('app.events')
     .select(EVENT_COLUMNS)
     .where('id', '=', eventId)
-    .where('owner_account_id', '=', principal.accountId)
+    .where('organization_id', 'in', manageableOrganizationIds(ctx.db, principal.accountId))
     .executeTakeFirst();
   if (!row) throw new AppError(404, 'not_found');
-  return eventView(ctx, row, await decisionTime(ctx.db));
+  const images = (await imagesOf(ctx.db, [row.id])).get(row.id)!;
+  return {
+    ...eventView(ctx, row, await decisionTime(ctx.db)),
+    cover: images.find((i) => i.role === 'cover') ?? null, // K-713: the workspace header
+  };
+}
+
+/**
+ * Public availability (PD-81): aggregate counts only, never identities. The counts describe committed
+ * state; the seat or waiting-list place is still decided by TX-R02 when the visitor confirms their email
+ * (FR-REG-2), so the free-seat figure is an estimate. Outside the open phase no counts are published.
+ */
+export type RegistrationMode = 'seats_available' | 'waiting_list' | 'closed';
+
+export interface PublicAvailability {
+  registrationMode: RegistrationMode;
+  capacity: number | null;
+  confirmedCount: number | null;
+  waitlistedCount: number | null;
+  estimatedAvailableSeats: number | null;
 }
 
 export async function getPublicEvent(ctx: AppContext, id: string) {
+  // One statement, so the counts come from one snapshot; registrations_ix07 serves the waiting-list count.
   const row = await ctx.db
-    .selectFrom('app.events')
-    .select(['title', 'description', 'starts_at', 'time_zone', 'status'])
-    .where('public_id', '=', id)
+    .selectFrom('app.events as e')
+    .select((eb) => [
+      'e.id',
+      'e.title',
+      'e.description',
+      'e.starts_at',
+      'e.time_zone',
+      'e.status',
+      'e.capacity',
+      'e.confirmed_count',
+      ...LOCATION_COLUMNS.map((c) => `e.${c}` as const),
+      eb
+        .selectFrom('app.registrations as r')
+        .select((r) => r.fn.countAll<number>().as('n'))
+        .whereRef('r.event_id', '=', 'e.id')
+        .where('r.state', '=', 'WAITLISTED')
+        .as('waitlisted_count'),
+    ])
+    .where('e.public_id', '=', id)
     .executeTakeFirst();
   if (!row) throw new AppError(404, 'not_found');
   const now = await decisionTime(ctx.db);
+  const phase = eventPhase(row.status, row.starts_at, now);
+  const free = Math.max(0, row.capacity - row.confirmed_count);
+  // The same rule TX-R02 applies: a seat while confirmed < capacity, otherwise the waiting list.
+  const availability: PublicAvailability =
+    phase === 'registration_open'
+      ? {
+          registrationMode: free > 0 ? 'seats_available' : 'waiting_list',
+          capacity: row.capacity,
+          confirmedCount: row.confirmed_count,
+          waitlistedCount: Number(row.waitlisted_count ?? 0),
+          estimatedAvailableSeats: free,
+        }
+      : {
+          registrationMode: 'closed',
+          capacity: null,
+          confirmedCount: null,
+          waitlistedCount: null,
+          estimatedAvailableSeats: null,
+        };
   return {
     title: row.title,
     description: row.description,
     startsAt: row.starts_at.toISOString(),
     timeZone: row.time_zone,
-    phase: eventPhase(row.status, row.starts_at, now),
+    location: locationView(row),
+    images: publicImages((await imagesOf(ctx.db, [row.id])).get(row.id)!),
+    phase,
+    availability,
   };
 }
 
@@ -233,40 +313,106 @@ export async function dashboard(ctx: AppContext, principal: OrganizerPrincipal, 
   };
 }
 
-/** Owner-only participant list (FR-DSH-4). Delivery labels cover our send states only until webhooks exist. */
-export async function listParticipants(ctx: AppContext, principal: OrganizerPrincipal, eventId: string) {
+/** Largest page of the participant list (K-723); the client follows `nextCursor` to the end. */
+export const PARTICIPANT_PAGE_MAX = 1000;
+
+export const participantPageSchema = z.object({
+  cursor: z.string().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(PARTICIPANT_PAGE_MAX).optional(),
+});
+
+// The keyset cursor: the last row's creation time (as PostgreSQL text, keeping microseconds) and id.
+function encodeParticipantCursor(createdKey: string, id: string): string {
+  return Buffer.from(JSON.stringify([createdKey, id])).toString('base64url');
+}
+
+function decodeParticipantCursor(cursor: string): { createdKey: string; id: string } {
+  try {
+    const value: unknown = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
+    const parsed = z.tuple([z.string().max(64), z.uuid()]).parse(value);
+    if (Number.isNaN(Date.parse(parsed[0]))) throw new Error('not a time');
+    return { createdKey: parsed[0], id: parsed[1] };
+  } catch {
+    throw new AppError(422, 'validation_failed', { errors: [{ field: 'cursor', code: 'invalid_cursor' }] });
+  }
+}
+
+/**
+ * Owner-only participant list (FR-DSH-4), in pages ordered by registration time (K-723: an event may
+ * have up to 100,000 registrations; before, the list stopped silently at 1,000). Waiting-list positions
+ * are counted over the whole event, not the page.
+ */
+export async function listParticipants(
+  ctx: AppContext,
+  principal: OrganizerPrincipal,
+  eventId: string,
+  page: z.infer<typeof participantPageSchema> = {},
+) {
   await getOwnedEvent(ctx, principal, eventId);
+  const limit = page.limit ?? PARTICIPANT_PAGE_MAX;
+  const after = page.cursor ? decodeParticipantCursor(page.cursor) : null;
   const rows = await sql<{
     id: string;
     email: string;
     state: string;
+    end_reason: string | null;
     waitlist_seq: number | null;
+    created_key: string;
     position: number | null;
     checked_in_at: Date | null;
     check_in_id: string | null;
   }>`
-    SELECT r.id, r.email, r.state, r.waitlist_seq,
-      CASE WHEN r.state = 'WAITLISTED' THEN
-        (SELECT count(*) FROM app.registrations w
-          WHERE w.event_id = r.event_id AND w.state = 'WAITLISTED' AND w.waitlist_seq <= r.waitlist_seq)::int END AS position,
-      c.checked_in_at, c.id AS check_in_id
-    FROM app.registrations r
-    LEFT JOIN app.tickets t ON t.registration_id = r.id
-    LEFT JOIN app.check_ins c ON c.ticket_id = t.id AND c.undone_at IS NULL
-    WHERE r.event_id = ${eventId}
-    ORDER BY r.created_at
-    LIMIT 1000`.execute(ctx.db);
-  const issues = await ctx.db
-    .selectFrom('app.outbox_messages')
-    .select(['registration_id', 'message_type', 'status', 'settled_at', 'last_error_code'])
-    .where('event_id', '=', eventId)
-    .where('status', 'in', ['FAILED', 'UNCONFIRMED'])
-    .execute();
+    SELECT * FROM (
+      SELECT r.id, r.email, r.state, r.end_reason, r.waitlist_seq, r.created_at, r.created_at::text AS created_key,
+        -- K-723: the waiting-list position in one pass (a per-row count was quadratic in the list's length).
+        CASE WHEN r.state = 'WAITLISTED' THEN
+          (count(*) FILTER (WHERE r.state = 'WAITLISTED')
+            OVER (ORDER BY r.waitlist_seq NULLS LAST ROWS UNBOUNDED PRECEDING))::int END AS position,
+        c.checked_in_at, c.id AS check_in_id
+      FROM app.registrations r
+      LEFT JOIN app.tickets t ON t.registration_id = r.id
+      LEFT JOIN app.check_ins c ON c.ticket_id = t.id AND c.undone_at IS NULL
+      WHERE r.event_id = ${eventId}
+    ) participants
+    ${after ? sql`WHERE (created_at, id) > (${after.createdKey}::timestamptz, ${after.id}::uuid)` : sql``}
+    ORDER BY created_at, id
+    LIMIT ${limit + 1}`.execute(ctx.db);
+  const pageRows = rows.rows.slice(0, limit);
+  const last = pageRows.at(-1);
+  const ids = pageRows.map((r) => r.id);
+  const issues = ids.length
+    ? await ctx.db
+        .selectFrom('app.outbox_messages')
+        .select(['registration_id', 'message_type', 'status', 'settled_at', 'last_error_code'])
+        .where('event_id', '=', eventId)
+        .where('registration_id', 'in', ids)
+        .where('status', 'in', ['FAILED', 'UNCONFIRMED'])
+        .execute()
+    : [];
+  // K-402: provider evidence after acceptance (bounced, complained), from the generations' facts.
+  const evidence = ids.length
+    ? await ctx.db
+        .selectFrom('app.outbox_messages as m')
+        .innerJoin('app.outbox_generations as g', 'g.outbox_id', 'm.id')
+        .select([
+          'm.registration_id',
+          'm.message_type',
+          'g.bounced_at',
+          'g.complained_at',
+          'g.failure_reason',
+        ])
+        .where('m.event_id', '=', eventId)
+        .where('m.registration_id', 'in', ids)
+        .where((eb) => eb.or([eb('g.bounced_at', 'is not', null), eb('g.complained_at', 'is not', null)]))
+        .execute()
+    : [];
   return {
-    items: rows.rows.map((r) => ({
+    items: pageRows.map((r) => ({
       registrationId: r.id,
       email: r.email,
       state: r.state,
+      // Why an ended registration ended (K-703): kept in the list, so cancelled people stay visible.
+      ...(r.end_reason ? { endReason: r.end_reason } : {}),
       ...(r.position ? { position: r.position } : {}),
       ...(r.checked_in_at ? { checkedInAt: r.checked_in_at.toISOString(), checkInId: r.check_in_id } : {}),
       emailIssues: issues
@@ -278,8 +424,20 @@ export async function listParticipants(ctx: AppContext, principal: OrganizerPrin
           ...(i.last_error_code ? { reason: i.last_error_code } : {}),
           at: (i.settled_at ?? new Date()).toISOString(),
           anomaly: false,
-        })),
+        }))
+        .concat(
+          evidence
+            .filter((e) => e.registration_id === r.id)
+            .map((e) => ({
+              messageType: e.message_type,
+              sendState: 'ACCEPTED',
+              label: e.bounced_at ? 'bounced' : 'complained',
+              ...(e.failure_reason ? { reason: e.failure_reason } : {}),
+              at: (e.bounced_at ?? e.complained_at)!.toISOString(),
+              anomaly: false,
+            })),
+        ),
     })),
-    nextCursor: null,
+    nextCursor: rows.rows.length > limit && last ? encodeParticipantCursor(last.created_key, last.id) : null,
   };
 }

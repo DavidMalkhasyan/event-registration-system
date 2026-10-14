@@ -3,6 +3,7 @@ import type { Database } from '../../platform/db.js';
 import { checkInWindow, cutoffOf } from '../../platform/time.js';
 import type { Tx } from '../../platform/tx.js';
 import { issueToken } from '../access-tokens/tokens.js';
+import { LOCATION_COLUMNS, addressLine, locationView } from '../event-core/location.js';
 
 // The §4.9 catalogue in code for the message types of this slice: freshness checks, link issuance
 // at send time (FR-LNK-3) and deterministic rendering (NFR-REL-17). Texts are English (OQ-8 pending).
@@ -332,6 +333,48 @@ const eventChange: MessageHandler = {
   },
 };
 
+const venueChange: MessageHandler = {
+  // K-711 (PD-91): the venue changed. Fresh while the registration is active, the event scheduled and
+  // this is still the latest location; an older notice is dropped in favour of the newer one.
+  async freshness(trx, msg) {
+    const registration = await registrationOf(trx, msg.registration_id!);
+    const event = await trx
+      .selectFrom('app.events')
+      .select(['status', 'location_version'])
+      .where('id', '=', msg.event_id!)
+      .executeTakeFirst();
+    const fresh =
+      !!registration &&
+      ['CONFIRMED', 'WAITLISTED'].includes(registration.state) &&
+      event?.status === 'SCHEDULED' &&
+      event.location_version === msg.payload.locationVersion;
+    return fresh ? { fresh: true } : { fresh: false, reason: 'obsolete' };
+  },
+  issueTokens: registrationMessage('ACTIVE', false).issueTokens,
+  async render(db, msg, tokens, origin) {
+    const event = await db
+      .selectFrom('app.events')
+      .select(['title', 'starts_at', 'time_zone', ...LOCATION_COLUMNS])
+      .where('id', '=', msg.event_id!)
+      .executeTakeFirstOrThrow();
+    const location = locationView(event);
+    const lines: (string | { link: string; label: string })[] = location
+      ? [
+          `The venue of "${event.title}" (${localTime(event.starts_at, event.time_zone)}) has changed.`,
+          `New venue: ${location.venueName}, ${addressLine(location)}.`,
+          ...(location.arrivalInstructions ? [`Arrival: ${location.arrivalInstructions}`] : []),
+        ]
+      : [
+          `The venue of "${event.title}" (${localTime(event.starts_at, event.time_zone)}) has been removed from the event page; the organizer will share the new details.`,
+        ];
+    lines.push(
+      { label: 'Manage or cancel your registration', link: `${origin}/manage#t=${tokens.manage}` },
+      FORWARD_WARNING,
+    );
+    return email(`Venue changed: ${event.title}`, lines);
+  },
+};
+
 const waitlistClosed: MessageHandler = {
   // §4.9 "Waiting list closed" (FR-WL-5): event SCHEDULED, version current, still WAITLISTED. No links.
   async freshness(trx, msg) {
@@ -491,7 +534,177 @@ const waitlistRemoved: MessageHandler = {
   },
 };
 
+const organizerCancellation: MessageHandler = {
+  // K-703 (PD-83): a required notice (CK-69): no freshness check, never dropped, also after a later
+  // event cancellation. No management or share link and no ticket code.
+  async freshness() {
+    return { fresh: true };
+  },
+  async issueTokens() {
+    return {};
+  },
+  async render(db, msg) {
+    const event = (await eventOf(db, msg.event_id!))!;
+    return email(`Registration cancelled by the organizer: ${event.title}`, [
+      `Your registration for "${event.title}" has been cancelled by the organizer.`,
+      `The event: "${event.title}", ${localTime(event.starts_at, event.time_zone)}.`,
+      'Your ticket is no longer valid, and links in earlier emails about this registration no longer work. Please do not come to the event with this ticket.',
+      'If you have questions, please contact the organizer.',
+    ]);
+  },
+};
+
+/** K-709: links bound to an account request (verification, password reset), issued at send time. */
+function accountLink(
+  type: 'account_verification' | 'password_reset',
+): Pick<MessageHandler, 'freshness' | 'issueTokens'> {
+  return {
+    async freshness(trx, msg, now) {
+      const request = await trx
+        .selectFrom('app.sign_in_requests')
+        .select(['status', 'expires_at'])
+        .where('id', '=', msg.sign_in_request_id!)
+        .forShare()
+        .executeTakeFirst();
+      if (!request || request.status !== 'active') return { fresh: false, reason: 'request_replaced' };
+      if (now.getTime() + 2 * 60_000 > request.expires_at.getTime())
+        return { fresh: false, reason: 'link_expiry' };
+      return { fresh: true };
+    },
+    async issueTokens(trx, msg, now, attemptNo) {
+      const t = await issueToken(trx, {
+        type,
+        now,
+        signInRequestId: msg.sign_in_request_id!,
+        via: 'email',
+        outboxMessageId: msg.id,
+        attemptNo,
+      });
+      return { link: t };
+    },
+  };
+}
+
+const accountVerification: MessageHandler = {
+  ...accountLink('account_verification'),
+  async render(_db, _msg, tokens, origin) {
+    return email('Confirm your email address: Event Registration', [
+      'Confirm your email address to finish creating your organizer account. If you registered an organization, it then goes to approval; if you were invited to one, sign in to accept the invitation.',
+      { label: 'Confirm my email address', link: `${origin}/verify-account#t=${tokens.link}` },
+      'The link works once and expires 15 minutes after it was sent. For a new one, use “Forgot your password?” on the sign-in page: setting a password also confirms the address.',
+      'If you did not register, you can ignore this email.',
+    ]);
+  },
+};
+
+const passwordReset: MessageHandler = {
+  ...accountLink('password_reset'),
+  async render(_db, _msg, tokens, origin) {
+    return email('Set a new password: Event Registration', [
+      'Use this link to set a new password for your organizer account.',
+      { label: 'Set a new password', link: `${origin}/reset-password#t=${tokens.link}` },
+      'The link works once and expires 15 minutes after it was sent. Setting a new password signs out every device that is signed in to your account.',
+      'If you did not ask for this, you can ignore this email; your password stays as it is.',
+    ]);
+  },
+};
+
+const accountExistsNotice: MessageHandler = {
+  // K-709: a registration was attempted with an address that already has an account (no link).
+  async freshness() {
+    return { fresh: true };
+  },
+  async issueTokens() {
+    return {};
+  },
+  async render(_db, _msg, _tokens, origin) {
+    return email('Your organizer account: Event Registration', [
+      'Someone tried to register an organization with this email address, which already has an organizer account.',
+      `If it was you, sign in at ${origin}/organizer, or reset your password from the sign-in page.`,
+      'If it was not you, you can ignore this email; nothing was changed.',
+    ]);
+  },
+};
+
+const DECISION_TEXT: Record<string, { subject: string; lines: (origin: string) => string[] }> = {
+  approve: {
+    subject: 'approved',
+    lines: (origin) => [
+      'is approved. You can now create and manage events.',
+      `Sign in at ${origin}/organizer.`,
+    ],
+  },
+  reject: {
+    subject: 'not approved',
+    lines: () => ['was not approved, so it cannot create or manage events.'],
+  },
+  suspend: {
+    subject: 'suspended',
+    lines: () => [
+      'is suspended: its organizers cannot create or manage events for now. Its public event pages and existing registrations are not affected.',
+    ],
+  },
+  reinstate: {
+    subject: 'reinstated',
+    lines: (origin) => [
+      'is active again. You can create and manage events.',
+      `Sign in at ${origin}/organizer.`,
+    ],
+  },
+};
+
+const organizationDecision: MessageHandler = {
+  // K-710: a Super Admin's decision on an organization, to each owner (no link, nothing to issue).
+  async freshness() {
+    return { fresh: true };
+  },
+  async issueTokens() {
+    return {};
+  },
+  async render(_db, msg, _tokens, origin) {
+    const { decision, organizationName, reason } = msg.payload as {
+      decision: string;
+      organizationName: string;
+      reason: string | null;
+    };
+    const text = DECISION_TEXT[decision]!;
+    const [first, ...rest] = text.lines(origin);
+    return email(`Your organization was ${text.subject}: Event Registration`, [
+      `Your organization "${organizationName}" ${first}`,
+      ...(reason ? [`Reason given: ${reason}`] : []),
+      ...rest,
+    ]);
+  },
+};
+
+const ROLE_TEXT: Record<string, string> = { admin: 'an admin', member: 'a member' };
+
+const organizationInvitation: MessageHandler = {
+  // K-716: an invitation into an organization. No link grants access: the invitee signs in (or creates
+  // an account with this address) and accepts in the organizer area.
+  async freshness() {
+    return { fresh: true };
+  },
+  async issueTokens() {
+    return {};
+  },
+  async render(_db, msg, _tokens, origin) {
+    const p = msg.payload as { organizationName: string; role: string; invitedBy: string; expiresAt: string };
+    return email(`You are invited to join ${p.organizationName}: Event Registration`, [
+      `${p.invitedBy} invited you to join "${p.organizationName}" as ${ROLE_TEXT[p.role] ?? 'a member'}, to organize its events.`,
+      `If you have an organizer account with this email address, sign in at ${origin}/organizer and accept the invitation there.`,
+      `If not, create one at ${origin}/organizer/join with this email address, confirm it, then sign in and accept.`,
+      'The invitation expires in 14 days. If you did not expect it, you can ignore this email.',
+    ]);
+  },
+};
+
 export const HANDLERS: Record<string, MessageHandler> = {
+  organization_invitation: organizationInvitation,
+  organization_decision: organizationDecision,
+  account_verification: accountVerification,
+  password_reset: passwordReset,
+  account_exists_notice: accountExistsNotice,
   sign_in: signIn,
   verification,
   ticket_confirmation: ticketConfirmation,
@@ -500,9 +713,11 @@ export const HANDLERS: Record<string, MessageHandler> = {
   promotion,
   reminder,
   event_change: eventChange,
+  venue_change: venueChange,
   waitlist_closed: waitlistClosed,
   registration_cancelled: registrationCancelled,
   waitlist_removed: waitlistRemoved,
+  organizer_cancellation: organizerCancellation,
   event_cancellation: eventCancellation,
   ticket_resend: ticketResend,
   staff_invitation: staffInvitation,

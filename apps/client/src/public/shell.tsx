@@ -1,3 +1,4 @@
+import type { Location } from '../shared/location';
 import type { ReactNode } from 'react';
 import { Link2Off } from 'lucide-react';
 import { Logo, PageSkeleton, Status, TRANSFER_STATEMENT, TicketQr, formatLocal } from '../shared/ui';
@@ -9,6 +10,8 @@ export interface EventSummary {
   title: string;
   startsAt: string;
   timeZone: string;
+  /** K-711: the venue, when the organizer gave one (not on every view). */
+  location?: Location | null;
 }
 
 export function PublicShell({ children }: { children: ReactNode }) {
@@ -89,6 +92,11 @@ export function TicketCard({
         <span className="eyebrow">Your next great gathering</span>
         <h2>{event.title}</h2>
         <p>{formatLocal(event.startsAt, event.timeZone)}</p>
+        {event.location && (
+          <p className="ticket-venue">
+            {event.location.venueName}, {event.location.city}
+          </p>
+        )}
       </div>
       <div className="ticket-perforation" aria-hidden="true" />
       {code ? (

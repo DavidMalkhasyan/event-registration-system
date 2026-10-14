@@ -29,6 +29,21 @@ export const RULES = {
   registrationPerIp: { scope: 'register_ip', limit: 30, windowSeconds: 900 },
   registrationPerAddress: { scope: 'register_email', limit: 5, windowSeconds: 900 },
   failedCheckInsPerSession: { scope: 'checkin_fail_session', limit: 30, windowSeconds: 300 },
+  // K-709 (PD-89): organizer accounts.
+  organizationRegistrationPerIp: { scope: 'org_register_ip', limit: 10, windowSeconds: 3600 },
+  organizationRegistrationPerAddress: { scope: 'org_register_email', limit: 3, windowSeconds: 3600 },
+  passwordSignInPerAddress: { scope: 'password_signin_email', limit: 10, windowSeconds: 900 },
+  passwordSignInPerIp: { scope: 'password_signin_ip', limit: 30, windowSeconds: 900 },
+  passwordResetPerAddress: { scope: 'password_reset_email', limit: 3, windowSeconds: 900 },
+  // K-710 (PD-90): Super Admin sign-in, stricter than organizers'.
+  adminSignInPerAddress: { scope: 'admin_signin_email', limit: 5, windowSeconds: 900 },
+  adminSignInPerIp: { scope: 'admin_signin_ip', limit: 20, windowSeconds: 900 },
+  // K-712 (PD-92): image uploads and replacements per organizer account.
+  imageUploadsPerAccount: { scope: 'image_upload_account', limit: 60, windowSeconds: 3600 },
+  // K-716 (PD-94): invitations sent per organizer account.
+  invitationsPerAccount: { scope: 'invitations_account', limit: 30, windowSeconds: 3600 },
+  // K-714 (PD-96): map tiles per client (a viewer looking around one venue needs a few hundred at most).
+  mapTilesPerIp: { scope: 'map_tiles_ip', limit: 600, windowSeconds: 600 },
 } satisfies Record<string, RateLimitRule>;
 
 export class RateLimiter {

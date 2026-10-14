@@ -9,12 +9,19 @@ export const MESSAGE_POLICY = {
   staff_invitation: { regenClass: 'A', lane: 'bulk', required: false },
   sign_in: { regenClass: 'A', lane: 'priority', required: false },
   email_change_confirmation: { regenClass: 'A', lane: 'priority', required: false },
+  account_verification: { regenClass: 'A', lane: 'priority', required: false }, // K-709, migration 0010
+  password_reset: { regenClass: 'A', lane: 'priority', required: false },
+  account_exists_notice: { regenClass: 'A', lane: 'bulk', required: false },
+  organization_decision: { regenClass: 'A', lane: 'bulk', required: false }, // K-710, migration 0011
+  organization_invitation: { regenClass: 'A', lane: 'bulk', required: false }, // K-716, migration 0014
   ticket_confirmation: { regenClass: 'B', lane: 'bulk', required: false },
   promotion: { regenClass: 'B', lane: 'bulk', required: false },
   event_change: { regenClass: 'B', lane: 'bulk', required: false },
+  venue_change: { regenClass: 'B', lane: 'bulk', required: false }, // K-711, migration 0012
   event_cancellation: { regenClass: 'B', lane: 'bulk', required: false },
   registration_cancelled: { regenClass: 'B', lane: 'bulk', required: true },
   waitlist_removed: { regenClass: 'B', lane: 'bulk', required: true },
+  organizer_cancellation: { regenClass: 'B', lane: 'bulk', required: true }, // K-703, migration 0008
   email_change_notice: { regenClass: 'B', lane: 'bulk', required: false },
   waitlist_confirmation: { regenClass: 'C', lane: 'bulk', required: false },
   reminder: { regenClass: 'C', lane: 'bulk', required: false },

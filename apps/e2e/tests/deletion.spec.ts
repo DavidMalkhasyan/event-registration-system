@@ -16,6 +16,8 @@ import {
 // K-304d in the browser: FR-EVT-10, FR-EVT-11, FR-EVT-13, FR-ORG-5.
 
 const deleteCard = (page: Page) => page.getByRole('region', { name: 'Delete event' });
+/** Deletion is a secondary action under "More actions" (K-702), collapsed after every page load. */
+const openMoreActions = (page: Page) => page.locator('summary', { hasText: 'More actions' }).click();
 
 test('deletes an eligible event; it disappears, and a pending registrant’s link stops working', async ({
   page,
@@ -31,6 +33,7 @@ test('deletes an eligible event; it disappears, and a pending registrant’s lin
   await openVerification(visitorPage, publicUrl, pending);
   await openSection(page, 'Settings');
 
+  await openMoreActions(page);
   await deleteCard(page).getByRole('button', { name: 'Delete this event…' }).click();
   await expect(page.getByText(`Delete “${title}” permanently?`)).toBeVisible();
   await deleteCard(page).getByRole('button', { name: 'Yes, delete the event permanently' }).click();
@@ -59,6 +62,7 @@ test('explains why an event can’t be deleted, and offers no deletion for a can
   await page.reload();
   await openSection(page, 'Settings');
 
+  await openMoreActions(page);
   await deleteCard(page).getByRole('button', { name: 'Delete this event…' }).click();
   await expect(deleteCard(page).getByText('It still has confirmed participants.')).toBeVisible();
   await expect(
@@ -68,7 +72,7 @@ test('explains why an event can’t be deleted, and offers no deletion for a can
   // After cancellation there is no delete action at all (FR-EVT-11).
   await page
     .getByRole('region', { name: 'Cancel event' })
-    .getByRole('button', { name: 'Cancel this event…' })
+    .getByRole('button', { name: 'Cancel event' })
     .click();
   await page.getByRole('button', { name: 'Yes, cancel the event permanently' }).click();
   await expect(page.getByText('Status: CANCELLED.')).toBeVisible();
@@ -85,6 +89,7 @@ test('a stale session confirms it’s you, comes back, and confirms the deletion
   expect(await ageOrganizerSessions(organizer, 16)).toBe(1); // controlled test-database setup
   await page.reload();
 
+  await openMoreActions(page);
   await deleteCard(page).getByRole('button', { name: 'Delete this event…' }).click();
   await expect(deleteCard(page).getByText('nothing is deleted until you confirm')).toBeVisible();
   await deleteCard(page).getByRole('button', { name: 'Confirm it’s you' }).click();
@@ -94,6 +99,7 @@ test('a stale session confirms it’s you, comes back, and confirms the deletion
   await expect(page).toHaveURL(eventUrl);
   await expect(page.getByRole('heading', { name: title })).toBeVisible(); // the link deleted nothing
 
+  await openMoreActions(page);
   await deleteCard(page).getByRole('button', { name: 'Delete this event…' }).click();
   await deleteCard(page).getByRole('button', { name: 'Yes, delete the event permanently' }).click();
   await expect(page).toHaveURL(/\/organizer\?deleted=1$/);

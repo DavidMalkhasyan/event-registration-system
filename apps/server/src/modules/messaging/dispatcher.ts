@@ -8,7 +8,8 @@ import type { EmailProvider } from './fake-provider.js';
 // pre-claim counter, two-phase claim under the shared event lock (or the request row for
 // sign-in messages), freshness check, link issuance inside the claim, render after the claim,
 // send_started_at committed before the provider call, fenced result write, lease reaper and
-// retry horizon. Not yet implemented: send budget, sending pause, webhooks and delivery facts,
+// retry horizon, provider outcome classes (K-717). Not yet implemented: send budget, sending pause,
+// webhooks and delivery facts,
 // class B regeneration (docs/process/MILESTONES.md, deferred scope).
 
 const LEASE_MS = 60_000;
@@ -256,19 +257,24 @@ export class Dispatcher {
     await withTransaction(this.db, async ({ trx, now }) => {
       const current = await trx
         .selectFrom('app.outbox_messages')
-        .select(['status', 'attempt_no', 'horizon_at'])
+        .select(['status', 'attempt_no', 'horizon_at', 'possibly_accepted'])
         .where('id', '=', msg.id)
         .forUpdate()
         .executeTakeFirst();
       if (!current) return;
       const category = result?.category ?? 'ambiguous';
+      // K-717: only ambiguous outcomes may have been accepted; refusals (rate limits, configuration
+      // faults, invalid requests) are definitely not, and say nothing about earlier attempts.
+      const thisMayBeAccepted = category === 'ambiguous' || category === 'concurrent_conflict';
       await trx
         .updateTable('app.outbox_attempts')
         .set({
           result_at: now,
           result_category: category,
           provider_message_id: result?.providerMessageId ?? null,
-          possibly_accepted: category !== 'accepted' && category !== 'replayed',
+          possibly_accepted: category === 'accepted' || category === 'replayed' ? false : thisMayBeAccepted,
+          http_status: result?.httpStatus ?? null,
+          error_code: result?.errorCode ?? (result ? null : 'network_or_timeout'),
           stale: current.attempt_no !== attemptNo,
           latency_ms: Date.now() - sentAt,
         })
@@ -303,15 +309,34 @@ export class Dispatcher {
           .execute();
         return;
       }
-      const delay = BACKOFF_MS[Math.min(attemptNo - 1, BACKOFF_MS.length - 1)]!;
+      if (category === 'permanent') {
+        // The provider refused this request as invalid; retrying the same request cannot help. If an
+        // earlier attempt may have been accepted, the outcome stays unknown, never "failed".
+        await this.settle(
+          trx,
+          msg.id,
+          current.possibly_accepted ? 'UNCONFIRMED' : 'FAILED',
+          'provider_rejected',
+          now,
+          result?.errorCode ?? 'permanent',
+        );
+        return;
+      }
+      const backoff = BACKOFF_MS[Math.min(attemptNo - 1, BACKOFF_MS.length - 1)]!;
+      const delay =
+        category === 'rate_limited' && result?.retryAfterSeconds
+          ? result.retryAfterSeconds * 1000
+          : category === 'concurrent_conflict'
+            ? 30_000
+            : backoff;
       await trx
         .updateTable('app.outbox_messages')
         .set({
           status: 'WAITING_RETRY',
-          possibly_accepted: true,
+          possibly_accepted: current.possibly_accepted || thisMayBeAccepted,
           lease_expires_at: null,
           next_attempt_at: new Date(now.getTime() + delay),
-          last_error_code: 'ambiguous',
+          last_error_code: category === 'ambiguous' ? (result?.errorCode ?? 'ambiguous') : category,
         })
         .where('id', '=', msg.id)
         .execute();

@@ -8,7 +8,10 @@ export type HashDomain =
   | 'staff_invitation'
   | 'sign_in'
   | 'email_change'
+  | 'account_verification'
+  | 'password_reset'
   | 'organizer_session'
+  | 'admin_session'
   | 'staff_session';
 
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;

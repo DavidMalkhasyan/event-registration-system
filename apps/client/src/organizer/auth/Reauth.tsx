@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { api, errorMessage } from '../../shared/api';
 import { saveReturnTo } from '../../shared/return-to';
@@ -43,29 +43,5 @@ export function ReauthPrompt({ session, intro }: { session: Session; intro: stri
       </div>
       {error && <Alert>{error}</Alert>}
     </div>
-  );
-}
-
-/** Shows whether the sign-in still counts as recent (display only; the server decides). */
-export function RecentSignIn({ session }: { session: Session }) {
-  const until = new Date(session.recentAuthUntil);
-  // Re-evaluated every 30 s, so the text changes when the 15 minutes run out.
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(timer);
-  }, []);
-  if (until.getTime() > now)
-    return (
-      <p className="muted">
-        Protected actions, such as cancelling or deleting an event, need a sign-in within the last 15 minutes.
-        Your sign-in counts as recent until {until.toLocaleTimeString()}.
-      </p>
-    );
-  return (
-    <ReauthPrompt
-      session={session}
-      intro="Your last sign-in was more than 15 minutes ago. Protected actions, such as cancelling or deleting an event, need you to confirm it’s you first."
-    />
   );
 }

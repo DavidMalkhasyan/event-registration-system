@@ -1,0 +1,11 @@
+# HTTPS termination (K-720): Caddy obtains and renews the certificate for EVENTFLOW_DOMAIN and forwards to
+# the web process, which sets every security header itself. TRUST_PROXY_HOPS=1 in .env.production makes
+# the web process use the client's address from X-Forwarded-For (per-IP rate limits).
+{$EVENTFLOW_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web:3000 {
+		header_up -X-Forwarded-Host
+	}
+	# Only what the application serves; nothing else is exposed.
+	header -Server
+}

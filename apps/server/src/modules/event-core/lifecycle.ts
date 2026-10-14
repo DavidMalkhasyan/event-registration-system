@@ -16,6 +16,9 @@ import {
 } from '../identity/sessions.js';
 import { enqueue, type MessageType } from '../messaging/outbox.js';
 import { revokeInvitationsOnCancellation } from '../staff/staff.js';
+import { assertEventAccess } from '../organizations/access.js';
+import { LOCATION_COLUMNS, locationView } from './location.js';
+import { mapView } from '../maps/tiles.js';
 
 const DAY_MS = 24 * 3_600_000;
 export const TRANSFER_STATEMENT = 'This ticket can be transferred, but it admits one person, once.';
@@ -225,13 +228,18 @@ export async function managementView(ctx: AppContext, raw: string) {
   if (!found) throw new InvalidLinkError();
   const event = await ctx.db
     .selectFrom('app.events')
-    .select(['title', 'starts_at', 'time_zone', 'status'])
+    .select(['title', 'starts_at', 'time_zone', 'status', 'public_id', ...LOCATION_COLUMNS])
     .where('id', '=', found.registration.event_id)
     .executeTakeFirstOrThrow();
   const now = await decisionTime(ctx.db);
   if (event.status !== 'SCHEDULED' || now > checkInWindow(event.starts_at).closes)
     throw new InvalidLinkError();
-  const summary = { title: event.title, startsAt: event.starts_at.toISOString(), timeZone: event.time_zone };
+  const summary = {
+    title: event.title,
+    startsAt: event.starts_at.toISOString(),
+    timeZone: event.time_zone,
+    location: locationView(event),
+  };
   const beforeStart = now < event.starts_at;
   if (found.registration.state === 'CONFIRMED') {
     const ticket = await ctx.db
@@ -245,6 +253,8 @@ export async function managementView(ctx: AppContext, raw: string) {
     return {
       state: 'CONFIRMED' as const,
       event: summary,
+      // K-714: the venue map is for confirmed participants (amendment A-6).
+      map: mapView(ctx.config, event.public_id, summary.location),
       ticket: { code: ticket.code },
       checkedIn: !!ticket.check_in_id,
       transferStatement: TRANSFER_STATEMENT,
@@ -271,18 +281,34 @@ export async function shareView(ctx: AppContext, raw: string) {
     .leftJoin('app.check_ins as c', (join) =>
       join.onRef('c.ticket_id', '=', 't.id').on('c.undone_at', 'is', null),
     )
-    .select(['r.state', 'e.title', 'e.starts_at', 'e.time_zone', 'e.status', 't.code', 'c.id as check_in_id'])
+    .select([
+      'r.state',
+      'e.title',
+      'e.starts_at',
+      'e.time_zone',
+      'e.status',
+      't.code',
+      'c.id as check_in_id',
+      ...LOCATION_COLUMNS.map((c) => `e.${c}` as const),
+      'e.public_id',
+    ])
     .where('r.id', '=', token.registration_id)
     .executeTakeFirst();
   const now = await decisionTime(ctx.db);
   if (!row || now > checkInWindow(row.starts_at).closes) throw new InvalidLinkError(); // FR-LNK-5
-  const event = { title: row.title, startsAt: row.starts_at.toISOString(), timeZone: row.time_zone };
+  const event = {
+    title: row.title,
+    startsAt: row.starts_at.toISOString(),
+    timeZone: row.time_zone,
+    location: locationView(row),
+  };
   if (row.state !== 'CONFIRMED' || row.status !== 'SCHEDULED' || !row.code)
     return { state: 'not_available' as const, event };
   if (row.check_in_id) return { state: 'checked_in' as const, event, transferStatement: TRANSFER_STATEMENT };
   return {
     state: 'valid' as const,
     event,
+    map: mapView(ctx.config, row.public_id, event.location),
     ticket: { code: row.code },
     transferStatement: TRANSFER_STATEMENT,
   };
@@ -380,7 +406,7 @@ export async function removeFromWaitlist(
   if (!z.uuid().safeParse(eventId).success || !z.uuid().safeParse(registrationId).success)
     throw new AppError(404, 'not_found');
   const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
-    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    await assertEventAccess(trx, principal.accountId, event);
     if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
     const reg = await trx
       .selectFrom('app.registrations')
@@ -460,7 +486,7 @@ export async function cancelEvent(
   if (!limit.allowed) throw new AppError(429, 'rate_limited', { retryAfterSeconds: limit.retryAfterSeconds });
 
   const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
-    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    await assertEventAccess(trx, principal.accountId, event);
     await requireRecentAuthentication(trx, principal.sessionId, now); // 401 unauthenticated / reauthentication_required
     if (event.status === 'CANCELLED') return 'already_cancelled' as const;
     if (now >= event.starts_at) return 'started' as const;
@@ -516,8 +542,93 @@ export async function cancelEvent(
     });
     return 'cancelled' as const;
   });
-  if (result === null || result === 'not_found') throw new AppError(404, 'not_found');
+  if (result === null) throw new AppError(404, 'not_found');
   if (result === 'started') throw new AppError(409, 'event_started');
+}
+
+// ---------------------------------------------------------------- organizer cancellation of one registration (K-703)
+
+export type OrganizerCancellationResult = { result: 'cancelled'; promoted: number };
+
+/**
+ * K-703 (PD-83): the owner cancels one CONFIRMED registration. Under the exclusive event lock, so it is
+ * serialized with verification, promotion, participant cancellation, check-in, waiting-list removal and
+ * event cancellation, and decided by commit order. Everything read before is re-read under the lock.
+ * Only a CONFIRMED registration of a SCHEDULED event before its start, without an active check-in, is
+ * cancelled (a checked-in ticket stays: its history and check-in undo are kept). One transaction: the
+ * registration becomes CANCELLED with end_reason 'cancelled_by_organizer'; its ticket stops being valid
+ * through the registration state (check-in answers TICKET_CANCELLED, management and share links stop
+ * working); exactly one required notice, by logical key; the freed seat goes FIFO to the waiting list
+ * before the cutoff (promoteFifo, after the decrement); an audit record with IDs and counts only.
+ * A repeat finds the registration no longer CONFIRMED and changes nothing.
+ */
+export async function cancelRegistrationByOrganizer(
+  ctx: AppContext,
+  principal: OrganizerPrincipal,
+  eventId: string,
+  registrationId: string,
+  correlationId: string,
+): Promise<OrganizerCancellationResult> {
+  if (!z.uuid().safeParse(eventId).success || !z.uuid().safeParse(registrationId).success)
+    throw new AppError(404, 'not_found');
+  const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
+    await assertEventAccess(trx, principal.accountId, event);
+    if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
+    const reg = await trx
+      .selectFrom('app.registrations')
+      .select(['id', 'email', 'state'])
+      .where('id', '=', registrationId)
+      .where('event_id', '=', eventId)
+      .executeTakeFirst();
+    if (!reg) return 'not_found' as const;
+    if (event.status !== 'SCHEDULED') return 'not_scheduled' as const;
+    if (now >= event.starts_at) return 'started' as const;
+    if (reg.state !== 'CONFIRMED') return 'not_confirmed' as const;
+    const checkedIn = await trx
+      .selectFrom('app.check_ins as c')
+      .innerJoin('app.tickets as t', 't.id', 'c.ticket_id')
+      .select('c.id')
+      .where('t.registration_id', '=', reg.id)
+      .where('c.undone_at', 'is', null)
+      .executeTakeFirst();
+    if (checkedIn) return 'checked_in' as const;
+
+    // The decrement runs before any promotion increments (NFR-CON-4 f).
+    await trx
+      .updateTable('app.registrations')
+      .set({ state: 'CANCELLED', ended_at: now, end_reason: 'cancelled_by_organizer', updated_at: now })
+      .where('id', '=', reg.id)
+      .where('state', '=', 'CONFIRMED')
+      .execute();
+    await enqueue(trx, {
+      type: 'organizer_cancellation',
+      logicalKey: `organizer_cancellation:${reg.id}`,
+      recipientEmail: reg.email,
+      now,
+      eventId,
+      registrationId: reg.id,
+      correlationId,
+    });
+    const promoted = await promoteFifo(trx, eventId, now, correlationId);
+    await recordAudit(trx, {
+      now,
+      action: 'registration_cancel_by_organizer',
+      actorKind: 'owner',
+      actorAccountId: principal.accountId,
+      eventId,
+      registrationId: reg.id,
+      outcome: 'cancelled',
+      details: { previousState: 'CONFIRMED', promoted: promoted.length },
+    });
+    return { promoted: promoted.length };
+  });
+  if (result === null || result === 'not_found') throw new AppError(404, 'not_found');
+  if (result === 'unauthenticated') throw new AppError(401, 'unauthenticated');
+  if (result === 'not_scheduled') throw new AppError(409, 'event_not_scheduled');
+  if (result === 'started') throw new AppError(409, 'event_started');
+  if (result === 'not_confirmed') throw new AppError(409, 'registration_not_confirmed');
+  if (result === 'checked_in') throw new AppError(409, 'ticket_checked_in');
+  return { result: 'cancelled', promoted: result.promoted };
 }
 
 // ---------------------------------------------------------------- title and description (FR-EVT-5)
@@ -546,7 +657,7 @@ export async function updateEventDetails(
 ) {
   if (!z.uuid().safeParse(eventId).success) throw new AppError(404, 'not_found');
   const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
-    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    await assertEventAccess(trx, principal.accountId, event);
     if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
     if (event.status !== 'SCHEDULED') return 'not_scheduled' as const;
     const current = await trx
@@ -583,22 +694,23 @@ export async function updateEventDetails(
     });
     return 'changed' as const;
   });
-  if (result === null || result === 'not_found') throw new AppError(404, 'not_found');
+  if (result === null) throw new AppError(404, 'not_found');
   if (result === 'unauthenticated') throw new AppError(401, 'unauthenticated');
   if (result === 'not_scheduled') throw new AppError(409, 'event_not_scheduled');
 }
 
-// ---------------------------------------------------------------- capacity (FR-EVT-7, FR-EVT-8, BR-1, BR-5, BR-11)
+// ---------------------------------------------------------------- capacity (FR-EVT-7, BR-1, BR-5, BR-11; amendment A-2)
 
 export const capacitySchema = z.object({ capacity: z.number().int().min(1).max(100_000) }).strict();
 
 /**
- * TX-E03: sets an absolute capacity under the exclusive event lock, so it is serialized with
- * verification, cancellation, promotion, reschedule and the cutoff task (AC-14). A decrease is
- * never below the confirmed count (the error names the minimum). An increase writes the new
- * capacity first, then promotes FIFO into the new seats before the cutoff, in the same
- * transaction (AC-15, BR-5). Absolute values make retries idempotent: repeating a request
- * changes nothing and promotes no one again.
+ * TX-E03 with amendment A-2 (K-707, PD-87): capacity can only be increased. The absolute value is
+ * compared, under the exclusive event lock, with the authoritative capacity read there, so it is
+ * serialized with verification, cancellation, promotion, reschedule, the cutoff task and other
+ * capacity changes (AC-14). A lower value is refused with the current capacity; the same value
+ * changes nothing; a higher one is written first, then the new seats are filled FIFO before the
+ * cutoff in the same transaction (AC-15, BR-5). Absolute values keep retries idempotent. Values
+ * outside 1 to 100 000 never get here (capacitySchema: 422 validation_failed).
  */
 export async function setCapacity(
   ctx: AppContext,
@@ -609,10 +721,10 @@ export async function setCapacity(
 ) {
   if (!z.uuid().safeParse(eventId).success) throw new AppError(404, 'not_found');
   const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
-    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    await assertEventAccess(trx, principal.accountId, event);
     if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
     if (event.status !== 'SCHEDULED') return 'not_scheduled' as const;
-    if (input.capacity < event.confirmed_count) return { minimumCapacity: event.confirmed_count };
+    if (input.capacity < event.capacity) return { currentCapacity: event.capacity };
     if (input.capacity === event.capacity) return 'unchanged' as const;
 
     await trx
@@ -621,8 +733,7 @@ export async function setCapacity(
       .where('id', '=', eventId)
       .execute();
     // promoteFifo reads the new capacity and does nothing from the cutoff onward (BR-9).
-    const promoted =
-      input.capacity > event.capacity ? await promoteFifo(trx, eventId, now, correlationId) : [];
+    const promoted = await promoteFifo(trx, eventId, now, correlationId);
     await recordAudit(trx, {
       now,
       action: 'capacity_change',
@@ -634,10 +745,10 @@ export async function setCapacity(
     });
     return 'changed' as const;
   });
-  if (result === null || result === 'not_found') throw new AppError(404, 'not_found');
+  if (result === null) throw new AppError(404, 'not_found');
   if (result === 'unauthenticated') throw new AppError(401, 'unauthenticated');
   if (result === 'not_scheduled') throw new AppError(409, 'event_not_scheduled');
-  if (typeof result === 'object') throw new AppError(409, 'capacity_below_confirmed', result);
+  if (typeof result === 'object') throw new AppError(409, 'capacity_decrease_not_allowed', result);
 }
 
 // ---------------------------------------------------------------- reschedule (FR-EVT-6, BR-12 to BR-15)
@@ -674,7 +785,7 @@ export async function rescheduleEvent(
     throw new AppError(422, 'ambiguous_local_time', { offsets: resolved.offsets });
 
   const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
-    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    await assertEventAccess(trx, principal.accountId, event);
     if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
     if (event.status !== 'SCHEDULED') return 'not_scheduled' as const;
     if (now >= event.starts_at) return 'started' as const;
@@ -726,7 +837,7 @@ export async function rescheduleEvent(
     });
     return 'rescheduled' as const;
   });
-  if (result === null || result === 'not_found') throw new AppError(404, 'not_found');
+  if (result === null) throw new AppError(404, 'not_found');
   if (result === 'unauthenticated') throw new AppError(401, 'unauthenticated');
   if (result === 'not_scheduled') throw new AppError(409, 'event_not_scheduled');
   if (result === 'started') throw new AppError(409, 'event_started');

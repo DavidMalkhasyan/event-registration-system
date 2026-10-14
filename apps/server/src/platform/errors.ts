@@ -12,7 +12,12 @@ export type ProblemCode =
   | 'registration_closed'
   | 'event_not_scheduled'
   | 'event_started'
-  | 'capacity_below_confirmed'
+  | 'capacity_decrease_not_allowed'
+  | 'organization_not_active'
+  | 'invalid_credentials'
+  | 'email_verification_required'
+  | 'organization_required'
+  | 'invalid_transition'
   | 'cancelled_event_not_deletable'
   | 'deletion_blocked'
   | 'notifications_pending'
@@ -27,7 +32,20 @@ export type ProblemCode =
   | 'check_in_window_ended'
   | 'check_in_already_undone'
   | 'not_waitlisted'
+  | 'registration_not_confirmed'
   | 'schedule_version_mismatch'
+  | 'location_version_mismatch'
+  | 'image_rejected'
+  | 'image_too_large'
+  | 'cover_exists'
+  | 'gallery_full'
+  | 'gallery_changed'
+  | 'unsupported_media_type'
+  | 'already_member'
+  | 'last_owner'
+  | 'map_tile_unavailable'
+  | 'second_factor_required'
+  | 'media_storage_unavailable'
   | 'nonexistent_local_time'
   | 'ambiguous_local_time'
   | 'start_not_in_future'
@@ -51,7 +69,12 @@ const TITLES: Record<ProblemCode, string> = {
   registration_closed: 'Registration is closed',
   event_not_scheduled: 'The event is not scheduled',
   event_started: 'The event has started',
-  capacity_below_confirmed: 'Capacity is below the number of confirmed participants',
+  capacity_decrease_not_allowed: 'Capacity can only be increased',
+  organization_not_active: 'Your organization is not active',
+  invalid_credentials: 'The email address or password is not correct',
+  email_verification_required: 'Confirm your email address first',
+  organization_required: 'Choose the organization for this event',
+  invalid_transition: 'This decision is not possible in the organization’s current state',
   cancelled_event_not_deletable: "Cancelled events can't be deleted",
   deletion_blocked: 'The event cannot be deleted yet',
   notifications_pending: 'Notifications are still being sent; try again later',
@@ -66,7 +89,21 @@ const TITLES: Record<ProblemCode, string> = {
   check_in_window_ended: 'The check-in window of this event has ended',
   check_in_already_undone: 'This check-in was already undone',
   not_waitlisted: 'This registration is no longer on the waiting list',
+  registration_not_confirmed: 'This registration is no longer confirmed',
   schedule_version_mismatch: 'The event was changed by another request; reload and try again',
+  location_version_mismatch: 'The location was changed in the meantime; reload and try again',
+  image_rejected: 'This file is not a JPEG, PNG or WebP image of at least 200 × 200 pixels',
+  image_too_large: 'Images can be at most 10 MB',
+  cover_exists: 'The event already has a cover image; replace it instead',
+  gallery_full: 'The gallery already has 8 images',
+  gallery_changed: 'The gallery was changed in the meantime; reload and try again',
+  unsupported_media_type: 'Send the image file itself as the request body',
+  already_member: 'This person is already a member of the organization',
+  last_owner: 'An organization needs at least one owner',
+  map_tile_unavailable: 'The map could not be loaded right now',
+  media_storage_unavailable: 'Images cannot be stored right now; please try again later',
+  second_factor_required:
+    'This Super Admin has no second factor yet; ask the operator to enrol one (pnpm admin:totp)',
   nonexistent_local_time: 'This local time does not exist in the time zone',
   ambiguous_local_time: 'This local time is ambiguous in the time zone',
   start_not_in_future: 'The start must be in the future',

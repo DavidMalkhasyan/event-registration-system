@@ -5,6 +5,7 @@ import type { AppContext } from '../../composition/context.js';
 import { AppError } from '../../platform/errors.js';
 import { resolveOrganizer } from '../identity/sessions.js';
 import { requireEventPrincipal, resolveStaff, type EventPrincipal } from '../identity/staff-sessions.js';
+import { manageableOrganizationIds } from '../organizations/access.js';
 
 // Live checked-in count (FR-DSH-2, FR-DSH-3, API-D6): PostgreSQL LISTEN/NOTIFY → SSE.
 // Every connection starts with the authoritative count; updates are re-read from committed
@@ -51,14 +52,14 @@ async function checkedInCount(ctx: AppContext, eventId: string): Promise<number>
 const REVALIDATE_MS = 30_000;
 const KEEPALIVE_MS = 15_000;
 
-/** The owner of the event, or a staff session of this event (PD-56); otherwise 404 or 401. */
+/** A member of the event's active organization, or a staff session of this event (PD-56, K-708); otherwise 404 or 401. */
 async function authorizeEvent(ctx: AppContext, principal: EventPrincipal, eventId: string): Promise<void> {
   if (principal.kind === 'staff') return; // requireEventPrincipal already bound it to this event
   const owned = await ctx.db
     .selectFrom('app.events')
     .select('id')
     .where('id', '=', eventId)
-    .where('owner_account_id', '=', principal.accountId)
+    .where('organization_id', 'in', manageableOrganizationIds(ctx.db, principal.accountId))
     .executeTakeFirst();
   if (!owned) throw new AppError(404, 'not_found');
 }

@@ -4,6 +4,8 @@ import { linkToken } from './bootstrap-token';
 import { ApiError, api, errorMessage } from '../shared/api';
 import { takeReturnTo } from '../shared/return-to';
 import { Alert, Button, CopyLink, formatLocal } from '../shared/ui';
+import { VenueDetails } from '../shared/location';
+import { ParticipantMap, type MapData } from '../shared/ParticipantMap';
 import { CenterPage, InvalidLinkPage, LoadingPage, TicketCard, type EventSummary } from './shell';
 
 // Link pages (ADR-011): the token comes from bootstrap-token (memory only) and is sent as
@@ -169,7 +171,7 @@ export function VerifyPage() {
 }
 
 type ShareView =
-  | { state: 'valid'; event: EventSummary; ticket: { code: string } }
+  | { state: 'valid'; event: EventSummary; ticket: { code: string }; map: MapData | null }
   | { state: 'checked_in' | 'not_available'; event: EventSummary };
 
 /** The read-only share view (FR-SHR-2, FR-SHR-4): never checks in, never shows the participant. */
@@ -210,6 +212,12 @@ export function TicketPage() {
             )
           }
         />
+        {view.state === 'valid' && view.event.location && (
+          <div className="panel ticket-venue-panel">
+            <VenueDetails location={view.event.location} heading="Where to go" />
+            <ParticipantMap location={view.event.location} map={view.map} />
+          </div>
+        )}
       </div>
     </CenterPage>
   );

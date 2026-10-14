@@ -9,8 +9,24 @@ import type { RenderedEmail } from '../notifications/handlers.js';
 // Idempotency follows Resend's documented rule: same key + same body = replay; different body = 409.
 
 export interface ProviderResult {
-  category: 'accepted' | 'replayed' | 'idempotent_key_conflict';
+  /**
+   * What happened to the submission (K-717): accepted (or replayed) means the provider took it; the
+   * other categories never claim acceptance. `ambiguous` (also any thrown error) means it may have been.
+   */
+  category:
+    | 'accepted'
+    | 'replayed'
+    | 'idempotent_key_conflict'
+    | 'concurrent_conflict'
+    | 'rate_limited'
+    | 'config_fault'
+    | 'permanent'
+    | 'ambiguous';
   providerMessageId?: string;
+  httpStatus?: number;
+  /** The provider's error name (for example `validation_error`), never a message body. */
+  errorCode?: string;
+  retryAfterSeconds?: number;
 }
 
 export interface EmailProvider {

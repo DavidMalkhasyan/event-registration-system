@@ -21,7 +21,7 @@ export interface OrganizerPrincipal {
   absoluteExpiresAt: Date;
 }
 
-export function csrfTokenFor(secret: string, kind: 'org' | 'staff', sessionId: string): string {
+export function csrfTokenFor(secret: string, kind: 'org' | 'staff' | 'admin', sessionId: string): string {
   return `v1.1.${hmac(secret, 'ers/csrf/v1', kind, sessionId)}`;
 }
 

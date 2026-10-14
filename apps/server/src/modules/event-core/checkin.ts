@@ -9,6 +9,7 @@ import { withEventLock } from '../../platform/tx.js';
 import { recordAudit } from '../audit/audit.js';
 import { sessionStillValid, type OrganizerPrincipal } from '../identity/sessions.js';
 import { staffStillValid, type EventPrincipal } from '../identity/staff-sessions.js';
+import { assertEventAccess } from '../organizations/access.js';
 
 export const checkInSchema = z.object({ code: z.string().min(1).max(32), requestId: z.uuid() }).strict();
 
@@ -41,7 +42,7 @@ export async function checkIn(
 
   const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
     if (principal.kind === 'owner') {
-      if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+      await assertEventAccess(trx, principal.accountId, event);
       if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
     } else {
       if (principal.eventId !== eventId) return 'not_found' as const;
@@ -149,7 +150,7 @@ export async function undoCheckIn(
   if (!z.uuid().safeParse(eventId).success || !z.uuid().safeParse(checkInId).success)
     throw new AppError(404, 'not_found');
   const result = await withEventLock(ctx.db, eventId, 'exclusive', async ({ trx, now, event }) => {
-    if (event.owner_account_id !== principal.accountId) return 'not_found' as const;
+    await assertEventAccess(trx, principal.accountId, event);
     if (!(await sessionStillValid(trx, principal.sessionId, now))) return 'unauthenticated' as const;
     const checkIn = await trx
       .selectFrom('app.check_ins')

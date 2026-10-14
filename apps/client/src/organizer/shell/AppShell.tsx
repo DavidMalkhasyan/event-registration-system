@@ -1,19 +1,37 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { CalendarDays, ChevronRight, LayoutDashboard, LogOut, Menu, Sparkles, X } from 'lucide-react';
+import {
+  Building2,
+  CalendarDays,
+  ChevronRight,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import { api } from '../../shared/api';
 import { Button, Logo } from '../../shared/ui';
 import { SWATCHES, artworkIndex } from '../../shared/artwork';
 import { isUpcoming } from '../events/event-status';
 import { Link } from '../router';
-import type { EventListItem, Session } from '../types';
+import { ROLE_LABEL, type EventListItem, type Session } from '../types';
 import { useMobileNavigation } from './use-mobile-navigation';
 
-export type NavKey = 'overview' | 'events' | 'create' | 'event';
+/** The organization shown under the account (K-708): the only one, or how many. */
+function organizationLabel(session: Session): string {
+  const active = session.organizations.filter((o) => o.status === 'active');
+  if (active.length === 1) return `${active[0]!.name} · ${ROLE_LABEL[active[0]!.role]}`;
+  if (active.length > 1) return `${active.length} organizations`;
+  return 'No active organization';
+}
+
+export type NavKey = 'overview' | 'events' | 'create' | 'organization' | 'event';
 
 const NAV = [
   { key: 'overview', name: 'Overview', to: '/organizer', icon: LayoutDashboard },
   { key: 'events', name: 'All events', to: '/organizer/events', icon: CalendarDays },
   { key: 'create', name: 'Create event', to: '/organizer/events/new', icon: Sparkles },
+  { key: 'organization', name: 'Organization', to: '/organizer/organization', icon: Building2 },
 ] as const;
 
 async function signOut(session: Session) {
@@ -130,7 +148,7 @@ export function AppShell({
             </span>
             <div>
               <strong>{session.email}</strong>
-              <small>Organizer</small>
+              <small>{organizationLabel(session)}</small>
             </div>
           </div>
         </div>

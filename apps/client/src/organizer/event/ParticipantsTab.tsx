@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Check, Search, Users, X } from 'lucide-react';
 import { Alert, Empty, Status } from '../../shared/ui';
 import type { EventItem, Notice, Participant, Session } from '../types';
-import { RemoveFromWaitlist, UndoCheckIn } from './ParticipantActions';
+import { CancelRegistration, RemoveFromWaitlist, UndoCheckIn } from './ParticipantActions';
 
 export const STATE: Record<string, { label: string; tone: string }> = {
   CONFIRMED: { label: 'Confirmed', tone: 'confirmed' },
@@ -12,9 +12,20 @@ export const STATE: Record<string, { label: string; tone: string }> = {
   EXPIRED: { label: 'Expired', tone: 'expired' },
 };
 
+/** Why an ended registration ended; cancelled people stay in the list (K-703). */
+const END_REASON: Record<string, string> = {
+  participant_cancelled: 'by the participant',
+  cancelled_by_organizer: 'by you',
+  removed_by_organizer: 'removed from the waiting list',
+  event_cancelled: 'event cancelled',
+  cutoff: 'not confirmed before registration closed',
+};
+
 const ISSUE: Record<string, string> = {
   failed: 'failed',
   delivery_outcome_unknown: 'delivery outcome unknown',
+  bounced: 'bounced (not delivered)',
+  complained: 'marked as spam by the recipient',
 };
 
 /** One event's participants (FR-DSH-4), or only its waiting list in queue order (FR-WL). */
@@ -36,6 +47,8 @@ export function ParticipantsTab({
   const [search, setSearch] = useState('');
   const [state, setState] = useState('ALL');
   const scheduled = event.status === 'SCHEDULED';
+  const beforeStart = scheduled && event.phase !== 'started';
+  const waiting = participants.filter((p) => p.state === 'WAITLISTED').length;
   const base = waitingOnly
     ? participants
         .filter((p) => p.state === 'WAITLISTED')
@@ -53,7 +66,7 @@ export function ParticipantsTab({
           <Search size={16} aria-hidden="true" />
           <input
             type="search"
-            aria-label="Search participants"
+            aria-label={waitingOnly ? 'Search the waiting list' : 'Search participants'}
             placeholder="Search by email…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -131,6 +144,7 @@ export function ParticipantsTab({
                     <td data-label="Registration">
                       <Status tone={s.tone}>{s.label}</Status>
                       {p.state === 'WAITLISTED' && <small>Position #{p.position}</small>}
+                      {p.endReason && END_REASON[p.endReason] && <small>{END_REASON[p.endReason]}</small>}
                     </td>
                     <td data-label="Check-in">
                       {p.checkedInAt ? (
@@ -151,6 +165,16 @@ export function ParticipantsTab({
                     </td>
                     <td>
                       <div className="row-actions">
+                        {beforeStart && (
+                          <CancelRegistration
+                            session={session}
+                            eventId={event.id}
+                            participant={p}
+                            waiting={waiting}
+                            promotionOpen={event.phase === 'registration_open'}
+                            onDone={onNotice}
+                          />
+                        )}
                         {scheduled && (
                           <RemoveFromWaitlist
                             session={session}
