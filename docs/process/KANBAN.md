@@ -60,12 +60,13 @@
 | K-105 Dependency and secret scanning in CI | M1 | `47977c4` (part of K-605): `pnpm check:secrets`, `pnpm check:deps` and a migration idempotency step run in CI (run 38244890522). |
 | K-004 Process documentation | M0 | Kanban, milestones, journal, decision log, AI usage and submission checklist, kept current from S-01; final accuracy pass in S-15 ([PR #15](https://github.com/DavidMalkhasyan/event-registration-system/pull/15)). **Approved by the stakeholder on 2026-10-12 (S-16).** |
 | K-603 Final AI usage, journal, attribution, current state, incomplete work | M6 | S-15: `18cd457` to `093ccfe`; [PR #15](https://github.com/DavidMalkhasyan/event-registration-system/pull/15) into `dev`, CI [run 38253717986](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38253717986) passed (secret scan, dependency audit, 7 migrations and idempotency; 135/135, 11/11, 22/22); merged 2026-10-12 17:15:12 as `bb6db50`. **Approved by the stakeholder (S-16)**, subject to recording that evidence, which the S-16 journal entry does. |
+| K-726 Submission documentation for the `dev` release candidate (S-21) | M6 | [PR #48](https://github.com/DavidMalkhasyan/event-registration-system/pull/48) into `dev`, CI [run 38531079474](https://github.com/DavidMalkhasyan/event-registration-system/actions/runs/38531079474) passed (`verify`, `container`); merged by the owner 2026-10-14 12:05:18 as `ee556e4`. Not in `main` |
 
 ## Review
 
 | Card | Milestone | Awaiting |
 |---|---|---|
-| K-726 Submission documentation for the `dev` release candidate: SUBMISSION_CHECKLIST.md rewritten (v1.0.0 version kept as history), ASSIGNMENT_SCOPE.md and AI_USAGE.md corrected (S-21) | M6 | Its pull request into `dev`; then the owner's decisions on the draft release pull request #47, a tag and the submission |
+| K-727 CI failure in PR #47 (run 38532685849): the stale map tile test asserted an exact `max-age=59`; now bounded (S-21) | M6 | Its pull request into `dev` (`ba37876`), then fresh CI on PR #47 |
 
 ## In Progress
 
