@@ -15,6 +15,20 @@ This is Task 9 of the AI-assisted software engineering assignment.
 | **Email**    | A fake provider by default: emails are written to `var/mailbox/` and shown at `/dev/mailbox`. Resend for production (`EMAIL_PROVIDER=resend`, PD-97); not yet used for real. |
 | **Tests**    | Vitest integration tests against real PostgreSQL; Playwright browser tests in `apps/e2e`                                                                                     |
 
+## Quick Start / Быстрый запуск
+
+The whole application in Docker (PostgreSQL 18, migrations, web, worker, fake mailbox). Needs only Docker with Compose v2; no domain or email provider. Full guide in Russian, including a manual setup: [docs/QUICKSTART_RU.md](docs/QUICKSTART_RU.md).
+Всё приложение в Docker, нужен только Docker с Compose v2. Подробная инструкция (в том числе ручная установка): [docs/QUICKSTART_RU.md](docs/QUICKSTART_RU.md).
+
+```sh
+docker compose -f compose.demo.yaml up -d --build      # start (first build takes a few minutes)
+docker compose -f compose.demo.yaml run --rm seed      # demo data (optional, safe to repeat)
+docker compose -f compose.demo.yaml run --rm demo-password   # organizer password
+docker compose -f compose.demo.yaml down               # stop (data is kept); add -v to delete all demo data
+```
+
+Open **http://localhost:3000** (organizer area `/organizer`, fake mailbox `/dev/mailbox`). The demo stack is for local use only and has not yet been run in containers by its author (no Docker on the authoring machine); see the status note in the guide.
+
 ## 1. Prerequisites
 
 | Tool                                | Version | Notes                                                                                                  |

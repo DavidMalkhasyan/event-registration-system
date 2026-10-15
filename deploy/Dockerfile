@@ -36,7 +36,7 @@ RUN pnpm install --frozen-lockfile --prod --filter @ers/server
 COPY --from=build /src/apps/server/dist apps/server/dist
 COPY apps/server/migrations apps/server/migrations
 COPY --from=build /src/apps/client/dist apps/client/dist
-RUN mkdir -p /data/media /data/tile-cache /data/backups && chown -R node:node /data
+RUN mkdir -p /data/media /data/tile-cache /data/backups /data/mailbox && chown -R node:node /data
 USER node
 ENV HOST=0.0.0.0 PORT=3000 CLIENT_DIST_DIR=/app/apps/client/dist MEDIA_DIR=/data/media TILE_CACHE_DIR=/data/tile-cache
 EXPOSE 3000

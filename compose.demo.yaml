@@ -1,0 +1,138 @@
+# EventFlow local demo (NOT for production): the same image as deploy/compose.yaml, served on
+# http://localhost:3000 with the fake email provider (mailbox at /dev/mailbox). No domain, HTTPS or Resend.
+#   docker compose -f compose.demo.yaml up -d --build
+#   docker compose -f compose.demo.yaml run --rm seed          # demo data, once (safe to repeat)
+# Secrets are generated on first start into the demo-secrets volume (never in Git, never in an image).
+# PostgreSQL publishes no port; the web port is bound to 127.0.0.1 only. See docs/QUICKSTART_RU.md.
+
+name: eventflow-demo
+
+x-app: &app
+  build:
+    context: .
+    dockerfile: deploy/Dockerfile
+  image: eventflow:demo
+  environment: &app-env
+    NODE_ENV: development # the fake email provider and /dev/mailbox are refused in production
+    HOST: 0.0.0.0
+    PORT: '3000'
+    PUBLIC_ORIGIN: http://localhost:3000
+    EMAIL_PROVIDER: fake
+    DEV_MAILBOX_DIR: /data/mailbox
+  volumes:
+    - demo-secrets:/demo:ro
+    - media:/data/media
+    - mailbox:/data/mailbox
+  logging:
+    driver: json-file
+    options: { max-size: 10m, max-file: '3' }
+
+services:
+  # One-shot: writes random secrets to the volume if they are not there yet (idempotent).
+  secrets-init:
+    <<: *app
+    user: '0'
+    volumes: [demo-secrets:/demo]
+    entrypoint: ['sh', '-ec']
+    command:
+      - |
+        if [ ! -s /demo/secrets.env ]; then
+          node -e "const c=require('crypto');for(const k of ['POSTGRES_PASSWORD','APP_OWNER_PASSWORD','APP_RUNTIME_PASSWORD','CSRF_SECRET','PRESESSION_SECRET','RATE_LIMIT_SECRET','PREVIEW_SECRET'])console.log(k+'='+c.randomBytes(32).toString('hex'));console.log('DEMO_ORGANIZER_PASSWORD='+c.randomBytes(15).toString('base64url'))" > /demo/secrets.env.tmp
+          chmod 644 /demo/secrets.env.tmp
+          mv /demo/secrets.env.tmp /demo/secrets.env
+        fi
+    restart: 'no'
+
+  postgres:
+    image: postgres:18
+    entrypoint:
+      - sh
+      - -ec
+      - set -a; . /demo/secrets.env; set +a; exec docker-entrypoint.sh postgres
+    volumes:
+      - demo-secrets:/demo:ro
+      - pgdata:/var/lib/postgresql
+      - ./deploy/postgres-init.sh:/docker-entrypoint-initdb.d/10-eventflow.sh:ro
+    depends_on:
+      secrets-init: { condition: service_completed_successfully }
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d eventflow']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+    shm_size: 256m
+
+  migrate:
+    <<: *app
+    entrypoint: ['sh', '-ec']
+    command:
+      - 'set -a; . /demo/secrets.env; set +a; export DATABASE_URL="postgres://app_runtime:$$APP_RUNTIME_PASSWORD@postgres:5432/eventflow" MIGRATION_DATABASE_URL="postgres://app_owner:$$APP_OWNER_PASSWORD@postgres:5432/eventflow"; exec node apps/server/dist/entrypoints/migrate.js'
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: 'no'
+
+  web:
+    <<: *app
+    entrypoint: ['sh', '-ec']
+    command:
+      - 'set -a; . /demo/secrets.env; set +a; export DATABASE_URL="postgres://app_runtime:$$APP_RUNTIME_PASSWORD@postgres:5432/eventflow" MIGRATION_DATABASE_URL="postgres://app_owner:$$APP_OWNER_PASSWORD@postgres:5432/eventflow"; exec node apps/server/dist/entrypoints/web.js'
+    ports: ['127.0.0.1:3000:3000']
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    restart: unless-stopped
+
+  worker:
+    <<: *app
+    entrypoint: ['sh', '-ec']
+    command:
+      - 'set -a; . /demo/secrets.env; set +a; export DATABASE_URL="postgres://app_runtime:$$APP_RUNTIME_PASSWORD@postgres:5432/eventflow" MIGRATION_DATABASE_URL="postgres://app_owner:$$APP_OWNER_PASSWORD@postgres:5432/eventflow"; exec node apps/server/dist/entrypoints/worker.js'
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  # Demo data, only when asked: docker compose -f compose.demo.yaml run --rm seed
+  # Idempotent; the organizer password comes from the secrets volume and is never printed by the seed.
+  seed:
+    <<: *app
+    profiles: [tools]
+    environment:
+      <<: *app-env
+      DEMO_SEED_ALLOW_HOST: postgres # the only non-loopback host seed:demo accepts, and only here
+    entrypoint: ['sh', '-ec']
+    command:
+      - 'set -a; . /demo/secrets.env; set +a; export DATABASE_URL="postgres://app_runtime:$$APP_RUNTIME_PASSWORD@postgres:5432/eventflow" MIGRATION_DATABASE_URL="postgres://app_owner:$$APP_OWNER_PASSWORD@postgres:5432/eventflow"; exec node apps/server/dist/entrypoints/seed-demo.js'
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    restart: 'no'
+
+  # Prints the demo organizer password on request: docker compose -f compose.demo.yaml run --rm demo-password
+  demo-password:
+    <<: *app
+    profiles: [tools]
+    entrypoint: ['sh', '-ec']
+    command:
+      - '. /demo/secrets.env; echo "Email:    demo.organizer@example.test"; echo "Password: $$DEMO_ORGANIZER_PASSWORD"'
+    depends_on:
+      secrets-init: { condition: service_completed_successfully }
+    restart: 'no'
+    logging:
+      driver: none
+
+volumes:
+  demo-secrets:
+  pgdata:
+  media:
+  mailbox:
