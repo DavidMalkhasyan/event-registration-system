@@ -102,7 +102,10 @@ function assertLocal(databaseUrl: string): void {
   if (process.env.NODE_ENV === 'production')
     throw new SeedError('seed:demo refuses to run with NODE_ENV=production');
   const host = new URL(databaseUrl).hostname.replace(/^\[|\]$/g, '');
-  if (!['localhost', '127.0.0.1', '::1'].includes(host))
+  // compose.demo.yaml names its database service explicitly; only that exact host is accepted.
+  const extra = process.env.DEMO_SEED_ALLOW_HOST;
+  const allowed = ['localhost', '127.0.0.1', '::1', ...(extra ? [extra] : [])];
+  if (!allowed.includes(host))
     throw new SeedError(`seed:demo only runs against a local database (host is "${host}")`);
 }
 
@@ -124,8 +127,10 @@ try {
       const chosen = process.env.DEMO_ORGANIZER_PASSWORD;
       if (chosen !== undefined && chosen.length < PASSWORD_MIN)
         throw new SeedError(`DEMO_ORGANIZER_PASSWORD needs at least ${PASSWORD_MIN} characters`);
-      password = chosen ?? randomBytes(15).toString('base64url');
-      const hash = await hashPassword(password);
+      const generated = chosen === undefined;
+      const plain = chosen ?? randomBytes(15).toString('base64url');
+      password = generated ? plain : null; // a password the caller chose is never printed
+      const hash = await hashPassword(plain);
       account = await db.transaction().execute(async (trx) => {
         const now = await decisionTime(trx);
         const a = await trx
@@ -270,7 +275,7 @@ try {
         `Organizer sign-in: ${origin}/organizer\n  Email: ${ORGANIZER_EMAIL}\n` +
         (password
           ? `  Password: ${password}\n  (shown once; set DEMO_ORGANIZER_PASSWORD before the first run to choose it)\n`
-          : '  Password: unchanged (shown only when the account was created)\n') +
+          : '  Password: not shown (account already existed, or the password was set with DEMO_ORGANIZER_PASSWORD)\n') +
         `Public event pages:\n${out.join('\n')}\n`,
     );
   } finally {
