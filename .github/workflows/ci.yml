@@ -205,6 +205,42 @@ jobs:
           curl -fs http://localhost:3000/dev/mailbox | grep -qi 'Dev mailbox'
           $C run --rm -T demo-password | grep -q 'demo.organizer@example.test'
           $C run --rm -T demo-password | grep '^Password:' > /tmp/pw-before.txt
+      - name: Demo accounts sign in; Super Admin second-factor onboarding
+        run: |
+          set -eu
+          post() { curl -s -o /tmp/out.json -w '%{http_code}' -X POST -H 'Origin: http://localhost:3000' \
+            -H 'Content-Type: application/json' -d "$2" "http://localhost:3000$1"; }
+          $C run --rm -T demo-password > /tmp/creds.txt
+          ORG_PW=$(sed -n 's/^Password: //p' /tmp/creds.txt | sed -n 1p)
+          ADM_PW=$(sed -n 's/^Password: //p' /tmp/creds.txt | sed -n 2p)
+          test -n "$ORG_PW" && test -n "$ADM_PW" && test "$ORG_PW" != "$ADM_PW"
+          grep -q 'demo.admin@example.test' /tmp/creds.txt
+          # Organizer: the right password signs in, a wrong one does not.
+          test "$(post /api/auth/password-sessions "{\"email\":\"demo.organizer@example.test\",\"password\":\"$ORG_PW\"}")" = 200
+          test "$(post /api/auth/password-sessions '{"email":"demo.organizer@example.test","password":"wrong wrong wrong"}')" = 401
+          # Super Admin before onboarding: the password alone is refused (second factor required).
+          ADMIN="\"email\":\"demo.admin@example.test\",\"password\":\"$ADM_PW\""
+          test "$(post /api/admin/sessions "{$ADMIN}")" = 403
+          grep -q second_factor_required /tmp/out.json
+          # Onboarding with the production command: read the secret it shows, answer with a current code.
+          code() { node -e '
+            const c=require("crypto"),A="ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+            let bits=0,v=0;const b=[];for(const ch of process.argv[1]){v=(v<<5)|A.indexOf(ch);bits+=5;if(bits>=8){b.push((v>>>(bits-8))&255);bits-=8;}}
+            const n=Math.floor(Date.now()/30000)+Number(process.argv[2]);const m=Buffer.alloc(8);m.writeBigUInt64BE(BigInt(n));
+            const h=c.createHmac("sha1",Buffer.from(b)).update(m).digest();const o=h[h.length-1]&15;
+            console.log(String((h.readUInt32BE(o)&0x7fffffff)%1000000).padStart(6,"0"));' "$1" "$2"; }
+          coproc ENROL { $C run --rm -T admin-totp; }
+          KEY=""
+          while IFS= read -r line <&"${ENROL[0]}"; do
+            case "$line" in *"type the key "*) KEY=$(echo "$line" | sed 's/.*type the key \([A-Z2-7]*\)).*/\1/'); break;; esac
+          done
+          test -n "$KEY"
+          code "$KEY" 0 >&"${ENROL[1]}"
+          wait "$ENROL_PID"
+          # After onboarding: the password alone and a wrong code fail; the password plus a fresh code works.
+          test "$(post /api/admin/sessions "{$ADMIN}")" = 401
+          test "$(post /api/admin/sessions "{$ADMIN,\"code\":\"000000\"}")" = 401
+          test "$(post /api/admin/sessions "{$ADMIN,\"code\":\"$(code "$KEY" 1)\"}")" = 200
       - name: Restart and check persistence
         run: |
           $C down

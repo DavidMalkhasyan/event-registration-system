@@ -116,7 +116,7 @@ The password (at least 12 characters) is never accepted as an argument and never
 
 ### 2.5 Demo data (optional, local only)
 
-`pnpm seed:demo` fills the development database (`MIGRATION_DATABASE_URL`) with an approved demo organization, the organizer `demo.organizer@example.test`, and six events (capacities 6 to 80): confirmed registrations with tickets, FIFO waiting lists, and a completed event with 19 check-ins. All addresses use `example.test`; no email is written and nothing leaves the machine. It refuses `NODE_ENV=production` and non-local database hosts, never changes existing data, and is safe to run again (it adds only what is missing). On the first run it prints the organizer password once (or set `DEMO_ORGANIZER_PASSWORD`, at least 12 characters, before that run), the sign-in URL and each event URL.
+`pnpm seed:demo` fills the development database (`MIGRATION_DATABASE_URL`) with an approved demo organization, the organizer `demo.organizer@example.test`, the Super Admin `demo.admin@example.test` (no second factor until you run `pnpm admin:totp --email demo.admin@example.test`), and six events (capacities 6 to 80): confirmed registrations with tickets, FIFO waiting lists, and a completed event with 19 check-ins. All addresses use `example.test`; no email is written and nothing leaves the machine. It refuses `NODE_ENV=production` and non-local database hosts, never changes existing data, and is safe to run again (it adds only what is missing). On the first run it prints each new account's password once (or set `DEMO_ORGANIZER_PASSWORD` / `DEMO_ADMIN_PASSWORD`, at least 12 characters, before that run), the sign-in URL and each event URL.
 
 ## 3. Run (development)
 
