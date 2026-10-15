@@ -1152,3 +1152,15 @@ Not done: the local Docker demo stack was not started here (port 3000 is used by
 | 2026-10-15 20:57:44Z – 21:06:55Z (00:57–01:06) | GitHub CI run 38806144652 on `ffa5bff`, [PR #54](https://github.com/DavidMalkhasyan/event-registration-system/pull/54) | **verify** (33 files, **256/256**), **container**, **demo** green |
 
 Not done: Windows/macOS Docker; the upgrade of a pre-existing `demo-secrets` volume (new keys appended) was not run. The PR is not merged.
+
+## S-24: Static demo credentials (K-730)
+
+Request: reviewers must sign in immediately with static credentials, no `demo-access`, no TOTP, in the local Docker demo only. Done on `feature/demo-static-auth` (stacked on #54).
+
+| When (2026-10-16) | What | Result |
+| --- | --- | --- |
+| ~01:30–01:50 | Isolated stack by hand (project `evtest`, `down -v` afterwards): fresh `up -d --build`, bootstrap again, sign-ins, denials, production refusal, restart | 6 events / 132 registrations / 9 waitlisted / 19 check-ins / 1 admin; "0 of 6 events created"; organizer 200, admin 200 (password only); wrong and crossed credentials 401; no session or organizer session on the admin API 401; production with `DEMO_MODE=true` exits 1 naming `DEMO_MODE`; same sign-ins after `down` + `up -d` |
+| ~01:50 | Throwaway postgres:18 + `docker build --target build`: vitest demo-accounts, demo-mode, email-provider, auth-audit; tsc; eslint; prettier | 22/22; clean |
+| after push | GitHub CI run 38810129658 on [PR #55](https://github.com/DavidMalkhasyan/event-registration-system/pull/55) | **verify**, **container**, **demo** green |
+
+Not done: the full `pnpm test` suite was not run locally (CI ran it); an existing `demo-secrets` volume keeps its old random passwords (docs say `down -v`). The PR is not merged.
