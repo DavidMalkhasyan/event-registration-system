@@ -184,18 +184,14 @@ jobs:
           done
           $C ps
           exit 1
-      - name: Seed twice (idempotent)
+      - name: First boot has data and accounts without any manual command
         run: |
-          $C run --rm -T seed | tee /tmp/seed1.txt
-          grep -q '6 of 6 events created' /tmp/seed1.txt
-          $C run --rm -T seed | tee /tmp/seed2.txt
-          grep -q '0 of 6 events created' /tmp/seed2.txt
-          ! grep -qi 'Password: [A-Za-z0-9_-]\{15,\}' /tmp/seed1.txt
-      - name: Check counts, pages and mailbox
-        run: |
+          set -eu
           q() { $C exec -T postgres psql -U postgres -d eventflow -tAc "$1"; }
           test "$(q 'select count(*) from app.events')" = 6
           test "$(q "select count(*) from app.accounts where email = 'demo.organizer@example.test'")" = 1
+          test "$(q "select count(*) from app.platform_admins where email = 'demo.admin@example.test' and totp_enrolled_at is not null")" = 1
+          test "$(q "select count(*) from app.organizations where status = 'active'")" = 1
           test "$(q 'select count(*) from app.check_ins')" = 19
           test "$(q "select count(*) from app.registrations where state = 'WAITLISTED'")" = 9
           test "$(q "select count(*) from app.registrations where state = 'CONFIRMED'")" = 123
@@ -203,46 +199,48 @@ jobs:
           curl -fs http://localhost:3000/healthz
           curl -fs -o /dev/null http://localhost:3000/organizer
           curl -fs http://localhost:3000/dev/mailbox | grep -qi 'Dev mailbox'
-          $C run --rm -T demo-password | grep -q 'demo.organizer@example.test'
-          $C run --rm -T demo-password | grep '^Password:' > /tmp/pw-before.txt
-      - name: Demo accounts sign in; Super Admin second-factor onboarding
+          $C logs --no-color demo-bootstrap | grep -q '6 of 6 events created'
+      - name: Bootstrap again is idempotent
         run: |
           set -eu
-          post() { curl -s -o /tmp/out.json -w '%{http_code}' -X POST -H 'Origin: http://localhost:3000' \
-            -H 'Content-Type: application/json' -d "$2" "http://localhost:3000$1"; }
-          $C run --rm -T demo-password > /tmp/creds.txt
-          ORG_PW=$(sed -n 's/^Password: //p' /tmp/creds.txt | sed -n 1p)
-          ADM_PW=$(sed -n 's/^Password: //p' /tmp/creds.txt | sed -n 2p)
-          test -n "$ORG_PW" && test -n "$ADM_PW" && test "$ORG_PW" != "$ADM_PW"
-          grep -q 'demo.admin@example.test' /tmp/creds.txt
-          # Organizer: the right password signs in, a wrong one does not.
+          q() { $C exec -T postgres psql -U postgres -d eventflow -tAc "$1"; }
+          $C run --rm -T demo-bootstrap | tee /tmp/boot2.txt
+          grep -q '0 of 6 events created' /tmp/boot2.txt
+          grep -q 'already enrolled' /tmp/boot2.txt
+          test "$(q 'select count(*) from app.events')" = 6
+          test "$(q 'select count(*) from app.platform_admins')" = 1
+          test "$(q 'select count(*) from app.accounts')" = 1
+          test "$(q 'select count(*) from app.registrations')" = 132
+      - name: Organizer and Super Admin (with TOTP) sign in; no secret in service logs
+        run: |
+          set -eu
+          cat > /tmp/lib.sh <<'LIB'
+          post() { curl -s -o /tmp/out.json -w '%{http_code}' -X POST -H 'Origin: http://localhost:3000'             -H 'Content-Type: application/json' -d "$2" "http://localhost:3000$1"; }
+          field() { sed -n "s/^$1: *//p" /tmp/access.txt | sed -n "${2:-1}p" | awk '{print $1}'; }
+          access() { $C run --rm -T demo-access > /tmp/access.txt; }
+          LIB
+          . /tmp/lib.sh
+          access
+          ORG_PW=$(field Password 1); ADM_PW=$(field Password 2); CODE=$(field 'TOTP code')
+          KEY=$(field 'TOTP key')
+          test -n "$ORG_PW" && test -n "$ADM_PW" && test "$ORG_PW" != "$ADM_PW" && test -n "$KEY"
+          echo "$CODE" > /tmp/used-code
           test "$(post /api/auth/password-sessions "{\"email\":\"demo.organizer@example.test\",\"password\":\"$ORG_PW\"}")" = 200
           test "$(post /api/auth/password-sessions '{"email":"demo.organizer@example.test","password":"wrong wrong wrong"}')" = 401
-          # Super Admin before onboarding: the password alone is refused (second factor required).
           ADMIN="\"email\":\"demo.admin@example.test\",\"password\":\"$ADM_PW\""
-          test "$(post /api/admin/sessions "{$ADMIN}")" = 403
-          grep -q second_factor_required /tmp/out.json
-          # Onboarding with the production command: read the secret it shows, answer with a current code.
-          code() { node -e '
-            const c=require("crypto"),A="ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-            let bits=0,v=0;const b=[];for(const ch of process.argv[1]){v=(v<<5)|A.indexOf(ch);bits+=5;if(bits>=8){b.push((v>>>(bits-8))&255);bits-=8;}}
-            const n=Math.floor(Date.now()/30000)+Number(process.argv[2]);const m=Buffer.alloc(8);m.writeBigUInt64BE(BigInt(n));
-            const h=c.createHmac("sha1",Buffer.from(b)).update(m).digest();const o=h[h.length-1]&15;
-            console.log(String((h.readUInt32BE(o)&0x7fffffff)%1000000).padStart(6,"0"));' "$1" "$2"; }
-          coproc ENROL { $C run --rm -T admin-totp; }
-          KEY=""
-          while IFS= read -r line <&"${ENROL[0]}"; do
-            case "$line" in *"type the key "*) KEY=$(echo "$line" | sed 's/.*type the key \([A-Z2-7]*\)).*/\1/'); break;; esac
-          done
-          test -n "$KEY"
-          code "$KEY" 0 >&"${ENROL[1]}"
-          wait "$ENROL_PID"
-          # After onboarding: the password alone and a wrong code fail; the password plus a fresh code works.
           test "$(post /api/admin/sessions "{$ADMIN}")" = 401
           test "$(post /api/admin/sessions "{$ADMIN,\"code\":\"000000\"}")" = 401
-          test "$(post /api/admin/sessions "{$ADMIN,\"code\":\"$(code "$KEY" 1)\"}")" = 200
+          test "$(post /api/admin/sessions "{$ADMIN,\"code\":\"$CODE\"}")" = 200
+          test "$(post /api/admin/sessions "{$ADMIN,\"code\":\"$CODE\"}")" = 401
+          # Persistent logs hold none of the passwords or the TOTP key.
+          $C logs --no-color > /tmp/all.log
+          for v in "$ORG_PW" "$ADM_PW" "$KEY"; do if grep -qF "$v" /tmp/all.log; then echo "secret found in service logs"; exit 1; fi; done
+          cp /tmp/access.txt /tmp/access-before.txt
       - name: Restart and check persistence
         run: |
+          set -eu
+          . /tmp/lib.sh
+          q() { $C exec -T postgres psql -U postgres -d eventflow -tAc "$1"; }
           $C down
           $C up -d
           for i in $(seq 1 60); do
@@ -250,12 +248,24 @@ jobs:
             sleep 3
           done
           curl -fs http://localhost:3000/readyz
-          q() { $C exec -T postgres psql -U postgres -d eventflow -tAc "$1"; }
           test "$(q 'select count(*) from app.events')" = 6
           test "$(q 'select count(*) from app.check_ins')" = 19
-          $C run --rm -T demo-password | grep '^Password:' | cmp - /tmp/pw-before.txt
-          $C run --rm -T seed | tee /tmp/seed3.txt
-          grep -q '0 of 6 events created' /tmp/seed3.txt
+          test "$(q 'select count(*) from app.platform_admins')" = 1
+          # The same credentials and key after the restart (the rolling code line differs).
+          access
+          diff <(grep -v '^TOTP code' /tmp/access-before.txt) <(grep -v '^TOTP code' /tmp/access.txt)
+          # A code works once: wait for the next 30 s code, then sign in again.
+          for i in $(seq 1 12); do
+            access
+            CODE=$(field 'TOTP code')
+            [ "$CODE" != "$(cat /tmp/used-code)" ] && break
+            sleep 5
+          done
+          [ "$CODE" != "$(cat /tmp/used-code)" ]
+          ORG_PW=$(field Password 1); ADM_PW=$(field Password 2)
+          test "$(post /api/auth/password-sessions "{\"email\":\"demo.organizer@example.test\",\"password\":\"$ORG_PW\"}")" = 200
+          test "$(post /api/admin/sessions "{\"email\":\"demo.admin@example.test\",\"password\":\"$ADM_PW\",\"code\":\"$CODE\"}")" = 200
+          $C run --rm -T demo-bootstrap | grep -q '0 of 6 events created'
       - name: Sanitized logs on failure
         if: failure()
         run: |

@@ -21,13 +21,12 @@ The whole application in Docker (PostgreSQL 18, migrations, web, worker, fake ma
 Всё приложение в Docker, нужен только Docker с Compose v2. Подробная инструкция (в том числе ручная установка): [docs/QUICKSTART_RU.md](docs/QUICKSTART_RU.md).
 
 ```sh
-docker compose -f compose.demo.yaml up -d --build      # start (first build takes a few minutes)
-docker compose -f compose.demo.yaml run --rm seed      # demo data (optional, safe to repeat)
-docker compose -f compose.demo.yaml run --rm demo-password   # organizer password
+docker compose -f compose.demo.yaml up -d --build      # start; data, accounts and the Super Admin second factor are created automatically
+docker compose -f compose.demo.yaml run --rm demo-access   # sign-in details of the demo organizer and Super Admin
 docker compose -f compose.demo.yaml down               # stop (data is kept); add -v to delete all demo data
 ```
 
-Open **http://localhost:3000** (organizer area `/organizer`, fake mailbox `/dev/mailbox`). The demo stack is for local use only and has not yet been run in containers by its author (no Docker on the authoring machine); see the status note in the guide.
+Open **http://localhost:3000** (organizer area `/organizer`, Super Admin `/admin`, fake mailbox `/dev/mailbox`). The demo stack is for local use only and has not yet been run in containers by its author (no Docker on the authoring machine); see the status note in the guide.
 
 ## 1. Prerequisites
 

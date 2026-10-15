@@ -6,6 +6,7 @@ import {
   SeedError,
   assertLocal,
   ensureDemoAdmin,
+  ensureDemoAdminTotp,
   ensureDemoOrganizer,
 } from '../src/demo/accounts.js';
 import { enrolTotp } from '../src/modules/platform-admin/bootstrap.js';
@@ -81,6 +82,19 @@ describe('demo Super Admin', () => {
     const ok = await adminSignIn(password, totpCode(secret, stepAt(Date.now()) + 1));
     expect(ok.statusCode).toBe(200);
     expect(ok.cookies.some((c) => c.name === '__Host-ers_admin')).toBe(true);
+  });
+
+  it('is enrolled automatically with the stored secret, once, and then needs the code', async () => {
+    const created = await ensureDemoAdmin(h.owner);
+    const hex = randomBytes(20).toString('hex');
+    expect(await ensureDemoAdminTotp(h.owner, TOTP_KEY, hex)).toBe(true);
+    expect(await ensureDemoAdminTotp(h.owner, TOTP_KEY, hex)).toBe(false); // idempotent, no change
+    expect((await adminSignIn(created.password!)).statusCode).toBe(401); // password alone is not enough
+    const secret = Buffer.from(hex, 'hex');
+    const code = totpCode(secret, stepAt(Date.now()));
+    expect((await adminSignIn(created.password!, code)).statusCode).toBe(200); // the code shown now works
+    expect((await adminSignIn(created.password!, code)).statusCode).toBe(401); // and only once
+    await expect(ensureDemoAdminTotp(h.owner, TOTP_KEY, 'not hex')).rejects.toThrow(SeedError);
   });
 
   it('is created once and never changed by a second seed', async () => {
