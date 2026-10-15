@@ -41,6 +41,9 @@ const schema = z.object({
     .regex(/^[A-Za-z0-9+/]{43}=$/, 'must be 32 random bytes, base64-encoded')
     .optional(),
   ADMIN_REQUIRE_TOTP: z.enum(['true', 'false']).optional(),
+  // Local Docker demo only (compose.demo.yaml): static demo passwords and no second factor for the demo
+  // Super Admin. Refused in production (see parseConfig).
+  DEMO_MODE: z.enum(['true', 'false']).optional(),
   // K-402: the Svix signing secret of the Resend webhook endpoint; the endpoint is off without it.
   RESEND_WEBHOOK_SECRET: z
     .string()
@@ -97,6 +100,9 @@ export function parseConfig(env: Record<string, string | undefined>): Config {
         : []),
     ];
     if (missing.length) throw new ConfigError(missing);
+  }
+  if (config.NODE_ENV === 'production' && config.DEMO_MODE === 'true') {
+    throw new ConfigError(['DEMO_MODE (demo authentication is not allowed in production)']);
   }
   if (config.NODE_ENV === 'production' && !config.ADMIN_TOTP_KEY && config.ADMIN_REQUIRE_TOTP !== 'false') {
     throw new ConfigError(['ADMIN_TOTP_KEY (Super Admins need a second factor in production)']);

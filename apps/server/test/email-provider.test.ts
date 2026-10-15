@@ -155,6 +155,16 @@ describe('configuration', () => {
       }),
     ).not.toThrow(); // an explicit, documented opt-out
     expect(() => parseConfig({ ...base })).toThrow(/EMAIL_PROVIDER/);
+    // Demo authentication can never be switched on in production, whatever else is set.
+    expect(() =>
+      parseConfig({
+        ...base,
+        DEMO_MODE: 'true',
+        EMAIL_PROVIDER: 'resend',
+        RESEND_API_KEY: KEY,
+        EMAIL_FROM: 'a@b.test',
+      }),
+    ).toThrow(/DEMO_MODE/);
     const missing = (() => {
       try {
         parseConfig({ ...base, EMAIL_PROVIDER: 'resend' });

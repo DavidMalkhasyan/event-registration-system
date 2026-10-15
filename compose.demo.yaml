@@ -1,8 +1,9 @@
 # EventFlow local demo (NOT for production): the same image as deploy/compose.yaml, served on
 # http://localhost:3000 with the fake email provider (mailbox at /dev/mailbox). No domain, HTTPS or Resend.
-#   docker compose -f compose.demo.yaml up -d --build         # everything: data, accounts, second factor
-#   docker compose -f compose.demo.yaml run --rm demo-access  # sign-in details of both demo accounts
-# Secrets are generated on first start into the demo-secrets volume (never in Git, never in an image).
+#   docker compose -f compose.demo.yaml up -d --build         # everything: data and both demo accounts
+# Sign-in: static demo passwords (docs/QUICKSTART_RU.md), Super Admin without TOTP; both only because
+# DEMO_MODE=true, which the server refuses in production. Infrastructure secrets (database, CSRF, ...)
+# are generated on first start into the demo-secrets volume (never in Git, never in an image).
 # PostgreSQL publishes no port; the web port is bound to 127.0.0.1 only. See docs/QUICKSTART_RU.md.
 
 name: eventflow-demo
@@ -19,6 +20,7 @@ x-app: &app
     PUBLIC_ORIGIN: http://localhost:3000
     EMAIL_PROVIDER: fake
     DEV_MAILBOX_DIR: /data/mailbox
+    DEMO_MODE: 'true' # static demo sign-in, no Super Admin TOTP; the server refuses it in production
   volumes:
     - demo-secrets:/demo:ro
     - media:/data/media
@@ -39,11 +41,9 @@ services:
         node -e "
         const c=require('crypto'),fs=require('fs'),f='/demo/secrets.env',NL=String.fromCharCode(10);
         const have=fs.existsSync(f)?fs.readFileSync(f,'utf8'):'';
-        const hex=()=>c.randomBytes(32).toString('hex'),pw=()=>c.randomBytes(15).toString('base64url');
+        const hex=()=>c.randomBytes(32).toString('hex');
         const gen={POSTGRES_PASSWORD:hex,APP_OWNER_PASSWORD:hex,APP_RUNTIME_PASSWORD:hex,CSRF_SECRET:hex,
-          PRESESSION_SECRET:hex,RATE_LIMIT_SECRET:hex,PREVIEW_SECRET:hex,DEMO_ORGANIZER_PASSWORD:pw,
-          DEMO_ADMIN_PASSWORD:pw,ADMIN_TOTP_KEY:()=>c.randomBytes(32).toString('base64'),
-          DEMO_ADMIN_TOTP_SECRET:()=>c.randomBytes(20).toString('hex')};
+          PRESESSION_SECRET:hex,RATE_LIMIT_SECRET:hex,PREVIEW_SECRET:hex};
         const add=Object.entries(gen).filter(([k])=>!have.split(NL).some((l)=>l.startsWith(k+'='))).map(([k,g])=>k+'='+g());
         if(add.length){fs.writeFileSync(f+'.tmp',have.split(NL).filter(Boolean).concat(add).join(NL)+NL);fs.renameSync(f+'.tmp',f);}
         "
@@ -81,9 +81,6 @@ services:
 
   web:
     <<: *app
-    environment:
-      <<: *app-env
-      ADMIN_REQUIRE_TOTP: 'true' # the demo Super Admin signs in with a second factor, as in production
     entrypoint: ['sh', '-ec']
     command:
       - 'set -a; . /demo/secrets.env; set +a; export DATABASE_URL="postgres://app_runtime:$$APP_RUNTIME_PASSWORD@postgres:5432/eventflow" MIGRATION_DATABASE_URL="postgres://app_owner:$$APP_OWNER_PASSWORD@postgres:5432/eventflow"; exec node apps/server/dist/entrypoints/web.js'
@@ -114,8 +111,8 @@ services:
     restart: unless-stopped
 
   # One-shot, after the migrations and before web and worker. Idempotent. Refuses production and any
-  # database host but this stack's own. Creates the demo organization, organizer, Super Admin (with its
-  # second factor enrolled) and the six events. Prints no password and no secret.
+  # database host but this stack's own. Creates the demo organization, organizer, Super Admin and the six
+  # events with the static demo passwords.
   demo-bootstrap:
     <<: *app
     environment:
@@ -127,20 +124,6 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
     restart: 'no'
-
-  # Shows the sign-in details of both demo accounts and a current Super Admin code (logging disabled, so
-  # nothing is kept): docker compose -f compose.demo.yaml run --rm demo-access
-  demo-access:
-    <<: *app
-    profiles: [tools]
-    entrypoint: ['sh', '-ec']
-    command:
-      - 'set -a; . /demo/secrets.env; set +a; exec node apps/server/dist/entrypoints/demo-access.js'
-    depends_on:
-      secrets-init: { condition: service_completed_successfully }
-    restart: 'no'
-    logging:
-      driver: none
 
 volumes:
   demo-secrets:

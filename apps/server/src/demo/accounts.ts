@@ -3,11 +3,14 @@ import type { Database } from '../platform/db.js';
 import { normalizeEmail } from '../platform/crypto.js';
 import { PASSWORD_MIN, hashPassword } from '../platform/passwords.js';
 import { decisionTime } from '../platform/tx.js';
-import { createPlatformAdmin, enrolTotp } from '../modules/platform-admin/bootstrap.js';
-import { stepAt, totpCode } from '../platform/totp.js';
+import { createPlatformAdmin } from '../modules/platform-admin/bootstrap.js';
 
 // The two local demo accounts created by `pnpm seed:demo` (never by the server, never in production).
-// Their passwords are random per installation (or chosen by the operator) and never built in.
+// Their passwords are random per installation (or chosen by the operator). Only the Docker demo
+// (DEMO_MODE=true, via demo-bootstrap.ts) uses the static DEMO_* passwords below.
+
+export const DEMO_ORGANIZER_PASSWORD = 'DemoOrganizer2026!';
+export const DEMO_ADMIN_PASSWORD = 'DemoAdmin2026!';
 
 export class SeedError extends Error {}
 
@@ -95,8 +98,8 @@ export async function ensureDemoOrganizer(
 
 /**
  * Finds or creates the demo Super Admin through the same operator path as `pnpm admin:create`.
- * No second factor is enrolled here: onboarding is the interactive `pnpm admin:totp` (the demo
- * stack wraps it as `admin-totp`), so the production TOTP model is neither bypassed nor weakened.
+ * No second factor is enrolled here (`pnpm admin:totp` stays the production onboarding); the Docker demo
+ * signs in without one only through DEMO_MODE, which the server refuses in production.
  */
 export async function ensureDemoAdmin(
   db: Database,
@@ -111,32 +114,4 @@ export async function ensureDemoAdmin(
   const { plain, generated } = passwordFor('DEMO_ADMIN_PASSWORD', chosenPassword);
   await createPlatformAdmin(db, { email: ADMIN_EMAIL, name: 'Demo Super Admin', password: plain });
   return { created: true, password: generated ? plain : null };
-}
-
-/**
- * Demo-only automatic enrolment of the Super Admin's second factor, through the same `enrolTotp` the
- * operator command uses (the secret is sealed with ADMIN_TOTP_KEY; sign-in still requires the code).
- * The secret comes from the demo secrets volume as 40 hex characters. An admin that already has a
- * second factor is left alone. The confirming code is for the previous 30-second step, so the code
- * shown now is still accepted at sign-in.
- */
-export async function ensureDemoAdminTotp(
-  db: Database,
-  keyBase64: string | undefined,
-  secretHex: string | undefined,
-  nowMs = Date.now(),
-): Promise<boolean> {
-  if (!secretHex || !/^[0-9a-f]{40}$/.test(secretHex))
-    throw new SeedError('DEMO_ADMIN_TOTP_SECRET must be 40 hex characters');
-  const admin = await db
-    .selectFrom('app.platform_admins')
-    .select('totp_enrolled_at')
-    .where('email', '=', normalizeEmail(ADMIN_EMAIL))
-    .executeTakeFirst();
-  if (!admin) throw new SeedError('the demo Super Admin does not exist yet');
-  if (admin.totp_enrolled_at) return false;
-  const secret = Buffer.from(secretHex, 'hex');
-  const earlier = nowMs - 30_000;
-  await enrolTotp(db, keyBase64, ADMIN_EMAIL, secret, totpCode(secret, stepAt(earlier)), earlier);
-  return true;
 }
