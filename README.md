@@ -15,6 +15,20 @@ This is Task 9 of the AI-assisted software engineering assignment.
 | **Email**    | A fake provider by default: emails are written to `var/mailbox/` and shown at `/dev/mailbox`. Resend for production (`EMAIL_PROVIDER=resend`, PD-97); not yet used for real. |
 | **Tests**    | Vitest integration tests against real PostgreSQL; Playwright browser tests in `apps/e2e`                                                                                     |
 
+## Quick Start / Быстрый запуск
+
+The whole application in Docker (PostgreSQL 18, migrations, web, worker, fake mailbox). Needs only Docker with Compose v2; no domain or email provider. Full guide in Russian, including a manual setup: [docs/QUICKSTART_RU.md](docs/QUICKSTART_RU.md).
+Всё приложение в Docker, нужен только Docker с Compose v2. Подробная инструкция (в том числе ручная установка): [docs/QUICKSTART_RU.md](docs/QUICKSTART_RU.md).
+
+```sh
+docker compose -f compose.demo.yaml up -d --build      # start (first build takes a few minutes)
+docker compose -f compose.demo.yaml run --rm seed      # demo data (optional, safe to repeat)
+docker compose -f compose.demo.yaml run --rm demo-password   # organizer password
+docker compose -f compose.demo.yaml down               # stop (data is kept); add -v to delete all demo data
+```
+
+Open **http://localhost:3000** (organizer area `/organizer`, fake mailbox `/dev/mailbox`). The demo stack is for local use only and has not yet been run in containers by its author (no Docker on the authoring machine); see the status note in the guide.
+
 ## 1. Prerequisites
 
 | Tool                                | Version | Notes                                                                                                  |
@@ -99,6 +113,10 @@ pnpm admin:totp --email admin@example.test                     # enrols a second
 ```
 
 The password (at least 12 characters) is never accepted as an argument and never printed; for scripts it can be piped on standard input as one line. The command refuses an address that already is a Super Admin. **Second factor (PD-99):** set `ADMIN_TOTP_KEY` to 32 random bytes in base64 (for example `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`) and run `pnpm admin:totp` for each Super Admin, then sign in with the code from the authenticator app. In production it is required (the process does not start without `ADMIN_TOTP_KEY`); elsewhere it is optional. With a production build, run `node --env-file-if-exists=.env apps/server/dist/entrypoints/admin.js create --email … --name …`.
+
+### 2.5 Demo data (optional, local only)
+
+`pnpm seed:demo` fills the development database (`MIGRATION_DATABASE_URL`) with an approved demo organization, the organizer `demo.organizer@example.test`, and six events (capacities 6 to 80): confirmed registrations with tickets, FIFO waiting lists, and a completed event with 19 check-ins. All addresses use `example.test`; no email is written and nothing leaves the machine. It refuses `NODE_ENV=production` and non-local database hosts, never changes existing data, and is safe to run again (it adds only what is missing). On the first run it prints the organizer password once (or set `DEMO_ORGANIZER_PASSWORD`, at least 12 characters, before that run), the sign-in URL and each event URL.
 
 ## 3. Run (development)
 

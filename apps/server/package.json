@@ -7,6 +7,7 @@
     "dev:worker": "tsx watch --env-file-if-exists=../../.env src/entrypoints/worker.ts",
     "migrate": "tsx --env-file-if-exists=../../.env src/entrypoints/migrate.ts",
     "admin": "tsx --env-file-if-exists=../../.env src/entrypoints/admin.ts",
+    "seed:demo": "tsx --env-file-if-exists=../../.env src/entrypoints/seed-demo.ts",
     "media:sweep": "tsx --env-file-if-exists=../../.env src/entrypoints/media-sweep.ts",
     "ops": "tsx --env-file-if-exists=../../.env src/entrypoints/ops.ts",
     "bench": "tsx --env-file-if-exists=../../.env bench/load.ts",
