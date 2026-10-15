@@ -1120,3 +1120,19 @@ The last two rows were added in S-19 from GitHub's records.
 | 12:14:17–12:15:08 | `maps.test.ts` three times, real clock | **8/8** each time |
 | 12:15:16–12:20:55 | Prettier on the file, `pnpm lint`, `pnpm typecheck`, `pnpm check:secrets`, server suite | Exit 0; "No secrets found in 287 tracked files"; server **247 passed, 2 skipped** (`backup-restore`, without `RESTORE_ADMIN_URL`, as before) of 249. Browser tests not run (no client or server code changed) |
 | 12:21 | Test fix committed (`ba37876`), records separately | K-727 → Review |
+
+## S-22: Demo Super Admin and TOTP onboarding (K-728)
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-15 evening; work on `feature/demo-admin-accounts` from `origin/dev` (`2251d90`) |
+| **Cards** | K-728 (new) → Review |
+| **Tools and model** | Claude Code, model `claude-sonnet-5-5`; Docker (no Node.js or pnpm on this machine, so checks ran in the Dockerfile build stage and a throwaway `postgres:18` container) |
+
+| Time (+04:00) | Action | Result |
+|---|---|---|
+| 2026-10-16, before 00:31 | Built the image (TypeScript compile), Prettier, ESLint and `tsc --noEmit` in the build stage; `demo-accounts.test.ts` + `platform-admin.test.ts` against a throwaway PostgreSQL 18 | Compile and lint clean; **16/16** tests passed; real seed run: 6 of 6 events, then 0 of 6, `NODE_ENV=production` refused (exit 1) |
+| 00:31:22 | Code committed, branch pushed, [PR #53](https://github.com/DavidMalkhasyan/event-registration-system/pull/53) opened into `dev` | — |
+| 2026-10-15 20:31:32Z – 20:40:59Z (00:31–00:41) | GitHub CI run 38802648875 on `8c32756` | **verify** (33 files, **255/255** tests), **container** and **demo** green; the `demo` job's new step signed in both roles and ran the Super Admin TOTP onboarding end to end |
+
+Not done: the local Docker demo stack was not started here (port 3000 is used by an existing demo stack that was left untouched); the upgrade path for an old `demo-secrets` volume (missing keys are appended) was exercised only by reading the script, not by a run. The PR is not merged.
