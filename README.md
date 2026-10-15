@@ -27,7 +27,7 @@ docker compose -f compose.demo.yaml run --rm demo-password   # organizer passwor
 docker compose -f compose.demo.yaml down               # stop (data is kept); add -v to delete all demo data
 ```
 
-Open **http://localhost:3000** (organizer area `/organizer`, fake mailbox `/dev/mailbox`). The demo stack is for local use only and has not yet been run in containers by its author (no Docker on the authoring machine); see the status note in the guide.
+Open **http://localhost:3000** (organizer area `/organizer`, fake mailbox `/dev/mailbox`). The demo stack is for local use only and is verified in Ubuntu GitHub Actions; Windows and macOS have not been tested separately.
 
 ## 1. Prerequisites
 
