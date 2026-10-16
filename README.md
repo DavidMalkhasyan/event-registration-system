@@ -16,10 +16,10 @@ docker compose -f compose.demo.yaml up -d --build
 
 The local Docker demo automatically prepares PostgreSQL, migrations, an approved organization, two accounts and six events.
 
-| Role | Email | Password | URL |
-| --- | --- | --- | --- |
-| Organizer | `demo.organizer@example.test` | `DemoOrganizer2026!` | http://localhost:3000/organizer |
-| Super Admin | `demo.admin@example.test` | `DemoAdmin2026!` | http://localhost:3000/admin |
+| Role        | Email                         | Password             | URL                             |
+| ----------- | ----------------------------- | -------------------- | ------------------------------- |
+| Organizer   | `demo.organizer@example.test` | `DemoOrganizer2026!` | http://localhost:3000/organizer |
+| Super Admin | `demo.admin@example.test`     | `DemoAdmin2026!`     | http://localhost:3000/admin     |
 
 **Demo mailbox:** http://localhost:3000/dev/mailbox. These public demo credentials work only in isolated `DEMO_MODE`, which is refused in production. Standard production Super Admin authentication still requires TOTP.
 
@@ -35,13 +35,13 @@ The local Docker demo automatically prepares PostgreSQL, migrations, an approved
 
 ## Stack
 
-| Layer | Technology |
-| --- | --- |
-| Frontend | React 19, TypeScript, Vite |
-| Backend | Node.js 24, Fastify 5, TypeScript; separate web and worker processes |
-| Database | PostgreSQL 18, Kysely, SQL migrations |
-| Tests | Vitest (real PostgreSQL), Playwright (browser scenarios), GitHub Actions |
-| Local demonstration | Docker Compose with seeded example data and a fake email provider |
+| Layer               | Technology                                                               |
+| ------------------- | ------------------------------------------------------------------------ |
+| Frontend            | React 19, TypeScript, Vite                                               |
+| Backend             | Node.js 24, Fastify 5, TypeScript; separate web and worker processes     |
+| Database            | PostgreSQL 18, Kysely, SQL migrations                                    |
+| Tests               | Vitest (real PostgreSQL), Playwright (browser scenarios), GitHub Actions |
+| Local demonstration | Docker Compose with seeded example data and a fake email provider        |
 
 The project uses a modular monolith with PostgreSQL transactions and row locking for seat/check-in consistency, a transactional outbox for email and SSE for live updates.
 
@@ -51,7 +51,7 @@ The project uses a modular monolith with PostgreSQL transactions and row locking
 | --- | --- |
 | **How do I launch and log in?** | **[QUICKSTART_RU.md](QUICKSTART_RU.md)** |
 | **What was implemented, tested and deferred?** | [ASSIGNMENT_SCOPE.md](ASSIGNMENT_SCOPE.md) |
-| **What did we plan to build, and what would come next?** | **[PLANNED_WORK.md](PLANNED_WORK.md)** |
+| **What did we plan to build, and what would come next?** | **[PLANNED_WORK.md](PLANNED_WORK.md)** |\n| **What is the optional personal essay?** | [ESSAY_RU.md](ESSAY_RU.md) |
 | **Which AI model/tools were used, and which prompts?** | [AI_USAGE.md](docs/process/AI_USAGE.md) |
 | **How did the project evolve over time?** | [DEVELOPMENT_JOURNAL.md](docs/process/DEVELOPMENT_JOURNAL.md) and [DECISION_LOG.md](docs/process/DECISION_LOG.md) |
 | **Where is the architecture and database design?** | [ARCHITECTURE_INDEX.md](docs/ARCHITECTURE_INDEX.md) |
