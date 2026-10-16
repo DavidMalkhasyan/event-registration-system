@@ -1136,3 +1136,19 @@ The last two rows were added in S-19 from GitHub's records.
 | 2026-10-15 20:31:32Z – 20:40:59Z (00:31–00:41) | GitHub CI run 38802648875 on `8c32756` | **verify** (33 files, **255/255** tests), **container** and **demo** green; the `demo` job's new step signed in both roles and ran the Super Admin TOTP onboarding end to end |
 
 Not done: the local Docker demo stack was not started here (port 3000 is used by an existing demo stack that was left untouched); the upgrade path for an old `demo-secrets` volume (missing keys are appended) was exercised only by reading the script, not by a run. The PR is not merged.
+
+## S-23: Automatic demo bootstrap (K-729)
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-16 after S-22; `feature/demo-bootstrap` stacked on `feature/demo-admin-accounts` (PR #53, not yet merged) |
+| **Cards** | K-729 (new) → Review |
+| **Tools and model** | Claude Code, model `claude-sonnet-5-5`; Docker only (no Node.js or pnpm on this machine) |
+
+| Time (+04:00) | Action | Result |
+|---|---|---|
+| before 01:00 | Build stage: Prettier, ESLint, `tsc --noEmit`; `demo-accounts.test.ts` on a throwaway PostgreSQL 18 | Clean; **7/7**. `check:secrets` could not run locally (no `git` in the image); CI ran it |
+| before 01:00 | Real stack run by hand (project `efcheck`, web on port 3100, then removed with `down -v`): one `up -d --build`, bootstrap again, sign-ins, restart | 6 events / 132 registrations / 1 admin; bootstrap again "0 of 6 events created", "already enrolled"; organizer 200 / wrong password 401; admin without code 401, wrong code 401, right code 200, replay 401; no password or TOTP key in `compose logs`; after `down` + `up -d` same credentials, organizer 200, admin 200 with the next code |
+| 2026-10-15 20:57:44Z – 21:06:55Z (00:57–01:06) | GitHub CI run 38806144652 on `ffa5bff`, [PR #54](https://github.com/DavidMalkhasyan/event-registration-system/pull/54) | **verify** (33 files, **256/256**), **container**, **demo** green |
+
+Not done: Windows/macOS Docker; the upgrade of a pre-existing `demo-secrets` volume (new keys appended) was not run. The PR is not merged.

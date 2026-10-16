@@ -1,9 +1,7 @@
 # EventFlow local demo (NOT for production): the same image as deploy/compose.yaml, served on
 # http://localhost:3000 with the fake email provider (mailbox at /dev/mailbox). No domain, HTTPS or Resend.
-#   docker compose -f compose.demo.yaml up -d --build
-#   docker compose -f compose.demo.yaml run --rm seed          # demo data, once (safe to repeat)
-#   docker compose -f compose.demo.yaml run --rm demo-password # sign-in credentials of both demo accounts
-#   docker compose -f compose.demo.yaml run --rm admin-totp    # Super Admin second factor, once
+#   docker compose -f compose.demo.yaml up -d --build         # everything: data, accounts, second factor
+#   docker compose -f compose.demo.yaml run --rm demo-access  # sign-in details of both demo accounts
 # Secrets are generated on first start into the demo-secrets volume (never in Git, never in an image).
 # PostgreSQL publishes no port; the web port is bound to 127.0.0.1 only. See docs/QUICKSTART_RU.md.
 
@@ -44,7 +42,8 @@ services:
         const hex=()=>c.randomBytes(32).toString('hex'),pw=()=>c.randomBytes(15).toString('base64url');
         const gen={POSTGRES_PASSWORD:hex,APP_OWNER_PASSWORD:hex,APP_RUNTIME_PASSWORD:hex,CSRF_SECRET:hex,
           PRESESSION_SECRET:hex,RATE_LIMIT_SECRET:hex,PREVIEW_SECRET:hex,DEMO_ORGANIZER_PASSWORD:pw,
-          DEMO_ADMIN_PASSWORD:pw,ADMIN_TOTP_KEY:()=>c.randomBytes(32).toString('base64')};
+          DEMO_ADMIN_PASSWORD:pw,ADMIN_TOTP_KEY:()=>c.randomBytes(32).toString('base64'),
+          DEMO_ADMIN_TOTP_SECRET:()=>c.randomBytes(20).toString('hex')};
         const add=Object.entries(gen).filter(([k])=>!have.split(NL).some((l)=>l.startsWith(k+'='))).map(([k,g])=>k+'='+g());
         if(add.length){fs.writeFileSync(f+'.tmp',have.split(NL).filter(Boolean).concat(add).join(NL)+NL);fs.renameSync(f+'.tmp',f);}
         "
@@ -90,7 +89,7 @@ services:
       - 'set -a; . /demo/secrets.env; set +a; export DATABASE_URL="postgres://app_runtime:$$APP_RUNTIME_PASSWORD@postgres:5432/eventflow" MIGRATION_DATABASE_URL="postgres://app_owner:$$APP_OWNER_PASSWORD@postgres:5432/eventflow"; exec node apps/server/dist/entrypoints/web.js'
     ports: ['127.0.0.1:3000:3000']
     depends_on:
-      migrate: { condition: service_completed_successfully }
+      demo-bootstrap: { condition: service_completed_successfully }
     healthcheck:
       test:
         [
@@ -111,51 +110,37 @@ services:
     command:
       - 'set -a; . /demo/secrets.env; set +a; export DATABASE_URL="postgres://app_runtime:$$APP_RUNTIME_PASSWORD@postgres:5432/eventflow" MIGRATION_DATABASE_URL="postgres://app_owner:$$APP_OWNER_PASSWORD@postgres:5432/eventflow"; exec node apps/server/dist/entrypoints/worker.js'
     depends_on:
-      migrate: { condition: service_completed_successfully }
+      demo-bootstrap: { condition: service_completed_successfully }
     restart: unless-stopped
 
-  # Demo data, only when asked: docker compose -f compose.demo.yaml run --rm seed
-  # Idempotent; both demo passwords come from the secrets volume and are never printed by the seed.
-  seed:
+  # One-shot, after the migrations and before web and worker. Idempotent. Refuses production and any
+  # database host but this stack's own. Creates the demo organization, organizer, Super Admin (with its
+  # second factor enrolled) and the six events. Prints no password and no secret.
+  demo-bootstrap:
     <<: *app
-    profiles: [tools]
     environment:
       <<: *app-env
-      DEMO_SEED_ALLOW_HOST: postgres # the only non-loopback host seed:demo accepts, and only here
+      DEMO_SEED_ALLOW_HOST: postgres # the only non-loopback host the bootstrap accepts, and only here
     entrypoint: ['sh', '-ec']
     command:
-      - 'set -a; . /demo/secrets.env; set +a; export DATABASE_URL="postgres://app_runtime:$$APP_RUNTIME_PASSWORD@postgres:5432/eventflow" MIGRATION_DATABASE_URL="postgres://app_owner:$$APP_OWNER_PASSWORD@postgres:5432/eventflow"; exec node apps/server/dist/entrypoints/seed-demo.js'
+      - 'set -a; . /demo/secrets.env; set +a; export DATABASE_URL="postgres://app_runtime:$$APP_RUNTIME_PASSWORD@postgres:5432/eventflow" MIGRATION_DATABASE_URL="postgres://app_owner:$$APP_OWNER_PASSWORD@postgres:5432/eventflow"; exec node apps/server/dist/entrypoints/demo-bootstrap.js'
     depends_on:
       migrate: { condition: service_completed_successfully }
     restart: 'no'
 
-  # Prints the sign-in credentials of both demo accounts: docker compose -f compose.demo.yaml run --rm demo-password
-  demo-password:
+  # Shows the sign-in details of both demo accounts and a current Super Admin code (logging disabled, so
+  # nothing is kept): docker compose -f compose.demo.yaml run --rm demo-access
+  demo-access:
     <<: *app
     profiles: [tools]
     entrypoint: ['sh', '-ec']
     command:
-      - '. /demo/secrets.env; echo "Organizer (http://localhost:3000/organizer)"; echo "Email:    demo.organizer@example.test"; echo "Password: $$DEMO_ORGANIZER_PASSWORD"; echo; echo "Super Admin (http://localhost:3000/admin)"; echo "Email:    demo.admin@example.test"; echo "Password: $$DEMO_ADMIN_PASSWORD"'
+      - 'set -a; . /demo/secrets.env; set +a; exec node apps/server/dist/entrypoints/demo-access.js'
     depends_on:
       secrets-init: { condition: service_completed_successfully }
     restart: 'no'
     logging:
       driver: none
-
-  # One-time second factor for the demo Super Admin, with the production command (`admin:totp`): it shows
-  # a new secret, you add it to an authenticator app, and type the 6-digit code to confirm. Run after seed.
-  #   docker compose -f compose.demo.yaml run --rm admin-totp
-  admin-totp:
-    <<: *app
-    profiles: [tools]
-    entrypoint: ['sh', '-ec']
-    command:
-      - 'set -a; . /demo/secrets.env; set +a; export MIGRATION_DATABASE_URL="postgres://app_owner:$$APP_OWNER_PASSWORD@postgres:5432/eventflow"; exec node apps/server/dist/entrypoints/admin.js totp --email demo.admin@example.test'
-    stdin_open: true
-    tty: true
-    depends_on:
-      migrate: { condition: service_completed_successfully }
-    restart: 'no'
 
 volumes:
   demo-secrets:
