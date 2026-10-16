@@ -19,7 +19,7 @@ API: [API_DESIGN.md](api/API_DESIGN.md) and [openapi.yaml](api/openapi.yaml), AD
 ## Server entrypoints and composition
 
 - `apps/server/src/entrypoints/web.ts` — HTTP process; `worker.ts` — outbox and scheduled tasks;
-  `migrate.ts`; `admin.ts` (`pnpm admin:create|totp|disable`); `seed-demo.ts` (`pnpm seed:demo`, local demo data); `media-sweep.ts`; `ops.ts` (backup, restore drill).
+  `migrate.ts`; `admin.ts` (`pnpm admin:create|totp|disable`); `seed-demo.ts` (`pnpm seed:demo`, local demo data; demo organizer and Super Admin in `src/demo/accounts.ts`; `demo-bootstrap.ts` = Docker demo, static passwords, needs `DEMO_MODE=true`, refused in production by `platform/config.ts`); `media-sweep.ts`; `ops.ts` (backup, restore drill).
 - `apps/server/src/composition/web-app.ts` — builds Fastify, registers every module's routes, `/healthz`, `/readyz`.
 - `apps/server/src/composition/context.ts` — shared context; `dev-mailbox.ts` — `/dev/mailbox` (fake provider only).
 - `apps/server/src/platform/` — `config.ts` (env validation), `http.ts` (headers, CSRF/Origin, error mapping),

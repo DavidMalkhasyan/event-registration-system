@@ -184,18 +184,14 @@ jobs:
           done
           $C ps
           exit 1
-      - name: Seed twice (idempotent)
+      - name: First boot has data and accounts without any manual command
         run: |
-          $C run --rm -T seed | tee /tmp/seed1.txt
-          grep -q '6 of 6 events created' /tmp/seed1.txt
-          $C run --rm -T seed | tee /tmp/seed2.txt
-          grep -q '0 of 6 events created' /tmp/seed2.txt
-          ! grep -qi 'Password: [A-Za-z0-9_-]\{15,\}' /tmp/seed1.txt
-      - name: Check counts, pages and mailbox
-        run: |
+          set -eu
           q() { $C exec -T postgres psql -U postgres -d eventflow -tAc "$1"; }
           test "$(q 'select count(*) from app.events')" = 6
           test "$(q "select count(*) from app.accounts where email = 'demo.organizer@example.test'")" = 1
+          test "$(q "select count(*) from app.platform_admins where email = 'demo.admin@example.test'")" = 1
+          test "$(q "select count(*) from app.organizations where status = 'active'")" = 1
           test "$(q 'select count(*) from app.check_ins')" = 19
           test "$(q "select count(*) from app.registrations where state = 'WAITLISTED'")" = 9
           test "$(q "select count(*) from app.registrations where state = 'CONFIRMED'")" = 123
@@ -203,10 +199,51 @@ jobs:
           curl -fs http://localhost:3000/healthz
           curl -fs -o /dev/null http://localhost:3000/organizer
           curl -fs http://localhost:3000/dev/mailbox | grep -qi 'Dev mailbox'
-          $C run --rm -T demo-password | grep -q 'demo.organizer@example.test'
-          $C run --rm -T demo-password | grep '^Password:' > /tmp/pw-before.txt
+          $C logs --no-color demo-bootstrap | grep -q '6 of 6 events created'
+      - name: Bootstrap again is idempotent
+        run: |
+          set -eu
+          q() { $C exec -T postgres psql -U postgres -d eventflow -tAc "$1"; }
+          $C run --rm -T demo-bootstrap | tee /tmp/boot2.txt
+          grep -q '0 of 6 events created' /tmp/boot2.txt
+          test "$(q 'select count(*) from app.events')" = 6
+          test "$(q 'select count(*) from app.platform_admins')" = 1
+          test "$(q 'select count(*) from app.accounts')" = 1
+          test "$(q 'select count(*) from app.registrations')" = 132
+      - name: Both demo accounts sign in; access is denied otherwise
+        run: |
+          set -eu
+          cat > /tmp/lib.sh <<'LIB'
+          post() { curl -s -o /tmp/out.json -w '%{http_code}' -X POST -H 'Origin: http://localhost:3000' -H 'Content-Type: application/json' -d "$2" "http://localhost:3000$1"; }
+          LIB
+          . /tmp/lib.sh
+          ORG='"email":"demo.organizer@example.test"'; ADM='"email":"demo.admin@example.test"'
+          test "$(post /api/auth/password-sessions "{$ORG,\"password\":\"DemoOrganizer2026!\"}")" = 200
+          test "$(post /api/admin/sessions "{$ADM,\"password\":\"DemoAdmin2026!\"}")" = 200
+          # Wrong passwords and crossed roles are refused.
+          test "$(post /api/auth/password-sessions "{$ORG,\"password\":\"wrong wrong wrong\"}")" = 401
+          test "$(post /api/admin/sessions "{$ADM,\"password\":\"wrong wrong wrong\"}")" = 401
+          test "$(post /api/admin/sessions "{$ORG,\"password\":\"DemoOrganizer2026!\"}")" = 401
+          test "$(post /api/auth/password-sessions "{$ADM,\"password\":\"DemoAdmin2026!\"}")" = 401
+          # No session, no Super Admin area.
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/admin/organizations)
+          test "$code" = 401 || test "$code" = 403
+          # The organizer's session does not open the Super Admin area.
+          curl -s -o /dev/null -c /tmp/org.jar -X POST -H 'Origin: http://localhost:3000' -H 'Content-Type: application/json'             -d "{$ORG,\"password\":\"DemoOrganizer2026!\"}" http://localhost:3000/api/auth/password-sessions
+          code=$(curl -s -o /dev/null -b /tmp/org.jar -w '%{http_code}' http://localhost:3000/api/admin/organizations)
+          test "$code" = 401 || test "$code" = 403
+      - name: Production cannot enable demo authentication
+        run: |
+          set -u
+          if docker run --rm --entrypoint node -e NODE_ENV=production -e DEMO_MODE=true             -e PUBLIC_ORIGIN=https://eventflow.example -e DATABASE_URL=postgres://x             -e CSRF_SECRET=$(printf 'a%.0s' $(seq 32)) -e PRESESSION_SECRET=$(printf 'b%.0s' $(seq 32))             -e RATE_LIMIT_SECRET=$(printf 'c%.0s' $(seq 32)) -e PREVIEW_SECRET=$(printf 'd%.0s' $(seq 32))             -e ADMIN_TOTP_KEY="$(openssl rand -base64 32)" eventflow:demo apps/server/dist/entrypoints/web.js > /tmp/prod.txt 2>&1; then
+            echo "production started with DEMO_MODE=true"; exit 1
+          fi
+          grep -q 'DEMO_MODE' /tmp/prod.txt
       - name: Restart and check persistence
         run: |
+          set -eu
+          . /tmp/lib.sh
+          q() { $C exec -T postgres psql -U postgres -d eventflow -tAc "$1"; }
           $C down
           $C up -d
           for i in $(seq 1 60); do
@@ -214,12 +251,12 @@ jobs:
             sleep 3
           done
           curl -fs http://localhost:3000/readyz
-          q() { $C exec -T postgres psql -U postgres -d eventflow -tAc "$1"; }
           test "$(q 'select count(*) from app.events')" = 6
           test "$(q 'select count(*) from app.check_ins')" = 19
-          $C run --rm -T demo-password | grep '^Password:' | cmp - /tmp/pw-before.txt
-          $C run --rm -T seed | tee /tmp/seed3.txt
-          grep -q '0 of 6 events created' /tmp/seed3.txt
+          test "$(q 'select count(*) from app.platform_admins')" = 1
+          test "$(post /api/auth/password-sessions '{"email":"demo.organizer@example.test","password":"DemoOrganizer2026!"}')" = 200
+          test "$(post /api/admin/sessions '{"email":"demo.admin@example.test","password":"DemoAdmin2026!"}')" = 200
+          $C run --rm -T demo-bootstrap | grep -q '0 of 6 events created'
       - name: Sanitized logs on failure
         if: failure()
         run: |

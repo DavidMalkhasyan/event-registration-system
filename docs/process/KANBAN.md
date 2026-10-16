@@ -4,7 +4,7 @@
 |---|---|
 | **Columns** | Backlog → To Do → In Progress → Review → Done, plus **Deferred** for extended scope that was intentionally not built |
 | **Work-in-progress limits** | In Progress ≤ 2, Review ≤ 3 |
-| **Last updated** | 2026-10-14, session S-21 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
+| **Last updated** | 2026-10-16, session S-23 (exact times in [DEVELOPMENT_JOURNAL.md](DEVELOPMENT_JOURNAL.md)) |
 | **Scope** | Re-planned in S-02 by the final delivery strategy (PD-15): P0 is mandatory, then P1, with P2 deferred. Requirement-level status is in [ASSIGNMENT_SCOPE.md](../../ASSIGNMENT_SCOPE.md). |
 
 ## Rules
@@ -67,6 +67,9 @@
 | Card | Milestone | Awaiting |
 |---|---|---|
 | K-727 CI failure in PR #47 (run 38532685849): the stale map tile test asserted an exact `max-age=59`; now bounded (S-21) | M6 | Its pull request into `dev` (`ba37876`), then fresh CI on PR #47 |
+| K-728 Demo Super Admin (`demo.admin@example.test`), per-install demo passwords and TOTP onboarding for the Docker demo (S-22) | M6 | [PR #53](https://github.com/DavidMalkhasyan/event-registration-system/pull/53) into `dev`: CI run 38802648875 green; awaiting review and merge by the owner |
+| K-729 Automatic demo bootstrap: one compose command, `demo-access`, automatic demo Super Admin TOTP enrolment (S-23) | M6 | [PR #54](https://github.com/DavidMalkhasyan/event-registration-system/pull/54) into `dev` (stacked on #53): CI run 38806144652 green; awaiting review and merge by the owner |
+| K-730 Static demo credentials, no Super Admin TOTP in the Docker demo (`DEMO_MODE`, refused in production) (S-24) | M6 | [PR #55](https://github.com/DavidMalkhasyan/event-registration-system/pull/55) into `dev` (stacked on #54): CI run 38810129658 green (verify, container, demo); awaiting review and merge by the owner |
 
 ## In Progress
 

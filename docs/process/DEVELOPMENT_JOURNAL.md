@@ -1120,3 +1120,47 @@ The last two rows were added in S-19 from GitHub's records.
 | 12:14:17–12:15:08 | `maps.test.ts` three times, real clock | **8/8** each time |
 | 12:15:16–12:20:55 | Prettier on the file, `pnpm lint`, `pnpm typecheck`, `pnpm check:secrets`, server suite | Exit 0; "No secrets found in 287 tracked files"; server **247 passed, 2 skipped** (`backup-restore`, without `RESTORE_ADMIN_URL`, as before) of 249. Browser tests not run (no client or server code changed) |
 | 12:21 | Test fix committed (`ba37876`), records separately | K-727 → Review |
+
+## S-22: Demo Super Admin and TOTP onboarding (K-728)
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-15 evening; work on `feature/demo-admin-accounts` from `origin/dev` (`2251d90`) |
+| **Cards** | K-728 (new) → Review |
+| **Tools and model** | Claude Code, model `claude-sonnet-5-5`; Docker (no Node.js or pnpm on this machine, so checks ran in the Dockerfile build stage and a throwaway `postgres:18` container) |
+
+| Time (+04:00) | Action | Result |
+|---|---|---|
+| 2026-10-16, before 00:31 | Built the image (TypeScript compile), Prettier, ESLint and `tsc --noEmit` in the build stage; `demo-accounts.test.ts` + `platform-admin.test.ts` against a throwaway PostgreSQL 18 | Compile and lint clean; **16/16** tests passed; real seed run: 6 of 6 events, then 0 of 6, `NODE_ENV=production` refused (exit 1) |
+| 00:31:22 | Code committed, branch pushed, [PR #53](https://github.com/DavidMalkhasyan/event-registration-system/pull/53) opened into `dev` | — |
+| 2026-10-15 20:31:32Z – 20:40:59Z (00:31–00:41) | GitHub CI run 38802648875 on `8c32756` | **verify** (33 files, **255/255** tests), **container** and **demo** green; the `demo` job's new step signed in both roles and ran the Super Admin TOTP onboarding end to end |
+
+Not done: the local Docker demo stack was not started here (port 3000 is used by an existing demo stack that was left untouched); the upgrade path for an old `demo-secrets` volume (missing keys are appended) was exercised only by reading the script, not by a run. The PR is not merged.
+
+## S-23: Automatic demo bootstrap (K-729)
+
+| Field | Record |
+|---|---|
+| **Start** | 2026-10-16 after S-22; `feature/demo-bootstrap` stacked on `feature/demo-admin-accounts` (PR #53, not yet merged) |
+| **Cards** | K-729 (new) → Review |
+| **Tools and model** | Claude Code, model `claude-sonnet-5-5`; Docker only (no Node.js or pnpm on this machine) |
+
+| Time (+04:00) | Action | Result |
+|---|---|---|
+| before 01:00 | Build stage: Prettier, ESLint, `tsc --noEmit`; `demo-accounts.test.ts` on a throwaway PostgreSQL 18 | Clean; **7/7**. `check:secrets` could not run locally (no `git` in the image); CI ran it |
+| before 01:00 | Real stack run by hand (project `efcheck`, web on port 3100, then removed with `down -v`): one `up -d --build`, bootstrap again, sign-ins, restart | 6 events / 132 registrations / 1 admin; bootstrap again "0 of 6 events created", "already enrolled"; organizer 200 / wrong password 401; admin without code 401, wrong code 401, right code 200, replay 401; no password or TOTP key in `compose logs`; after `down` + `up -d` same credentials, organizer 200, admin 200 with the next code |
+| 2026-10-15 20:57:44Z – 21:06:55Z (00:57–01:06) | GitHub CI run 38806144652 on `ffa5bff`, [PR #54](https://github.com/DavidMalkhasyan/event-registration-system/pull/54) | **verify** (33 files, **256/256**), **container**, **demo** green |
+
+Not done: Windows/macOS Docker; the upgrade of a pre-existing `demo-secrets` volume (new keys appended) was not run. The PR is not merged.
+
+## S-24: Static demo credentials (K-730)
+
+Request: reviewers must sign in immediately with static credentials, no `demo-access`, no TOTP, in the local Docker demo only. Done on `feature/demo-static-auth` (stacked on #54).
+
+| When (2026-10-16) | What | Result |
+| --- | --- | --- |
+| ~01:30–01:50 | Isolated stack by hand (project `evtest`, `down -v` afterwards): fresh `up -d --build`, bootstrap again, sign-ins, denials, production refusal, restart | 6 events / 132 registrations / 9 waitlisted / 19 check-ins / 1 admin; "0 of 6 events created"; organizer 200, admin 200 (password only); wrong and crossed credentials 401; no session or organizer session on the admin API 401; production with `DEMO_MODE=true` exits 1 naming `DEMO_MODE`; same sign-ins after `down` + `up -d` |
+| ~01:50 | Throwaway postgres:18 + `docker build --target build`: vitest demo-accounts, demo-mode, email-provider, auth-audit; tsc; eslint; prettier | 22/22; clean |
+| after push | GitHub CI run 38810129658 on [PR #55](https://github.com/DavidMalkhasyan/event-registration-system/pull/55) | **verify**, **container**, **demo** green |
+
+Not done: the full `pnpm test` suite was not run locally (CI ran it); an existing `demo-secrets` volume keeps its old random passwords (docs say `down -v`). The PR is not merged.
