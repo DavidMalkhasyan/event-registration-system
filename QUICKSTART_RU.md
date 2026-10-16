@@ -14,10 +14,10 @@ PostgreSQL 18, миграции, две учётные записи, одобр�
 
 ## 2. Доступ к демоверсии
 
-| Роль | Email | Пароль | Вход |
-| --- | --- | --- | --- |
+| Роль        | Email                         | Пароль               | Вход                            |
+| ----------- | ----------------------------- | -------------------- | ------------------------------- |
 | Организатор | `demo.organizer@example.test` | `DemoOrganizer2026!` | http://localhost:3000/organizer |
-| Super Admin | `demo.admin@example.test` | `DemoAdmin2026!` | http://localhost:3000/admin |
+| Super Admin | `demo.admin@example.test`     | `DemoAdmin2026!`     | http://localhost:3000/admin     |
 
 **Сайт:** http://localhost:3000 · **Тестовые письма:** http://localhost:3000/dev/mailbox
 
