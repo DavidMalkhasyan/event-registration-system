@@ -1,20 +1,23 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { publicId, ticketCode } from '../platform/crypto.js';
 import { createDatabase } from '../platform/db.js';
 import { ConfigError, requireEnv } from '../platform/config.js';
-import { hashPassword, PASSWORD_MIN } from '../platform/passwords.js';
 import { decisionTime } from '../platform/tx.js';
+import {
+  ADMIN_EMAIL,
+  ORGANIZER_EMAIL,
+  SeedError,
+  assertLocal,
+  ensureDemoAdmin,
+  ensureDemoOrganizer,
+} from '../demo/accounts.js';
 import { scheduleCutoffTask, scheduleReminderTask } from '../modules/event-core/lifecycle.js';
 
-// Demo data for a local development database: `pnpm seed:demo`.
+// Demo data for a local development database: `pnpm seed:demo` (also the demo Super Admin; src/demo/accounts.ts).
 // Local only (refuses NODE_ENV=production and any non-loopback database host). Idempotent: the
 // organizer account, organization and each event are found by fixed keys and never changed or
 // duplicated; nothing else is touched. No email is written and nothing leaves the machine.
 
-class SeedError extends Error {}
-
-const ORGANIZER_EMAIL = 'demo.organizer@example.test';
-const ORGANIZATION = 'Demo Events Collective';
 const TIME_ZONE = 'Europe/Berlin';
 const DAY = 86_400_000;
 
@@ -98,17 +101,6 @@ function requestIdOf(key: string): string {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-8${h.slice(17, 20)}-${h.slice(20, 32)}`;
 }
 
-function assertLocal(databaseUrl: string): void {
-  if (process.env.NODE_ENV === 'production')
-    throw new SeedError('seed:demo refuses to run with NODE_ENV=production');
-  const host = new URL(databaseUrl).hostname.replace(/^\[|\]$/g, '');
-  // compose.demo.yaml names its database service explicitly; only that exact host is accepted.
-  const extra = process.env.DEMO_SEED_ALLOW_HOST;
-  const allowed = ['localhost', '127.0.0.1', '::1', ...(extra ? [extra] : [])];
-  if (!allowed.includes(host))
-    throw new SeedError(`seed:demo only runs against a local database (host is "${host}")`);
-}
-
 try {
   const databaseUrl = requireEnv('MIGRATION_DATABASE_URL');
   assertLocal(databaseUrl);
@@ -116,62 +108,12 @@ try {
   const db = createDatabase(databaseUrl, 1);
   const out: string[] = [];
   try {
-    // Account and organization (approved, verified), found by the demo address.
-    let password: string | null = null;
-    let account = await db
-      .selectFrom('app.accounts')
-      .select('id')
-      .where('email', '=', ORGANIZER_EMAIL)
-      .executeTakeFirst();
-    if (!account) {
-      const chosen = process.env.DEMO_ORGANIZER_PASSWORD;
-      if (chosen !== undefined && chosen.length < PASSWORD_MIN)
-        throw new SeedError(`DEMO_ORGANIZER_PASSWORD needs at least ${PASSWORD_MIN} characters`);
-      const generated = chosen === undefined;
-      const plain = chosen ?? randomBytes(15).toString('base64url');
-      password = generated ? plain : null; // a password the caller chose is never printed
-      const hash = await hashPassword(plain);
-      account = await db.transaction().execute(async (trx) => {
-        const now = await decisionTime(trx);
-        const a = await trx
-          .insertInto('app.accounts')
-          .values({
-            email: ORGANIZER_EMAIL,
-            display_name: 'Demo Organizer',
-            password_hash: hash,
-            password_changed_at: now,
-            email_verified_at: now,
-            created_at: now,
-          })
-          .returning('id')
-          .executeTakeFirstOrThrow();
-        const o = await trx
-          .insertInto('app.organizations')
-          .values({
-            name: ORGANIZATION,
-            description: 'Demonstration data for EventFlow. Synthetic; safe to ignore.',
-            status: 'active',
-            created_at: now,
-            updated_at: now,
-            email_verified_at: now,
-            submitted_at: now,
-            decided_at: now,
-          })
-          .returning('id')
-          .executeTakeFirstOrThrow();
-        await trx
-          .insertInto('app.organization_memberships')
-          .values({ organization_id: o.id, account_id: a.id, role: 'owner', created_at: now })
-          .execute();
-        return a;
-      });
-    }
-    const organization = await db
-      .selectFrom('app.organization_memberships')
-      .select('organization_id')
-      .where('account_id', '=', account.id)
-      .where('role', '=', 'owner')
-      .executeTakeFirstOrThrow();
+    // Accounts: the organizer with its approved organization, and the Super Admin (no second factor yet).
+    const organizer = await ensureDemoOrganizer(db);
+    const admin = await ensureDemoAdmin(db);
+    const password = organizer.password;
+    const account = { id: organizer.accountId };
+    const organization = { organization_id: organizer.organizationId };
 
     let created = 0;
     for (const s of SCENARIOS) {
@@ -276,6 +218,11 @@ try {
         (password
           ? `  Password: ${password}\n  (shown once; set DEMO_ORGANIZER_PASSWORD before the first run to choose it)\n`
           : '  Password: not shown (account already existed, or the password was set with DEMO_ORGANIZER_PASSWORD)\n') +
+        `Super Admin sign-in: ${origin}/admin\n  Email: ${ADMIN_EMAIL}\n` +
+        (admin.password
+          ? `  Password: ${admin.password}\n  (shown once; set DEMO_ADMIN_PASSWORD before the first run to choose it)\n`
+          : '  Password: not shown (account already existed, or the password was set with DEMO_ADMIN_PASSWORD)\n') +
+        '  Second factor: enrol once with admin:totp before the first sign-in (see docs/QUICKSTART_RU.md)\n' +
         `Public event pages:\n${out.join('\n')}\n`,
     );
   } finally {
