@@ -47,16 +47,16 @@ The project uses a modular monolith with PostgreSQL transactions and row locking
 
 ## Documentation — where to start
 
-| Question | Read |
-| --- | --- |
-| **How do I launch and log in?** | **[QUICKSTART_RU.md](QUICKSTART_RU.md)** |
-| **What was implemented, tested and deferred?** | [ASSIGNMENT_SCOPE.md](ASSIGNMENT_SCOPE.md) |
-| **What did we plan to build, and what would come next?** | **[PLANNED_WORK.md](PLANNED_WORK.md)** |
-| **What is the optional personal essay?** | [ESSAY_RU.md](ESSAY_RU.md) |
-| **Which AI model/tools were used, and which prompts?** | [AI_USAGE.md](docs/process/AI_USAGE.md) |
-| **How did the project evolve over time?** | [DEVELOPMENT_JOURNAL.md](docs/process/DEVELOPMENT_JOURNAL.md) and [DECISION_LOG.md](docs/process/DECISION_LOG.md) |
-| **Where is the architecture and database design?** | [ARCHITECTURE_INDEX.md](docs/ARCHITECTURE_INDEX.md) |
-| **What were the initial full requirements?** | [REQUIREMENTS.md](REQUIREMENTS.md) |
+| Question                                                 | Read                                                                                                              |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **How do I launch and log in?**                          | **[QUICKSTART_RU.md](QUICKSTART_RU.md)**                                                                          |
+| **What was implemented, tested and deferred?**           | [ASSIGNMENT_SCOPE.md](ASSIGNMENT_SCOPE.md)                                                                        |
+| **What did we plan to build, and what would come next?** | **[PLANNED_WORK.md](PLANNED_WORK.md)**                                                                            |
+| **What is the optional personal essay?**                 | [ESSAY_RU.md](ESSAY_RU.md)                                                                                        |
+| **Which AI model/tools were used, and which prompts?**   | [AI_USAGE.md](docs/process/AI_USAGE.md)                                                                           |
+| **How did the project evolve over time?**                | [DEVELOPMENT_JOURNAL.md](docs/process/DEVELOPMENT_JOURNAL.md) and [DECISION_LOG.md](docs/process/DECISION_LOG.md) |
+| **Where is the architecture and database design?**       | [ARCHITECTURE_INDEX.md](docs/ARCHITECTURE_INDEX.md)                                                               |
+| **What were the initial full requirements?**             | [REQUIREMENTS.md](REQUIREMENTS.md)                                                                                |
 
 Additional technical references live under `docs/architecture`, `docs/database`, `docs/adr`, `docs/security`, `docs/api`, `docs/operations` and `docs/process`. Historical planning and journal entries retain their original timestamps.
 
