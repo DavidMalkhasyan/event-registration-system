@@ -222,7 +222,9 @@ try {
         (admin.password
           ? `  Password: ${admin.password}\n  (shown once; set DEMO_ADMIN_PASSWORD before the first run to choose it)\n`
           : '  Password: not shown (account already existed, or the password was set with DEMO_ADMIN_PASSWORD)\n') +
-        '  Second factor: enrol once with admin:totp before the first sign-in (see docs/QUICKSTART_RU.md)\n' +
+        (process.env.DEMO_MODE === 'true'
+          ? '  Second factor: not required in the local Docker demo\n'
+          : '  Second factor: enrol once with admin:totp before the first sign-in (see docs/QUICKSTART_RU.md)\n') +
         `Public event pages:\n${out.join('\n')}\n`,
     );
   } finally {

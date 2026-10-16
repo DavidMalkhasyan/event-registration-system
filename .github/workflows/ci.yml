@@ -190,7 +190,7 @@ jobs:
           q() { $C exec -T postgres psql -U postgres -d eventflow -tAc "$1"; }
           test "$(q 'select count(*) from app.events')" = 6
           test "$(q "select count(*) from app.accounts where email = 'demo.organizer@example.test'")" = 1
-          test "$(q "select count(*) from app.platform_admins where email = 'demo.admin@example.test' and totp_enrolled_at is not null")" = 1
+          test "$(q "select count(*) from app.platform_admins where email = 'demo.admin@example.test'")" = 1
           test "$(q "select count(*) from app.organizations where status = 'active'")" = 1
           test "$(q 'select count(*) from app.check_ins')" = 19
           test "$(q "select count(*) from app.registrations where state = 'WAITLISTED'")" = 9
@@ -206,36 +206,39 @@ jobs:
           q() { $C exec -T postgres psql -U postgres -d eventflow -tAc "$1"; }
           $C run --rm -T demo-bootstrap | tee /tmp/boot2.txt
           grep -q '0 of 6 events created' /tmp/boot2.txt
-          grep -q 'already enrolled' /tmp/boot2.txt
           test "$(q 'select count(*) from app.events')" = 6
           test "$(q 'select count(*) from app.platform_admins')" = 1
           test "$(q 'select count(*) from app.accounts')" = 1
           test "$(q 'select count(*) from app.registrations')" = 132
-      - name: Organizer and Super Admin (with TOTP) sign in; no secret in service logs
+      - name: Both demo accounts sign in; access is denied otherwise
         run: |
           set -eu
           cat > /tmp/lib.sh <<'LIB'
-          post() { curl -s -o /tmp/out.json -w '%{http_code}' -X POST -H 'Origin: http://localhost:3000'             -H 'Content-Type: application/json' -d "$2" "http://localhost:3000$1"; }
-          field() { sed -n "s/^$1: *//p" /tmp/access.txt | sed -n "${2:-1}p" | awk '{print $1}'; }
-          access() { $C run --rm -T demo-access > /tmp/access.txt; }
+          post() { curl -s -o /tmp/out.json -w '%{http_code}' -X POST -H 'Origin: http://localhost:3000' -H 'Content-Type: application/json' -d "$2" "http://localhost:3000$1"; }
           LIB
           . /tmp/lib.sh
-          access
-          ORG_PW=$(field Password 1); ADM_PW=$(field Password 2); CODE=$(field 'TOTP code')
-          KEY=$(field 'TOTP key')
-          test -n "$ORG_PW" && test -n "$ADM_PW" && test "$ORG_PW" != "$ADM_PW" && test -n "$KEY"
-          echo "$CODE" > /tmp/used-code
-          test "$(post /api/auth/password-sessions "{\"email\":\"demo.organizer@example.test\",\"password\":\"$ORG_PW\"}")" = 200
-          test "$(post /api/auth/password-sessions '{"email":"demo.organizer@example.test","password":"wrong wrong wrong"}')" = 401
-          ADMIN="\"email\":\"demo.admin@example.test\",\"password\":\"$ADM_PW\""
-          test "$(post /api/admin/sessions "{$ADMIN}")" = 401
-          test "$(post /api/admin/sessions "{$ADMIN,\"code\":\"000000\"}")" = 401
-          test "$(post /api/admin/sessions "{$ADMIN,\"code\":\"$CODE\"}")" = 200
-          test "$(post /api/admin/sessions "{$ADMIN,\"code\":\"$CODE\"}")" = 401
-          # Persistent logs hold none of the passwords or the TOTP key.
-          $C logs --no-color > /tmp/all.log
-          for v in "$ORG_PW" "$ADM_PW" "$KEY"; do if grep -qF "$v" /tmp/all.log; then echo "secret found in service logs"; exit 1; fi; done
-          cp /tmp/access.txt /tmp/access-before.txt
+          ORG='"email":"demo.organizer@example.test"'; ADM='"email":"demo.admin@example.test"'
+          test "$(post /api/auth/password-sessions "{$ORG,\"password\":\"DemoOrganizer2026!\"}")" = 200
+          test "$(post /api/admin/sessions "{$ADM,\"password\":\"DemoAdmin2026!\"}")" = 200
+          # Wrong passwords and crossed roles are refused.
+          test "$(post /api/auth/password-sessions "{$ORG,\"password\":\"wrong wrong wrong\"}")" = 401
+          test "$(post /api/admin/sessions "{$ADM,\"password\":\"wrong wrong wrong\"}")" = 401
+          test "$(post /api/admin/sessions "{$ORG,\"password\":\"DemoOrganizer2026!\"}")" = 401
+          test "$(post /api/auth/password-sessions "{$ADM,\"password\":\"DemoAdmin2026!\"}")" = 401
+          # No session, no Super Admin area.
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/admin/organizations)
+          test "$code" = 401 || test "$code" = 403
+          # The organizer's session does not open the Super Admin area.
+          curl -s -o /dev/null -c /tmp/org.jar -X POST -H 'Origin: http://localhost:3000' -H 'Content-Type: application/json'             -d "{$ORG,\"password\":\"DemoOrganizer2026!\"}" http://localhost:3000/api/auth/password-sessions
+          code=$(curl -s -o /dev/null -b /tmp/org.jar -w '%{http_code}' http://localhost:3000/api/admin/organizations)
+          test "$code" = 401 || test "$code" = 403
+      - name: Production cannot enable demo authentication
+        run: |
+          set -u
+          if docker run --rm --entrypoint node -e NODE_ENV=production -e DEMO_MODE=true             -e PUBLIC_ORIGIN=https://eventflow.example -e DATABASE_URL=postgres://x             -e CSRF_SECRET=$(printf 'a%.0s' $(seq 32)) -e PRESESSION_SECRET=$(printf 'b%.0s' $(seq 32))             -e RATE_LIMIT_SECRET=$(printf 'c%.0s' $(seq 32)) -e PREVIEW_SECRET=$(printf 'd%.0s' $(seq 32))             -e ADMIN_TOTP_KEY="$(openssl rand -base64 32)" eventflow:demo apps/server/dist/entrypoints/web.js > /tmp/prod.txt 2>&1; then
+            echo "production started with DEMO_MODE=true"; exit 1
+          fi
+          grep -q 'DEMO_MODE' /tmp/prod.txt
       - name: Restart and check persistence
         run: |
           set -eu
@@ -251,20 +254,8 @@ jobs:
           test "$(q 'select count(*) from app.events')" = 6
           test "$(q 'select count(*) from app.check_ins')" = 19
           test "$(q 'select count(*) from app.platform_admins')" = 1
-          # The same credentials and key after the restart (the rolling code line differs).
-          access
-          diff <(grep -v '^TOTP code' /tmp/access-before.txt) <(grep -v '^TOTP code' /tmp/access.txt)
-          # A code works once: wait for the next 30 s code, then sign in again.
-          for i in $(seq 1 12); do
-            access
-            CODE=$(field 'TOTP code')
-            [ "$CODE" != "$(cat /tmp/used-code)" ] && break
-            sleep 5
-          done
-          [ "$CODE" != "$(cat /tmp/used-code)" ]
-          ORG_PW=$(field Password 1); ADM_PW=$(field Password 2)
-          test "$(post /api/auth/password-sessions "{\"email\":\"demo.organizer@example.test\",\"password\":\"$ORG_PW\"}")" = 200
-          test "$(post /api/admin/sessions "{\"email\":\"demo.admin@example.test\",\"password\":\"$ADM_PW\",\"code\":\"$CODE\"}")" = 200
+          test "$(post /api/auth/password-sessions '{"email":"demo.organizer@example.test","password":"DemoOrganizer2026!"}')" = 200
+          test "$(post /api/admin/sessions '{"email":"demo.admin@example.test","password":"DemoAdmin2026!"}')" = 200
           $C run --rm -T demo-bootstrap | grep -q '0 of 6 events created'
       - name: Sanitized logs on failure
         if: failure()

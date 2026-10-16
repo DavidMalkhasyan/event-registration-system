@@ -14,6 +14,7 @@ import { openSecret, totpKeyFrom, verifyTotp } from '../../platform/totp.js';
 
 /** K-718: Super Admins need a second factor in production unless the operator explicitly opts out. */
 export function totpRequired(ctx: AppContext): boolean {
+  if (ctx.config.DEMO_MODE === 'true') return false; // local Docker demo only; parseConfig refuses it in production
   if (ctx.config.ADMIN_REQUIRE_TOTP) return ctx.config.ADMIN_REQUIRE_TOTP === 'true';
   return ctx.config.NODE_ENV === 'production';
 }
